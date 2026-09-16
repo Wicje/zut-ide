@@ -16,9 +16,9 @@ interface ToolbarProps {
   onNewProject: (files: Record<string, string>, name: string) => void
   onFormat: () => void
   onDeploy: () => void
+  onOpenAi: () => void
   onImport: () => void
   formatting: boolean
-  deploying: boolean
   isMobile: boolean
   shareLink: string | null
 }
@@ -109,12 +109,11 @@ export default function Toolbar(props: ToolbarProps) {
               {props.formatting ? '…' : 'Format'}
             </button>
             {!props.isMobile && <button className="btn" onClick={props.onDownload}>⬇ ZIP</button>}
-            <button className="btn" onClick={props.onDeploy} disabled={props.deploying}>
-              {props.deploying ? '…' : '⬆ Deploy'}
-            </button>
+            <button className="btn" onClick={props.onDeploy}>⬆ Deploy</button>
             <button className="btn" onClick={props.onShare} disabled={!props.shareLink && !state.projectId}>
               Share
             </button>
+            <button className="btn ai" onClick={props.onOpenAi}>✨ AI</button>
           </>
         )}
 

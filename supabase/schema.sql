@@ -66,3 +66,64 @@ grant execute on function public.set_share_token(uuid, uuid) to authenticated;
 
 revoke all on function public.get_shared_project(uuid) from public;
 grant execute on function public.get_shared_project(uuid) to anon, authenticated;
+
+--------------------------------------------------------------------------
+-- OAuth connections (GitHub / Vercel) for the Publish + AI features.
+-- Rows are written/read ONLY by Supabase Edge Functions (service role).
+-- Users only ever see provider + meta through the RPCs below; access
+-- tokens never leave the server.
+--------------------------------------------------------------------------
+
+create table if not exists public.connections (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null check (provider in ('github', 'vercel')),
+  access_token text not null,
+  refresh_token text,
+  scope text,
+  meta jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists connections_owner_provider_idx
+  on public.connections (owner_id, provider);
+
+alter table public.connections enable row level security;
+
+-- No SELECT/UPDATE/DELETE policies: the API table is locked down. Edge
+-- Functions talk to it with the service role (RLS bypassed).
+
+-- Return which providers are connected and their display info (no tokens).
+create or replace function public.get_connections()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+stable
+as $$
+  select coalesce(
+    jsonb_agg(jsonb_build_object('provider', provider, 'meta', meta)),
+    '[]'::jsonb
+  )
+  from public.connections
+  where owner_id = auth.uid()
+$$;
+
+-- Unlink a provider (tokens deleted server-side only).
+create or replace function public.disconnect_connection(p_provider text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.connections
+   where owner_id = auth.uid() and provider = p_provider;
+end $$;
+
+revoke all on function public.get_connections() from public;
+grant execute on function public.get_connections() to authenticated;
+
+revoke all on function public.disconnect_connection(text) from public;
+grant execute on function public.disconnect_connection(text) to authenticated;

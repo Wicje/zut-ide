@@ -23,7 +23,6 @@ import {
 import { downloadProjectZip } from './lib/download'
 import { emptyProject } from './lib/templates'
 import { formatCode } from './lib/formatter'
-import { deployToNetlify } from './lib/deploy'
 import { importFromUrl } from './lib/importer'
 import Toolbar from './components/Toolbar'
 import FileExplorer from './components/FileExplorer'
@@ -35,6 +34,7 @@ import ProjectList from './components/ProjectList'
 import ShareDialog from './components/ShareDialog'
 import ImportDialog from './components/ImportDialog'
 import DeployDialog from './components/DeployDialog'
+import AiPanel from './components/AiPanel'
 import type { FileMap, RunStatus } from './types'
 
 function parseHash(): string | null {
@@ -65,7 +65,7 @@ export default function App() {
   const [showShare, setShowShare] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showDeploy, setShowDeploy] = useState(false)
-  const [deployUrl, setDeployUrl] = useState<string | null>(null)
+  const [showAi, setShowAi] = useState(false)
   const [projects, setProjects] = useState<StoredRow[]>([])
   const [shareLink, setShareLink] = useState<string | null>(null)
   const [status, setStatus] = useState<RunStatus>('idle')
@@ -75,7 +75,6 @@ export default function App() {
   const [mobileView, setMobileView] = useState<'code' | 'result' | 'files'>('code')
   const [viewport, setViewport] = useState<'auto' | number>('auto')
   const [formatting, setFormatting] = useState(false)
-  const [deploying, setDeploying] = useState(false)
 
   const sortedFiles = Object.keys(state.files).sort()
   const touchStartX = useRef(0)
@@ -296,16 +295,8 @@ export default function App() {
     } finally { setFormatting(false) }
   }
 
-  async function handleDeploy() {
-    setDeploying(true); setShowDeploy(true); setDeployUrl(null)
-    try {
-      const result = await deployToNetlify(state.projectName || 'project', state.files)
-      setDeployUrl(result.url)
-      addConsole('info', `Deployed to ${result.url}`)
-    } catch (e) {
-      addConsole('error', `Deploy failed: ${(e as { message?: string }).message}`)
-      setShowDeploy(false)
-    } finally { setDeploying(false) }
+  function handleDeploy() {
+    setShowDeploy(true)
   }
 
   async function handleImport(url: string) {
@@ -338,9 +329,9 @@ export default function App() {
         shareLink={canShare ? shareLink : null}
         onFormat={formatActive}
         onDeploy={handleDeploy}
+        onOpenAi={() => setShowAi(true)}
         onImport={() => setShowImport(true)}
         formatting={formatting}
-        deploying={deploying}
         isMobile={isMobile}
       />
 
@@ -458,7 +449,14 @@ export default function App() {
         <ShareDialog link={shareLink} onClose={() => setShowShare(false)} onStopSharing={stopSharing} />
       )}
       {showImport && <ImportDialog onClose={() => setShowImport(false)} onImport={handleImport} />}
-      {showDeploy && <DeployDialog url={deployUrl} onClose={() => { setShowDeploy(false); setDeployUrl(null) }} />}
+      {showDeploy && (
+        <DeployDialog
+          signedIn={Boolean(user)}
+          onClose={() => setShowDeploy(false)}
+          onLog={(level, message) => addConsole(level, message)}
+        />
+      )}
+      {showAi && <AiPanel signedIn={Boolean(user)} onSignIn={() => setShowLogin(true)} onClose={() => setShowAi(false)} />}
     </div>
   )
 }

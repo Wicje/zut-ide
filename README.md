@@ -27,6 +27,11 @@ A browser-based IDE for teaching web development. Students edit files in a VS Co
   and scaffolds a project from it.
 - **One-click deploy** — the *Deploy* button zips the project and publishes it to a free, live Netlify URL
   (visitor-created sites via Netlify's open API).
+- **GitHub push** — sign in and connect your GitHub account, then publish any project as a new (private or
+  public) repository. It's created and pushed for you.
+- **Vercel deploy** — connect your Vercel account and push the project straight to a live `.vercel.app` URL.
+- **AI assistant** — the *✨ AI* button opens a chat with Claude that can see your project (files + the active
+  file) and answer coding questions; the API key stays on the server.
 - **Quick-switch gestures** — on mobile, swipe left/right on the file-tab strip to cycle files.
 - **Collapsible console** — on mobile the result view folds the console into a drawer so the preview keeps
   the whole screen.
@@ -69,6 +74,51 @@ How saving works:
 - **Share** on a cloud project generates a read-only link `…#/p/<token>`. Viewers open a sandboxed,
   read-only copy — they can't edit or see your account.
 
+## Optional: deploy the backend (GitHub push, Vercel deploy, AI assistant)
+
+These features run through Supabase Edge Functions. OAuth tokens and your Anthropic API key live on the
+server only; the browser never sees them.
+
+1. Make sure Supabase is configured (previous section) and `supabase` CLI is installed
+   (`npm i -g supabase`).
+2. Sign in and link the project:
+   `supabase login` then `supabase link --project-ref YOUR_REF`.
+3. Create an OAuth app in the provider dashboard so users can "Connect" their account:
+
+   - **GitHub**: github.com → Settings → Developer settings → OAuth Apps → *New OAuth App*.
+     Set the callback URL to
+     `https://YOUR_REF.functions.supabase.co/oauth-github-callback`.
+     You may prefer *Classic* OAuth (the `repo` scope creates and writes repos).
+   - **Vercel**: vercel.com → Account → Settings → *OAuth Apps*. Set the callback URL to
+     `https://YOUR_REF.functions.supabase.co/oauth-vercel-callback`, and enable scopes for
+     deployments + project write.
+4. Deploy the functions:
+
+   ```bash
+   supabase functions deploy --project-ref YOUR_REF
+   supabase functions deploy connections oauth-github-start oauth-github-callback \
+     oauth-vercel-start oauth-vercel-callback github-push vercel-deploy claude \
+     --project-ref YOUR_REF
+   ```
+
+5. Set the secrets (function env vars):
+
+   ```bash
+   supabase secrets set --project-ref YOUR_REF \
+     GITHUB_CLIENT_ID=... \
+     GITHUB_CLIENT_SECRET=... \
+     VERCEL_CLIENT_ID=... \
+     VERCEL_CLIENT_SECRET=... \
+     OAUTH_STATE_SECRET=$(openssl rand -hex 32) \
+     ANTHROPIC_API_KEY=...
+   ```
+
+   Optional extras: `GITHUB_OAUTH_SCOPES` (default `repo`), `VERCEL_OAUTH_SCOPES`,
+   `ANTHROPIC_MODEL` (default `claude-sonnet-4-5`), `ANTHROPIC_MAX_TOKENS`.
+
+6. The app finds the functions automatically from `VITE_SUPABASE_URL`. Reload the IDE, sign in,
+   open **Deploy** (GitHub / Vercel) or **✨ AI**.
+
 ## How running code works
 
 1. `index.html` is the app entry point.
@@ -91,6 +141,11 @@ Build errors (missing files, syntax errors, bad imports) are shown as red entrie
 - Monaco is bundled locally (no CDN at runtime), so the first load is a bit heavier but works offline.
 - **Deploy** uses Netlify's public create-a-site API (no account needed). Sites are public and use a
   random subdomain; it's a great "check out my project" link but not for hosting real apps long-term.
+- **GitHub / Vercel** links require the Edge Functions above. Vercel deploys are inlined static builds
+  (or `npm run build` when a `package.json` with a build script / Vite is present); for heavy apps
+  prefer linking the pushed GitHub repo inside Vercel instead. OAuth uses a popup — allow popups for
+  the site.
+- **AI** runs on your Anthropic key at your cost. The button requires signing in (to attribute usage).
 - Importing some dynamic pages may fail if the site blocks cross-origin fetches or requires JS
   rendering. CodePen, raw GitHub, and plain HTML/CSS/JS pages work best.
 
@@ -105,6 +160,7 @@ src/
   lib/templates.ts       # starting templates
   lib/download.ts        # ZIP export
   lib/deploy.ts          # Netlify one-click deploy
+  lib/hosting.ts         # Edge Function client (OAuth, GitHub push, Vercel, Claude)
   lib/importer.ts        # import project from URL (HTML/CodePen/GitHub)
   lib/formatter.ts       # Prettier formatting
   store/workspace.tsx    # files / console / project state
@@ -113,7 +169,17 @@ src/
     FileExplorer.tsx     # add / upload / drop / rename / delete files
     Preview.tsx          # sandboxed iframe + status + viewport toggle
     ConsolePanel.tsx     # console + error streaming
-    Toolbar.tsx          # run / autosave / save / share / zip
+    Toolbar.tsx          # run / autosave / save / share / zip / deploy / AI
     Login.tsx, ProjectList.tsx, ShareDialog.tsx
-supabase/schema.sql      # tables + RLS + share RPCs
+    DeployDialog.tsx     # Publish hub: GitHub push, Vercel, Netlify
+    AiPanel.tsx          # Claude chat assistant
+supabase/schema.sql      # tables + RLS + share RPCs + OAuth connections
+supabase/functions/
+  _shared/               # auth, OAuth state, GitHub, Vercel helpers
+  oauth-github-start, oauth-github-callback
+  oauth-vercel-start, oauth-vercel-callback
+  github-push            # create repo + push files (Git Data API)
+  vercel-deploy          # create deployment from project files
+  claude                 # Anthropic proxy (server-side key, streaming)
+  connections            # list / disconnect linked accounts
 ```

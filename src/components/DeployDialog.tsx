@@ -1,43 +1,315 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useWorkspace } from '../store/workspace'
+import { deployToNetlify } from '../lib/deploy'
+import {
+  connectProvider,
+  deployToVercel,
+  disconnectConnection,
+  getConnections,
+  hostingEnabled,
+  pushToGithub,
+  type ConnectionInfo,
+  type GithubPushResult,
+  type VercelDeployResult,
+} from '../lib/hosting'
+import type { ConsoleLevel } from '../types'
 
 interface DeployDialogProps {
-  url: string | null
   onClose: () => void
+  onLog: (level: ConsoleLevel, message: string) => void
+  signedIn: boolean
 }
 
-export default function DeployDialog({ url, onClose }: DeployDialogProps) {
+function useCopied(link: string): [boolean, () => void] {
   const [copied, setCopied] = useState(false)
+  function copy() {
+    if (!link) return
+    navigator.clipboard
+      .writeText(link)
+      .then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      })
+      .catch(() => {
+        /* clipboard unavailable */
+      })
+  }
+  return [copied, copy]
+}
 
-  async function copy() {
-    if (!url) return
+function LinkResult({ link }: { link: string }) {
+  const [copied, copy] = useCopied(link)
+  return (
+    <div className="share-link" style={{ marginTop: 8 }}>
+      <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
+      <button className="btn primary" onClick={copy}>{copied ? 'Copied!' : 'Copy'}</button>
+    </div>
+  )
+}
+
+export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogProps) {
+  const { state } = useWorkspace()
+  const [connections, setConnections] = useState<ConnectionInfo[]>([])
+  const [busy, setBusy] = useState<string | null>(null)
+  const [ghRepoName, setGhRepoName] = useState(state.projectName)
+  const [ghPrivate, setGhPrivate] = useState(true)
+  const [ghResult, setGhResult] = useState<GithubPushResult | null>(null)
+  const [ghError, setGhError] = useState<string | null>(null)
+  const [vercelResult, setVercelResult] = useState<VercelDeployResult | null>(null)
+  const [vercelError, setVercelError] = useState<string | null>(null)
+  const [netlifyResult, setNetlifyResult] = useState<string | null>(null)
+  const [netlifyError, setNetlifyError] = useState<string | null>(null)
+
+  const isConnected = (p: string) => connections.some((c) => c.provider === p)
+  const login = (p: string) => connections.find((c) => c.provider === p)?.login ?? null
+
+  async function refreshConnections() {
     try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard unavailable */ }
+      setConnections(await getConnections())
+    } catch (e) {
+      onLog('error', `Cloud services: ${(e as { message?: string }).message}`)
+    }
+  }
+
+  useEffect(() => {
+    if (hostingEnabled()) refreshConnections()
+  }, [])
+
+  async function connect(provider: 'github' | 'vercel') {
+    setBusy(`connect-${provider}`)
+    setGhError(null)
+    setVercelError(null)
+    try {
+      await connectProvider(provider)
+      await refreshConnections()
+    } catch (e) {
+      const msg = (e as { message?: string }).message ?? 'Connection failed'
+      if (provider === 'github') setGhError(msg)
+      else setVercelError(msg)
+      onLog('error', `Connect ${provider}: ${msg}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function disconnect(provider: string) {
+    setBusy(`disconnect-${provider}`)
+    try {
+      await disconnectConnection(provider)
+      setGhResult(null)
+      setVercelResult(null)
+      await refreshConnections()
+    } catch (e) {
+      onLog('error', `Disconnect: ${(e as { message?: string }).message}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handlePush() {
+    if (!ghRepoName.trim()) return
+    setBusy('github')
+    setGhError(null)
+    setGhResult(null)
+    try {
+      const result = await pushToGithub(ghRepoName.trim(), ghPrivate, state.files)
+      setGhResult(result)
+      onLog('info', `Pushed to ${result.url}`)
+    } catch (e) {
+      const msg = (e as { message?: string }).message ?? 'Push failed'
+      setGhError(msg)
+      onLog('error', `GitHub: ${msg}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleVercel() {
+    setBusy('vercel')
+    setVercelError(null)
+    setVercelResult(null)
+    try {
+      const result = await deployToVercel(state.projectName, state.files)
+      setVercelResult(result)
+      onLog('info', `Deployed to ${result.url}`)
+    } catch (e) {
+      const msg = (e as { message?: string }).message ?? 'Deploy failed'
+      setVercelError(msg)
+      onLog('error', `Vercel: ${msg}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleNetlify() {
+    setBusy('netlify')
+    setNetlifyError(null)
+    setNetlifyResult(null)
+    try {
+      const result = await deployToNetlify(state.projectName || 'project', state.files)
+      setNetlifyResult(result.url)
+      onLog('info', `Deployed to ${result.url}`)
+    } catch (e) {
+      const msg = (e as { message?: string }).message ?? 'Deploy failed'
+      setNetlifyError(msg)
+      onLog('error', `Netlify: ${msg}`)
+    } finally {
+      setBusy(null)
+    }
   }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Deployed!</h2>
+          <h2>Publish project</h2>
           <button className="icon-btn" onClick={onClose}>✕</button>
         </div>
-        {url ? (
-          <>
-            <p className="share-note">Your project is live at:</p>
-            <div className="share-link">
-              <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
-              <button className="btn primary" onClick={copy}>{copied ? 'Copied!' : 'Copy'}</button>
-            </div>
-            <div className="share-actions" style={{ marginTop: 12 }}>
-              <a className="btn" href={url} target="_blank" rel="noreferrer">Open in new tab</a>
-            </div>
-          </>
-        ) : (
-          <p className="share-note">Deploying…</p>
+
+        {!hostingEnabled() && (
+          <p className="share-note">
+            Cloud publishing (GitHub push, Vercel deploy, AI) needs Supabase configured. See README.md.
+          </p>
         )}
+
+        {hostingEnabled() && !signedIn && (
+          <p className="share-note">
+            Sign in (top-right) to connect GitHub / Vercel and use the AI assistant.
+          </p>
+        )}
+
+        {/* ---------- GitHub ---------- */}
+        <section className="publish-card">
+          <div className="publish-head">
+            <strong>GitHub</strong>
+            {isConnected('github') ? (
+              <span className="conn-badge">Connected {login('github') ? `as @${login('github')}` : ''}</span>
+            ) : (
+              <span className="conn-badge off">Not connected</span>
+            )}
+          </div>
+
+          {isConnected('github') ? (
+            <>
+              <div className="publish-row">
+                <label className="publish-label">
+                  Repo name
+                  <input
+                    className="publish-input"
+                    value={ghRepoName}
+                    onChange={(e) => setGhRepoName(e.target.value)}
+                    placeholder="my-project"
+                  />
+                </label>
+                <label className="publish-check">
+                  <input
+                    type="checkbox"
+                    checked={ghPrivate}
+                    onChange={(e) => setGhPrivate(e.target.checked)}
+                  />
+                  Private
+                </label>
+                <button className="btn primary" onClick={handlePush} disabled={busy === 'github'}>
+                  {busy === 'github' ? '…' : 'Push to GitHub'}
+                </button>
+              </div>
+              {ghError && <p className="form-error">{ghError}</p>}
+              {ghResult && (
+                <>
+                  <LinkResult link={ghResult.url} />
+                  <p className="publish-note">
+                    {ghResult.created ? 'Created' : 'Updated'} repo — branch {ghResult.defaultBranch}
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="publish-note">
+                Lets you create a repository and push this project to your GitHub account.
+              </p>
+              <button
+                className="btn primary"
+                onClick={() => connect('github')}
+                disabled={busy === 'connect-github'}
+              >
+                {busy === 'connect-github' ? '…' : 'Connect GitHub'}
+              </button>
+            </>
+          )}
+          {isConnected('github') && (
+            <button
+              className="link-btn"
+              onClick={() => disconnect('github')}
+              disabled={busy === 'disconnect-github'}
+            >
+              Disconnect GitHub
+            </button>
+          )}
+        </section>
+
+        {/* ---------- Vercel ---------- */}
+        <section className="publish-card">
+          <div className="publish-head">
+            <strong>Vercel</strong>
+            {isConnected('vercel') ? (
+              <span className="conn-badge">Connected {login('vercel') ? `as @${login('vercel')}` : ''}</span>
+            ) : (
+              <span className="conn-badge off">Not connected</span>
+            )}
+          </div>
+
+          {isConnected('vercel') ? (
+            <>
+              <p className="publish-note">
+                Deploys “{state.projectName}” to a live <code>.vercel.app</code> URL.
+              </p>
+              <button className="btn primary" onClick={handleVercel} disabled={busy === 'vercel'}>
+                {busy === 'vercel' ? '…' : 'Deploy to Vercel'}
+              </button>
+              {vercelError && <p className="form-error">{vercelError}</p>}
+              {vercelResult && <LinkResult link={vercelResult.url} />}
+            </>
+          ) : (
+            <>
+              <p className="publish-note">
+                Lets you deploy this project to your Vercel account.
+              </p>
+              <button
+                className="btn primary"
+                onClick={() => connect('vercel')}
+                disabled={busy === 'connect-vercel'}
+              >
+                {busy === 'connect-vercel' ? '…' : 'Connect Vercel'}
+              </button>
+            </>
+          )}
+          {isConnected('vercel') && (
+            <button
+              className="link-btn"
+              onClick={() => disconnect('vercel')}
+              disabled={busy === 'disconnect-vercel'}
+            >
+              Disconnect Vercel
+            </button>
+          )}
+        </section>
+
+        {/* ---------- Netlify ---------- */}
+        <section className="publish-card">
+          <div className="publish-head">
+            <strong>Netlify</strong>
+            <span className="conn-badge">No account needed</span>
+          </div>
+          <p className="publish-note">
+            Zips the project and publishes it to a live Netlify URL.
+          </p>
+          <button className="btn primary" onClick={handleNetlify} disabled={busy === 'netlify'}>
+            {busy === 'netlify' ? '…' : 'Deploy to Netlify'}
+          </button>
+          {netlifyError && <p className="form-error">{netlifyError}</p>}
+          {netlifyResult && <LinkResult link={netlifyResult} />}
+        </section>
       </div>
     </div>
   )
