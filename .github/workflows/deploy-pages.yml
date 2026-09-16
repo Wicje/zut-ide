@@ -33,7 +33,12 @@ jobs:
       - name: Build
         # GitHub Pages serves the site from /<repo-name>/. Set VITE_BASE so asset
         # URLs resolve under that subpath. For Vercel/root hosting, omit VITE_BASE.
-        run: VITE_BASE=/${{ github.event.repository.name }}/ npm run build
+        # Supabase client keys are public by design; they come from repo secrets
+        # (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) and are baked in at build time.
+        run: |
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+          VITE_BASE=/${{ github.event.repository.name }}/ npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
