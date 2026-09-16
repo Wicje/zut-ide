@@ -1,6 +1,16 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useWorkspace } from '../store/workspace'
 import type { FileMap } from '../types'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Upload, Plus, Pencil, Trash2, FilePlus2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const FILE_KINDS = [
   { label: 'HTML', file: 'newpage.html', content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <title>New page</title>\n  <style>\n\n  </style>\n</head>\n<body>\n  <h1>New page</h1>\n</body>\n</html>\n' },
@@ -34,20 +44,10 @@ interface FileExplorerProps {
 
 export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerProps) {
   const { state, dispatch } = useWorkspace()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const files = Object.keys(state.files).sort()
-
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [])
 
   function uniqueName(base: string): string {
     if (!(base in state.files)) return base
@@ -62,7 +62,6 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
   function addFile(kind: (typeof FILE_KINDS)[number]) {
     const path = uniqueName(kind.file)
     dispatch({ type: 'ADD_FILE', path, content: kind.content })
-    setMenuOpen(false)
   }
 
   function confirmDelete(path: string) {
@@ -125,71 +124,107 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
 
   return (
     <div
-      className={`explorer ${dragOver ? 'drag-over' : ''}`}
+      className="relative flex h-full flex-col"
       onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      <div className="explorer-header">
-        <span>Files</span>
-        <div className="explorer-actions" ref={menuRef}>
-          {!readOnly && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept={ACCEPT_TYPES}
-                style={{ display: 'none' }}
-                onChange={handleFileInput}
-              />
-              <button
-                className="icon-btn"
-                title="Upload file"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                ↑
-              </button>
-              <div className="menu-wrap">
-                <button className="icon-btn" title="New file" onClick={() => setMenuOpen((o) => !o)}>
-                  ＋
-                </button>
-                {menuOpen && (
-                  <div className="menu">
-                    {FILE_KINDS.map((k) => (
-                      <button key={k.label} onClick={() => addFile(k)}>
-                        <span className="badge" style={{ color: COLORS[k.label] }}>{k.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/60 px-3">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Files <span className="ml-1 font-mono text-muted-foreground/60">{files.length}</span>
+        </span>
+        {!readOnly && (
+          <div className="flex items-center gap-0.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={ACCEPT_TYPES}
+              style={{ display: 'none' }}
+              onChange={handleFileInput}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title="Upload file"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="size-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-7" title="New file">
+                  <Plus className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {FILE_KINDS.map((k) => (
+                  <DropdownMenuItem key={k.label} onSelect={() => addFile(k)}>
+                    <FilePlus2 className="mr-2 size-4 text-muted-foreground" />
+                    <span className="font-mono text-xs" style={{ color: COLORS[k.label] }}>
+                      {k.label}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
-      {dragOver && <div className="explorer-drop-hint">Drop files here</div>}
-      <ul className="file-list">
-        {files.map((file) => (
-          <li
-            key={file}
-            className={state.activeFile === file ? 'file active' : 'file'}
-            onClick={() => dispatch({ type: 'SET_ACTIVE', path: file })}
-          >
-            <span className="file-badge" style={{ color: COLORS[languageBadge(file)] ?? '#9da5b1' }}>
-              {languageBadge(file)}
-            </span>
-            <span className="file-name">{file}</span>
-            {!readOnly && (
-              <span className="file-tools">
-                <button className="icon-btn small" title="Rename" onClick={(e) => { e.stopPropagation(); startRename(file) }}>✎</button>
-                <button className="icon-btn small" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDelete(file) }}>✕</button>
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-      {files.length === 0 && <div className="explorer-empty">No files yet</div>}
+
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-emerald-500/50 bg-background/80 text-sm font-medium text-emerald-400">
+          Drop files here
+        </div>
+      )}
+
+      <ScrollArea className="min-h-0 flex-1">
+        <ul className="p-1.5">
+          {files.map((file) => {
+            const active = state.activeFile === file
+            const color = COLORS[languageBadge(file)] ?? '#9da5b1'
+            return (
+              <li
+                key={file}
+                className={cn(
+                  'group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60 text-foreground/90',
+                )}
+                onClick={() => dispatch({ type: 'SET_ACTIVE', path: file })}
+              >
+                <span className="w-8 shrink-0 font-mono text-[10px] font-semibold" style={{ color }}>
+                  {languageBadge(file)}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{file}</span>
+                {!readOnly && (
+                  <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                    <button
+                      className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Rename"
+                      onClick={(e) => { e.stopPropagation(); startRename(file) }}
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      className="rounded p-0.5 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                      title="Delete"
+                      onClick={(e) => { e.stopPropagation(); confirmDelete(file) }}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        {files.length === 0 && (
+          <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+            No files yet — add one with the + button.
+          </div>
+        )}
+      </ScrollArea>
     </div>
   )
 }

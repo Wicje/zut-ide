@@ -11,6 +11,17 @@ import {
   computeProjectChanges,
   type OpencodeProvider,
 } from '../lib/opencode'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { Loader2, Send, Sparkles, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 type Backend = 'claude' | 'opencode'
 
@@ -227,122 +238,177 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
     setError(null)
   }
 
+  const [open, setOpen] = useState(true)
+
   return (
-    <aside className="ai-panel">
-      <div className="ai-head">
-        <strong>zut AI</strong>
-        <div className="ai-head-actions">
-          <button className="icon-btn" title="Clear chat" onClick={reset}>🗑</button>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) onClose() }}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md" showCloseButton={false}>
+        <SheetTitle className="sr-only">zut AI</SheetTitle>
+
+        {/* Header */}
+        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-3">
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className="size-4 text-violet-400" /> zut AI
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              title="Clear chat"
+              onClick={reset}
+            >
+              <Trash2 className="size-4" />
+            </button>
+            <button
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              title="Close"
+              onClick={() => { setOpen(false); onClose() }}
+            >
+              <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Backend selector */}
-      <div className="ai-backend-row">
-        <button
-          className={`ai-backend-btn ${backend === 'claude' ? 'active' : ''}`}
-          onClick={() => switchBackend('claude')}
-        >
-          Claude
-        </button>
-        <button
-          className={`ai-backend-btn ${backend === 'opencode' ? 'active' : ''}`}
-          onClick={() => switchBackend('opencode')}
-        >
-          opencode
-          {opencodeConnected === true && <span className="ai-status-dot connected" />}
-          {opencodeConnected === false && <span className="ai-status-dot disconnected" />}
-        </button>
-      </div>
-
-      {/* opencode provider/model selectors */}
-      {backend === 'opencode' && (
-        <div className="ai-opencode-config">
-          {opencodeConnected === false ? (
-            <div className="ai-empty">
-              <p>opencode server not detected.</p>
-              <code>npm run dev:opencode</code>
-            </div>
-          ) : (
-            <>
-              <select
-                className="ai-select"
-                value={selectedProvider}
-                onChange={(e) => {
-                  setSelectedProvider(e.target.value)
-                  setSelectedModel('')
-                  const p = providers.find((pr) => pr.id === e.target.value)
-                  if (p?.models.length) setSelectedModel(p.models[0].id)
-                }}
+        {/* Backend selector */}
+        <div className="flex shrink-0 items-center gap-1 px-3 py-2.5">
+          <div className="flex rounded-lg border bg-muted/40 p-0.5">
+            {(['claude', 'opencode'] as const).map((b) => (
+              <button
+                key={b}
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors',
+                  backend === b ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground',
+                )}
+                onClick={() => switchBackend(b)}
               >
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              {availableModels.length > 0 && (
+                {b === 'claude' ? 'Claude' : 'opencode'}
+                {b === 'opencode' && (
+                  <span
+                    className={cn(
+                      'ml-1.5 inline-block size-1.5 rounded-full align-middle',
+                      opencodeConnected === true
+                        ? 'bg-emerald-400'
+                        : opencodeConnected === false
+                          ? 'bg-red-400'
+                          : 'bg-muted-foreground',
+                    )}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* opencode provider/model config */}
+        {backend === 'opencode' && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pb-2.5">
+            {opencodeConnected === false ? (
+              <p className="text-xs text-muted-foreground">
+                opencode server not detected. Run <code className="rounded bg-muted px-1 font-mono">npm run dev:opencode</code>
+              </p>
+            ) : (
+              <>
                 <select
-                  className="ai-select"
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="h-8 w-auto rounded-md border border-input bg-background px-2 text-xs"
+                  value={selectedProvider}
+                  onChange={(e) => {
+                    setSelectedProvider(e.target.value)
+                    setSelectedModel('')
+                    const p = providers.find((pr) => pr.id === e.target.value)
+                    if (p?.models.length) setSelectedModel(p.models[0].id)
+                  }}
                 >
-                  {availableModels.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
                     </option>
                   ))}
                 </select>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {!signedIn && backend === 'claude' ? (
-        <div className="ai-empty">
-          <p>Sign in to chat with Claude about your code.</p>
-          <button className="btn primary" onClick={onSignIn}>Sign in</button>
-        </div>
-      ) : (
-        <>
-          <div className="ai-messages">
-            {messages.length === 0 && !draft && (
-              <p className="ai-empty">
-                {backend === 'claude'
-                  ? 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".'
-                  : 'Ask the AI to read, edit, or analyze your code. opencode has full file and shell access.'}
-              </p>
+                {availableModels.length > 0 && (
+                  <select
+                    className="h-8 w-auto rounded-md border border-input bg-background px-2 text-xs"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                  >
+                    {availableModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
             )}
-            {messages.map((m, i) => (
-              <div key={i} className={`ai-msg ${m.role}`}>
-                {m.content}
-              </div>
-            ))}
-            {draft && <div className="ai-msg assistant">{draft}<span className="ai-cursor">▍</span></div>}
-            {error && <p className="form-error">{error}</p>}
-            <div ref={endRef} />
           </div>
-          <form
-            className="ai-input"
-            onSubmit={(e) => {
-              e.preventDefault()
-              send(input)
-            }}
-          >
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={busy ? 'Thinking…' : 'Message the AI…'}
-              disabled={busy}
-            />
-            <button type="submit" className="btn primary" disabled={busy || !input.trim()}>
-              ➤
-            </button>
-          </form>
-        </>
-      )}
-    </aside>
+        )}
+
+        <Separator />
+
+        {!signedIn && backend === 'claude' ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+            <p className="text-sm text-muted-foreground">Sign in to chat with Claude about your code.</p>
+            <Button onClick={onSignIn}>Sign in</Button>
+          </div>
+        ) : (
+          <>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="flex flex-col gap-2 px-3 py-3">
+                {messages.length === 0 && !draft && (
+                  <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                    {backend === 'claude'
+                      ? 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".'
+                      : 'Ask the AI to read, edit, or analyze your code. opencode has full file and shell access.'}
+                  </p>
+                )}
+                {messages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'max-w-[90%] whitespace-pre-wrap rounded-xl px-3 py-2 text-[13px] leading-relaxed break-words',
+                      m.role === 'user'
+                        ? 'self-end bg-primary text-primary-foreground'
+                        : 'self-start border border-border/60 bg-muted/40',
+                    )}
+                  >
+                    {m.content}
+                  </div>
+                ))}
+                {draft && (
+                  <div className="self-start max-w-[90%] whitespace-pre-wrap rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-[13px] leading-relaxed break-words">
+                    {draft}
+                    <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-emerald-400 align-text-bottom" />
+                  </div>
+                )}
+                {error && <p className="px-1 text-xs text-destructive">{error}</p>}
+                <div ref={endRef} />
+              </div>
+            </ScrollArea>
+
+            <div className="flex shrink-0 items-center gap-2 border-t p-3">
+              <form
+                className="flex flex-1 items-center gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  send(input)
+                }}
+              >
+                <Input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={busy ? 'Thinking…' : 'Message the AI…'}
+                  disabled={busy}
+                  className="h-9"
+                />
+                <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={busy || !input.trim()}>
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                </Button>
+              </form>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   )
 }

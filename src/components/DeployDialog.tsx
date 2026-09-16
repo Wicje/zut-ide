@@ -14,6 +14,32 @@ import {
 } from '../lib/hosting'
 import { checkNodeProject, findNodeEntry } from '../lib/runner'
 import type { ConsoleLevel } from '../types'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  GitBranch,
+  Triangle,
+  Cloud,
+  CheckCircle2,
+  Copy,
+  Loader2,
+  PlugZap,
+  Link2,
+  X,
+  Stethoscope,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface DeployDialogProps {
   onClose: () => void
@@ -41,15 +67,28 @@ function useCopied(link: string): [boolean, () => void] {
 function LinkResult({ link }: { link: string }) {
   const [copied, copy] = useCopied(link)
   return (
-    <div className="share-link" style={{ marginTop: 8 }}>
-      <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
-      <button className="btn primary" onClick={copy}>{copied ? 'Copied!' : 'Copy'}</button>
+    <div className="mt-2 flex items-center gap-2">
+      <Input readOnly value={link} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+      <Button onClick={copy} variant="outline" size="sm" className="shrink-0 gap-1.5">
+        {copied ? <CheckCircle2 className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+        {copied ? 'Copied!' : 'Copy'}
+      </Button>
     </div>
+  )
+}
+
+function ConnBadge({ label, off }: { label: string; off?: boolean }) {
+  return (
+    <Badge variant="outline" className={cn('gap-1.5 font-normal', off ? 'text-muted-foreground' : 'text-emerald-400')}>
+      <span className={cn('size-1.5 rounded-full', off ? 'bg-muted-foreground' : 'bg-emerald-400')} />
+      {label}
+    </Badge>
   )
 }
 
 export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogProps) {
   const { state } = useWorkspace()
+  const [open, setOpen] = useState(true)
   const [connections, setConnections] = useState<ConnectionInfo[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [ghRepoName, setGhRepoName] = useState(state.projectName)
@@ -153,6 +192,11 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
     }
   }
 
+  const pushFromToken = () => {
+    setBusy('github')
+    handlePush()
+  }
+
   async function handleVercel() {
     setBusy('vercel')
     setVercelError(null)
@@ -170,6 +214,11 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
     } finally {
       setBusy(null)
     }
+  }
+
+  const deployFromToken = () => {
+    setBusy('vercel')
+    handleVercel()
   }
 
   async function handleNodeCheck() {
@@ -207,246 +256,283 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
     }
   }
 
+  function ErrorNote({ message }: { message: string | null }) {
+    if (!message) return null
+    return (
+      <Alert variant="destructive" className="py-2">
+        <AlertDescription className="text-xs">{message}</AlertDescription>
+      </Alert>
+    )
+  }
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Publish project</h2>
-          <button className="icon-btn" onClick={onClose}>✕</button>
-        </div>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) onClose() }}>
+      <DialogContent className="flex h-[78vh] max-h-[700px] flex-col sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Publish project</DialogTitle>
+          <DialogDescription>
+            {!hostingEnabled()
+              ? 'Cloud publishing (GitHub push, Vercel deploy, AI) needs Supabase configured. See README.md.'
+              : !signedIn
+                ? 'Sign in (top-right) to connect GitHub / Vercel and use the AI assistant.'
+                : 'Deploy or push “{name}” to a hosting provider.'.replace('{name}', state.projectName)}
+          </DialogDescription>
+        </DialogHeader>
 
-        {!hostingEnabled() && (
-          <p className="share-note">
-            Cloud publishing (GitHub push, Vercel deploy, AI) needs Supabase configured. See README.md.
-          </p>
-        )}
+        {hostingEnabled() && signedIn && (
+          <Tabs defaultValue={nodeProject ? 'node' : 'github'} className="flex min-h-0 flex-1 flex-col">
+            <TabsList className="w-full justify-start">
+              {nodeProject && (
+                <TabsTrigger value="node">
+                  <Stethoscope className="mr-1.5 size-3.5" /> Check
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="github">
+                <GitBranch className="mr-1.5 size-3.5" /> GitHub
+              </TabsTrigger>
+              <TabsTrigger value="vercel">
+                <Triangle className="mr-1.5 size-3.5" /> Vercel
+              </TabsTrigger>
+              <TabsTrigger value="netlify">
+                <Cloud className="mr-1.5 size-3.5" /> Netlify
+              </TabsTrigger>
+            </TabsList>
 
-        {hostingEnabled() && !signedIn && (
-          <p className="share-note">
-            Sign in (top-right) to connect GitHub / Vercel and use the AI assistant.
-          </p>
-        )}
+            <div className="min-h-0 flex-1">
+              {nodeProject && (
+                <TabsContent value="node">
+                  <div className="grid gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      Compile-checks your server code (
+                      {nodeProject.entry ? `entry ${nodeProject.entry.entry}` : 'no entry file found'})
+                      without running it. Use the GitHub push to host it on any Node platform.
+                    </p>
+                    <Button
+                      className="w-fit"
+                      onClick={handleNodeCheck}
+                      disabled={!nodeProject.entry || busy === 'node-check'}
+                    >
+                      {busy === 'node-check' && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      Check server code
+                    </Button>
+                    <ErrorNote message={nodeError} />
+                    {nodeResult && (
+                      <p className="flex items-center gap-1.5 text-sm text-emerald-400">
+                        <CheckCircle2 className="size-4" /> {nodeResult}
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+              )}
 
-        {/* ---------- Node check ---------- */}
-        {nodeProject && (
-          <section className="publish-card">
-            <div className="publish-head">
-              <strong>{nodeProject.framework} check</strong>
-              <span className="conn-badge">server code</span>
+              <TabsContent value="github" className="grid gap-3">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="size-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">GitHub</span>
+                  <ConnBadge
+                    label={
+                      isConnected('github')
+                        ? `Connected${login('github') ? ` as @${login('github')}` : ''}`
+                        : 'Not connected'
+                    }
+                    off={!isConnected('github')}
+                  />
+                </div>
+
+                {isConnected('github') ? (
+                  <>
+                    <div className="grid gap-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="gh-repo">Repo name</Label>
+                        <Input
+                          id="gh-repo"
+                          value={ghRepoName}
+                          onChange={(e) => setGhRepoName(e.target.value)}
+                          placeholder="my-project"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={ghPrivate}
+                          onChange={(e) => setGhPrivate(e.target.checked)}
+                          className="size-4 accent-emerald-500"
+                        />
+                        Private repository
+                      </label>
+                      <Button className="w-fit" onClick={handlePush} disabled={busy === 'github'}>
+                        {busy === 'github' ? <Loader2 className="mr-2 size-4 animate-spin" /> : <GitBranch className="mr-2 size-4" />}
+                        Push to GitHub
+                      </Button>
+                    </div>
+                    <ErrorNote message={ghError} />
+                    {ghResult && (
+                      <>
+                        <LinkResult link={ghResult.url} />
+                        <p className="text-xs text-muted-foreground">
+                          {ghResult.created ? 'Created' : 'Updated'} repo — branch {ghResult.defaultBranch}
+                        </p>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Create a repository and push this project to your GitHub account.
+                    </p>
+                    <Button className="w-fit" onClick={() => connect('github')} disabled={busy === 'connect-github'}>
+                      {busy === 'connect-github' ? <Loader2 className="mr-2 size-4 animate-spin" /> : <PlugZap className="mr-2 size-4" />}
+                      Connect GitHub
+                    </Button>
+                    {!ghUseToken ? (
+                      <Button variant="link" className="w-fit px-0 text-xs" onClick={() => setGhUseToken(true)}>
+                        or use a GitHub token (PAT)
+                      </Button>
+                    ) : (
+                      <div className="grid gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            className="flex-1 min-w-40"
+                            type="password"
+                            value={ghToken}
+                            onChange={(e) => setGhToken(e.target.value)}
+                            placeholder="GitHub Personal Access Token"
+                          />
+                          <Button
+                            onClick={pushFromToken}
+                            disabled={busy === 'github' || !ghToken.trim() || !ghRepoName.trim()}
+                          >
+                            {busy === 'github' ? <Loader2 className="mr-2 size-4 animate-spin" /> : <GitBranch className="mr-2 size-4" />}
+                            Push with token
+                          </Button>
+                        </div>
+                        <Button
+                          variant="link"
+                          className="w-fit px-0 text-xs text-muted-foreground"
+                          onClick={() => { setGhUseToken(false); setGhToken('') }}
+                        >
+                          <X className="mr-1 size-3" /> Cancel
+                        </Button>
+                      </div>
+                    )}
+                    <ErrorNote message={ghError} />
+                    {ghResult && <LinkResult link={ghResult.url} />}
+                  </>
+                )}
+                {isConnected('github') && (
+                  <Button
+                    variant="link"
+                    className="w-fit px-0 text-xs text-muted-foreground"
+                    onClick={() => disconnect('github')}
+                    disabled={busy === 'disconnect-github'}
+                  >
+                    <Link2 className="mr-1 size-3.5" /> Disconnect GitHub
+                  </Button>
+                )}
+              </TabsContent>
+
+              <TabsContent value="vercel" className="grid gap-3">
+                <div className="flex items-center gap-2">
+                  <Triangle className="size-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">Vercel</span>
+                  <ConnBadge
+                    label={
+                      isConnected('vercel')
+                        ? `Connected${login('vercel') ? ` as @${login('vercel')}` : ''}`
+                        : 'Not connected'
+                    }
+                    off={!isConnected('vercel')}
+                  />
+                </div>
+
+                {isConnected('vercel') ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Deploys “{state.projectName}” to a live <code className="rounded bg-muted px-1 font-mono text-xs">.vercel.app</code> URL.
+                    </p>
+                    <Button className="w-fit" onClick={handleVercel} disabled={busy === 'vercel'}>
+                      {busy === 'vercel' ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Triangle className="mr-2 size-4" />}
+                      Deploy to Vercel
+                    </Button>
+                    <ErrorNote message={vercelError} />
+                    {vercelResult && <LinkResult link={vercelResult.url} />}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Deploy this project to your Vercel account.
+                    </p>
+                    <Button className="w-fit" onClick={() => connect('vercel')} disabled={busy === 'connect-vercel'}>
+                      {busy === 'connect-vercel' ? <Loader2 className="mr-2 size-4 animate-spin" /> : <PlugZap className="mr-2 size-4" />}
+                      Connect Vercel
+                    </Button>
+                    {!vercelUseToken ? (
+                      <Button variant="link" className="w-fit px-0 text-xs" onClick={() => setVercelUseToken(true)}>
+                        or use a Vercel token
+                      </Button>
+                    ) : (
+                      <div className="grid gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            className="flex-1 min-w-40"
+                            type="password"
+                            value={vercelToken}
+                            onChange={(e) => setVercelToken(e.target.value)}
+                            placeholder="Vercel API token"
+                          />
+                          <Button
+                            onClick={deployFromToken}
+                            disabled={busy === 'vercel' || !vercelToken.trim()}
+                          >
+                            {busy === 'vercel' ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Triangle className="mr-2 size-4" />}
+                            Deploy with token
+                          </Button>
+                        </div>
+                        <Button
+                          variant="link"
+                          className="w-fit px-0 text-xs text-muted-foreground"
+                          onClick={() => { setVercelUseToken(false); setVercelToken('') }}
+                        >
+                          <X className="mr-1 size-3" /> Cancel
+                        </Button>
+                      </div>
+                    )}
+                    <ErrorNote message={vercelError} />
+                    {vercelResult && <LinkResult link={vercelResult.url} />}
+                  </>
+                )}
+                {isConnected('vercel') && (
+                  <Button
+                    variant="link"
+                    className="w-fit px-0 text-xs text-muted-foreground"
+                    onClick={() => disconnect('vercel')}
+                    disabled={busy === 'disconnect-vercel'}
+                  >
+                    <Link2 className="mr-1 size-3.5" /> Disconnect Vercel
+                  </Button>
+                )}
+              </TabsContent>
+
+              <TabsContent value="netlify" className="grid gap-3">
+                <div className="flex items-center gap-2">
+                  <Cloud className="size-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">Netlify</span>
+                  <ConnBadge label="No account needed" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Zips the project and publishes it to a live Netlify URL.
+                </p>
+                <Button className="w-fit" onClick={handleNetlify} disabled={busy === 'netlify'}>
+                  {busy === 'netlify' ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Cloud className="mr-2 size-4" />}
+                  Deploy to Netlify
+                </Button>
+                <ErrorNote message={netlifyError} />
+                {netlifyResult && <LinkResult link={netlifyResult} />}
+              </TabsContent>
             </div>
-            <p className="publish-note">
-              Compile-checks your server code ({nodeProject.entry
-                ? `entry ${nodeProject.entry.entry}`
-                : 'no entry file found'}) without running it. Use the
-              GitHub push above to host it on any Node platform.
-            </p>
-            <button
-              className="btn primary"
-              onClick={handleNodeCheck}
-              disabled={!nodeProject.entry || busy === 'node-check'}
-            >
-              {busy === 'node-check' ? '…' : 'Check server code'}
-            </button>
-            {nodeError && <p className="form-error">{nodeError}</p>}
-            {nodeResult && <p className="publish-note ok">{nodeResult}</p>}
-          </section>
+          </Tabs>
         )}
-
-        {/* ---------- GitHub ---------- */}
-        <section className="publish-card">
-          <div className="publish-head">
-            <strong>GitHub</strong>
-            {isConnected('github') ? (
-              <span className="conn-badge">Connected {login('github') ? `as @${login('github')}` : ''}</span>
-            ) : (
-              <span className="conn-badge off">Not connected</span>
-            )}
-          </div>
-
-          {isConnected('github') ? (
-            <>
-              <div className="publish-row">
-                <label className="publish-label">
-                  Repo name
-                  <input
-                    className="publish-input"
-                    value={ghRepoName}
-                    onChange={(e) => setGhRepoName(e.target.value)}
-                    placeholder="my-project"
-                  />
-                </label>
-                <label className="publish-check">
-                  <input
-                    type="checkbox"
-                    checked={ghPrivate}
-                    onChange={(e) => setGhPrivate(e.target.checked)}
-                  />
-                  Private
-                </label>
-                <button className="btn primary" onClick={handlePush} disabled={busy === 'github'}>
-                  {busy === 'github' ? '…' : 'Push to GitHub'}
-                </button>
-              </div>
-              {ghError && <p className="form-error">{ghError}</p>}
-              {ghResult && (
-                <>
-                  <LinkResult link={ghResult.url} />
-                  <p className="publish-note">
-                    {ghResult.created ? 'Created' : 'Updated'} repo — branch {ghResult.defaultBranch}
-                  </p>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="publish-note">
-                Lets you create a repository and push this project to your GitHub account.
-              </p>
-              <button
-                className="btn primary"
-                onClick={() => connect('github')}
-                disabled={busy === 'connect-github'}
-              >
-                {busy === 'connect-github' ? '…' : 'Connect GitHub'}
-              </button>
-              {!ghUseToken ? (
-                <button className="link-btn" onClick={() => setGhUseToken(true)}>
-                  or use a GitHub token (PAT)
-                </button>
-              ) : (
-                <div className="publish-row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
-                  <input
-                    className="publish-input"
-                    type="password"
-                    value={ghToken}
-                    onChange={(e) => setGhToken(e.target.value)}
-                    placeholder="GitHub Personal Access Token"
-                    style={{ flex: '1 1 200px' }}
-                  />
-                  <button
-                    className="btn primary"
-                    onClick={() => {
-                      setBusy('github')
-                      handlePush()
-                    }}
-                    disabled={busy === 'github' || !ghToken.trim() || !ghRepoName.trim()}
-                  >
-                    {busy === 'github' ? '…' : 'Push with token'}
-                  </button>
-                  <button className="link-btn" onClick={() => { setGhUseToken(false); setGhToken('') }}>
-                    Cancel
-                  </button>
-                </div>
-              )}
-              {ghError && <p className="form-error">{ghError}</p>}
-              {ghResult && <LinkResult link={ghResult.url} />}
-            </>
-          )}
-          {isConnected('github') && (
-            <button
-              className="link-btn"
-              onClick={() => disconnect('github')}
-              disabled={busy === 'disconnect-github'}
-            >
-              Disconnect GitHub
-            </button>
-          )}
-        </section>
-
-        {/* ---------- Vercel ---------- */}
-        <section className="publish-card">
-          <div className="publish-head">
-            <strong>Vercel</strong>
-            {isConnected('vercel') ? (
-              <span className="conn-badge">Connected {login('vercel') ? `as @${login('vercel')}` : ''}</span>
-            ) : (
-              <span className="conn-badge off">Not connected</span>
-            )}
-          </div>
-
-          {isConnected('vercel') ? (
-            <>
-              <p className="publish-note">
-                Deploys “{state.projectName}” to a live <code>.vercel.app</code> URL.
-              </p>
-              <button className="btn primary" onClick={handleVercel} disabled={busy === 'vercel'}>
-                {busy === 'vercel' ? '…' : 'Deploy to Vercel'}
-              </button>
-              {vercelError && <p className="form-error">{vercelError}</p>}
-              {vercelResult && <LinkResult link={vercelResult.url} />}
-            </>
-          ) : (
-            <>
-              <p className="publish-note">
-                Lets you deploy this project to your Vercel account.
-              </p>
-              <button
-                className="btn primary"
-                onClick={() => connect('vercel')}
-                disabled={busy === 'connect-vercel'}
-              >
-                {busy === 'connect-vercel' ? '…' : 'Connect Vercel'}
-              </button>
-              {!vercelUseToken ? (
-                <button className="link-btn" onClick={() => setVercelUseToken(true)}>
-                  or use a Vercel token
-                </button>
-              ) : (
-                <div className="publish-row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
-                  <input
-                    className="publish-input"
-                    type="password"
-                    value={vercelToken}
-                    onChange={(e) => setVercelToken(e.target.value)}
-                    placeholder="Vercel API token"
-                    style={{ flex: '1 1 200px' }}
-                  />
-                  <button
-                    className="btn primary"
-                    onClick={() => {
-                      setBusy('vercel')
-                      handleVercel()
-                    }}
-                    disabled={busy === 'vercel' || !vercelToken.trim()}
-                  >
-                    {busy === 'vercel' ? '…' : 'Deploy with token'}
-                  </button>
-                  <button className="link-btn" onClick={() => { setVercelUseToken(false); setVercelToken('') }}>
-                    Cancel
-                  </button>
-                </div>
-              )}
-              {vercelError && <p className="form-error">{vercelError}</p>}
-              {vercelResult && <LinkResult link={vercelResult.url} />}
-            </>
-          )}
-          {isConnected('vercel') && (
-            <button
-              className="link-btn"
-              onClick={() => disconnect('vercel')}
-              disabled={busy === 'disconnect-vercel'}
-            >
-              Disconnect Vercel
-            </button>
-          )}
-        </section>
-
-        {/* ---------- Netlify ---------- */}
-        <section className="publish-card">
-          <div className="publish-head">
-            <strong>Netlify</strong>
-            <span className="conn-badge">No account needed</span>
-          </div>
-          <p className="publish-note">
-            Zips the project and publishes it to a live Netlify URL.
-          </p>
-          <button className="btn primary" onClick={handleNetlify} disabled={busy === 'netlify'}>
-            {busy === 'netlify' ? '…' : 'Deploy to Netlify'}
-          </button>
-          {netlifyError && <p className="form-error">{netlifyError}</p>}
-          {netlifyResult && <LinkResult link={netlifyResult} />}
-        </section>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

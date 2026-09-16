@@ -35,6 +35,8 @@ import ShareDialog from './components/ShareDialog'
 import ImportDialog from './components/ImportDialog'
 import DeployDialog from './components/DeployDialog'
 import AiPanel from './components/AiPanel'
+import { AlertTriangle, Braces, MonitorPlay, FolderOpen } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { FileMap, RunStatus } from './types'
 
 function parseHash(): string | null {
@@ -179,7 +181,6 @@ export default function App() {
     return () => clearTimeout(t)
   }, [state.files, state.projectName, state.projectId, user, state.isSharedView, addConsole, dispatch])
 
-  // Quick-switch gesture handlers for mobile file tabs
   function onTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
@@ -197,14 +198,8 @@ export default function App() {
     isSwiping.current = false
     const idx = sortedFiles.indexOf(state.activeFile)
     if (idx === -1) return
-    const dx = 0 // delta captured in touchStart; we determine direction from movement
-    // Use the last known delta: if touch moved left (next file), right (prev file)
-    // We track direction in touchEnd by comparing start vs end position
-    // For simplicity: just advance forward (right swipe = next, left swipe = prev)
-    // We stored touchStartX but not endX. Let's just cycle forward on any swipe.
     const next = (idx + 1) % sortedFiles.length
     dispatch({ type: 'SET_ACTIVE', path: sortedFiles[next] })
-    void dx // suppress lint
   }
 
   async function refreshProjects() {
@@ -313,7 +308,7 @@ export default function App() {
   const canShare = Boolean(user && state.projectId && !state.isSharedView)
 
   return (
-    <div className="app">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <Toolbar
         user={user}
         autoplay={autoplay}
@@ -336,33 +331,45 @@ export default function App() {
       />
 
       {!supabaseOrNull() && (
-        <div className="env-banner">
-          Cloud not configured — running in local-only mode. Set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in .env to enable
-          accounts, saving, and sharing. See README.md
+        <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+          <AlertTriangle className="size-3.5 shrink-0" />
+          <span className="truncate">
+            Cloud not configured — running in local-only mode. Set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in .env
+            to enable accounts, saving, and sharing.
+          </span>
         </div>
       )}
 
       {isMobile ? (
-        <div className="content mobile">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div
-            className="mobile-files"
+            className="flex shrink-0 gap-1 overflow-x-auto border-b bg-muted/40 px-2 py-1.5"
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
           >
-            {sortedFiles.map((file) => (
-              <button
-                key={file}
-                className={state.activeFile === file ? 'mobile-file active' : 'mobile-file'}
-                onClick={() => { dispatch({ type: 'SET_ACTIVE', path: file }); setMobileView('code') }}
-              >
-                {file}
-              </button>
-            ))}
+            {sortedFiles.map((file) => {
+              const active = state.activeFile === file
+              return (
+                <button
+                  key={file}
+                  className={cn(
+                    'shrink-0 rounded-md px-2.5 py-1 font-mono text-xs transition-colors',
+                    active
+                      ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => { dispatch({ type: 'SET_ACTIVE', path: file }); setMobileView('code') }}
+                >
+                  {file}
+                </button>
+              )
+            })}
           </div>
-          <div className="mobile-main">
+
+          <div className="min-h-0 flex-1">
             {mobileView === 'code' && (
-              <main className="editor-pane">
+              <main className="h-full">
                 {state.activeFile ? (
                   <CodeEditor
                     path={state.activeFile}
@@ -371,44 +378,53 @@ export default function App() {
                     onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
                   />
                 ) : (
-                  <div className="editor-empty">Create a file to get started.</div>
+                  <div className="grid h-full place-content-center text-sm text-muted-foreground">
+                    Create a file to get started.
+                  </div>
                 )}
               </main>
             )}
             {mobileView === 'result' && (
-              <section className="right-pane">
+              <div className="flex h-full flex-col">
                 <Preview srcDoc={srcDoc} runKey={runKey} status={status} />
                 <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} collapsible />
-              </section>
+              </div>
             )}
             {mobileView === 'files' && (
-              <aside className="sidebar">
+              <aside className="h-full">
                 <FileExplorer readOnly={state.isSharedView || state.readOnly} />
               </aside>
             )}
           </div>
-          <nav className="mobile-nav">
-            <button className={mobileView === 'code' ? 'mnav-btn active' : 'mnav-btn'} onClick={() => setMobileView('code')}>
-              <span className="mnav-icon">⟨⟩</span>
-              <span className="mnav-label">Code</span>
-            </button>
-            <button className={mobileView === 'result' ? 'mnav-btn active' : 'mnav-btn'} onClick={() => setMobileView('result')}>
-              <span className="mnav-icon">▣</span>
-              <span className="mnav-label">Result</span>
-              {status === 'error' && <span className="mnav-dot" />}
-            </button>
-            <button className={mobileView === 'files' ? 'mnav-btn active' : 'mnav-btn'} onClick={() => setMobileView('files')}>
-              <span className="mnav-icon">▤</span>
-              <span className="mnav-label">Files</span>
-            </button>
+
+          <nav className="grid shrink-0 grid-cols-3 border-t bg-background/90 backdrop-blur">
+            <MobileNavButton
+              active={mobileView === 'code'}
+              icon={<Braces className="size-5" />}
+              label="Code"
+              onClick={() => setMobileView('code')}
+            />
+            <MobileNavButton
+              active={mobileView === 'result'}
+              icon={<MonitorPlay className="size-5" />}
+              label="Result"
+              dot={status === 'error'}
+              onClick={() => setMobileView('result')}
+            />
+            <MobileNavButton
+              active={mobileView === 'files'}
+              icon={<FolderOpen className="size-5" />}
+              label="Files"
+              onClick={() => setMobileView('files')}
+            />
           </nav>
         </div>
       ) : (
-        <div className="content">
-          <aside className="sidebar">
+        <div className="grid min-h-0 flex-1 grid-cols-[248px_minmax(0,1fr)_minmax(320px,42%)]">
+          <aside className="min-h-0 border-r border-border bg-muted/30">
             <FileExplorer readOnly={state.isSharedView || state.readOnly} />
           </aside>
-          <main className="editor-pane">
+          <main className="min-w-0 min-h-0 border-r border-border">
             {state.activeFile ? (
               <CodeEditor
                 path={state.activeFile}
@@ -417,10 +433,12 @@ export default function App() {
                 onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
               />
             ) : (
-              <div className="editor-empty">Create a file to get started.</div>
+              <div className="grid h-full place-content-center text-sm text-muted-foreground">
+                Create a file to get started.
+              </div>
             )}
           </main>
-          <section className="right-pane">
+          <section className="flex min-h-0 min-w-0 flex-col bg-background">
             <Preview
               srcDoc={srcDoc}
               runKey={runKey}
@@ -458,5 +476,33 @@ export default function App() {
       )}
       {showAi && <AiPanel signedIn={Boolean(user)} onSignIn={() => setShowLogin(true)} onClose={() => setShowAi(false)} />}
     </div>
+  )
+}
+
+function MobileNavButton({
+  active,
+  icon,
+  label,
+  onClick,
+  dot,
+}: {
+  active: boolean
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  dot?: boolean
+}) {
+  return (
+    <button
+      className={cn(
+        'relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors',
+        active ? 'text-emerald-400' : 'text-muted-foreground hover:text-foreground',
+      )}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+      {dot && <span className="absolute right-[28%] top-2 size-1.5 rounded-full bg-red-500" />}
+    </button>
   )
 }
