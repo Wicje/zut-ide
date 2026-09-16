@@ -159,7 +159,12 @@ function projectKeyOf(projectId: string | null, name: string): string {
   return projectId ? `id:${projectId}` : `name:${name}`
 }
 
-export async function saveWorkspaceSnapshot(projectId: string | null, name: string, files: FileMap): Promise<void> {
+export async function saveWorkspaceSnapshot(
+  projectId: string | null,
+  name: string,
+  files: FileMap,
+  kind: SnapshotRecord['kind'] = 'auto',
+): Promise<void> {
   if (!isIdbAvailable()) return
   const record: SnapshotRecord = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -168,7 +173,7 @@ export async function saveWorkspaceSnapshot(projectId: string | null, name: stri
     name,
     files,
     createdAt: Date.now(),
-    kind: 'auto',
+    kind,
   }
   try {
     await idbPut('workspaceSnapshots', record)
@@ -176,6 +181,10 @@ export async function saveWorkspaceSnapshot(projectId: string | null, name: stri
   } catch {
     /* snapshotting is best-effort */
   }
+}
+
+export function saveWorkspaceCheckpoint(projectId: string | null, name: string, files: FileMap): Promise<void> {
+  return saveWorkspaceSnapshot(projectId, name, files, 'checkpoint')
 }
 
 export async function listWorkspaceSnapshots(projectId: string | null, name: string): Promise<SnapshotRecord[]> {

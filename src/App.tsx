@@ -41,6 +41,7 @@ import ProjectList from './components/ProjectList'
 import ShareDialog from './components/ShareDialog'
 import ImportDialog from './components/ImportDialog'
 import DeployDialog from './components/DeployDialog'
+import HistoryDialog from './components/HistoryDialog'
 import AiPanel from './components/AiPanel'
 import { AlertTriangle, Braces, MonitorPlay, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -74,6 +75,7 @@ export default function App() {
   const [showShare, setShowShare] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showDeploy, setShowDeploy] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [showAi, setShowAi] = useState(false)
   const [projects, setProjects] = useState<StoredRow[]>([])
   const [shareLink, setShareLink] = useState<string | null>(null)
@@ -203,14 +205,14 @@ export default function App() {
     if (state.isSharedView) return
     lastLocalWrite.current = Date.now()
     saveLocalWorkspace(state.projectName, state.files)
-    const now = Date.now()
-    if (now - lastSnapshotAt.current > 30_000) {
-      lastSnapshotAt.current = now
-      void saveWorkspaceSnapshot(state.projectId, state.projectName, state.files)
-    }
     if (firstRunRef.current) {
       firstRunRef.current = false
       return
+    }
+    const now = Date.now()
+    if (now - lastSnapshotAt.current > 30_000 && Object.keys(state.files).length > 0) {
+      lastSnapshotAt.current = now
+      void saveWorkspaceSnapshot(state.projectId, state.projectName, state.files)
     }
     if (maybeHeartbeatBackup(state.projectName)) {
       void downloadProjectZip(state.projectName || 'project', state.files).then(() => {
@@ -346,6 +348,15 @@ export default function App() {
     setShowDeploy(true)
   }
 
+  function restoreSnapshot(name: string, files: FileMap) {
+    setSrcDoc('')
+    conflictWarned.current = false
+    lastLocalWrite.current = 0
+    firstRunRef.current = true
+    loadFiles(files, name, { projectId: state.projectId })
+    addConsole('info', `Restored snapshot of "${name}".`)
+  }
+
   async function handleImport(url: string) {
     setShowImport(false)
     try {
@@ -376,6 +387,7 @@ export default function App() {
         shareLink={canShare ? shareLink : null}
         onFormat={formatActive}
         onDeploy={handleDeploy}
+        onHistory={() => setShowHistory(true)}
         onOpenAi={() => setShowAi(true)}
         onImport={() => setShowImport(true)}
         formatting={formatting}
@@ -524,6 +536,15 @@ export default function App() {
           signedIn={Boolean(user)}
           onClose={() => setShowDeploy(false)}
           onLog={(level, message) => addConsole(level, message)}
+        />
+      )}
+      {showHistory && (
+        <HistoryDialog
+          projectId={state.projectId}
+          projectName={state.projectName}
+          files={state.files}
+          onRestore={restoreSnapshot}
+          onClose={() => setShowHistory(false)}
         />
       )}
       {showAi && <AiPanel signedIn={Boolean(user)} onSignIn={() => setShowLogin(true)} onClose={() => setShowAi(false)} />}

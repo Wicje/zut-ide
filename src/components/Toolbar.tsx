@@ -38,6 +38,7 @@ import {
   CircleUser,
   FilePlus2,
   Globe,
+  History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -55,6 +56,7 @@ interface ToolbarProps {
   onNewProject: (files: Record<string, string>, name: string) => void
   onFormat: () => void
   onDeploy: () => void
+  onHistory: () => void
   onOpenAi: () => void
   onImport: () => void
   formatting: boolean
@@ -184,6 +186,10 @@ export default function Toolbar(props: ToolbarProps) {
                 <Sparkles className="size-4 md:mr-1.5" />
               )}
               <span className="hidden md:inline">Format</span>
+            </Button>
+            <Button variant="ghost" size="sm" title="Version history" onClick={props.onHistory}>
+              <History className="size-4" />
+              <span className="sr-only">Version history</span>
             </Button>
             {!props.isMobile && (
               <Button variant="ghost" size="sm" onClick={props.onDownload}>
