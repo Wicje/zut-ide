@@ -2,6 +2,7 @@
 // Provides multi-provider AI chat with tool access (file read/edit, shell, search).
 
 import type { ChatMessage } from './hosting'
+import type { FileMap } from '../types'
 
 export interface OpencodeProvider {
   id: string
@@ -22,10 +23,68 @@ export interface OpencodeConfig {
   model?: string
 }
 
+export interface ProjectChange {
+  updated: Record<string, string>
+  created: Record<string, string>
+  deleted: string[]
+}
+
 const DEFAULT_URL = 'http://127.0.0.1:4096'
+const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:4331'
 
 function getBaseUrl(): string {
   return (import.meta.env.VITE_OPENCODE_URL as string) || DEFAULT_URL
+}
+
+function getBridgeUrl(): string {
+  return (import.meta.env.VITE_OPENCODE_BRIDGE_URL as string) || DEFAULT_BRIDGE_URL
+}
+
+/** Whether the file bridge (disk sync) is reachable. */
+export async function isBridgeAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch(`${getBridgeUrl()}/health`, { signal: AbortSignal.timeout(2000) })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/** Write the IDE's virtual project files to the disk workspace opencode edits. */
+export async function syncProjectToDisk(files: FileMap): Promise<void> {
+  const res = await fetch(`${getBridgeUrl()}/write`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`opencode file sync failed (${res.status}): ${body}`)
+  }
+}
+
+/** Read the disk workspace back (files opencode may have created/edited/deleted). */
+export async function readProjectFromDisk(): Promise<FileMap> {
+  const res = await fetch(`${getBridgeUrl()}/read-tree`)
+  if (!res.ok) throw new Error(`opencode file read failed (${res.status})`)
+  const json = (await res.json()) as { files?: FileMap }
+  return json.files ?? {}
+}
+
+/** Diff a pulled tree against the IDE's current files. */
+export function computeProjectChanges(prev: FileMap, next: FileMap): ProjectChange {
+  const updated: Record<string, string> = {}
+  const created: Record<string, string> = {}
+  const deleted: string[] = []
+  for (const [p, c] of Object.entries(next)) {
+    const before = prev[p]
+    if (before === undefined) created[p] = c
+    else if (before !== c) updated[p] = c
+  }
+  for (const p of Object.keys(prev)) {
+    if (!(p in next)) deleted.push(p)
+  }
+  return { updated, created, deleted }
 }
 
 export async function isOpencodeAvailable(): Promise<boolean> {

@@ -6,6 +6,9 @@ import {
   createSession,
   streamOpencode,
   getProviders,
+  syncProjectToDisk,
+  readProjectFromDisk,
+  computeProjectChanges,
   type OpencodeProvider,
 } from '../lib/opencode'
 
@@ -52,7 +55,12 @@ function buildOpencodePrompt(
   const parts = [
     `You are zut, a coding assistant in a browser-based web IDE.`,
     `The user is working on project "${projectName}" with ${names.length} files: ${names.join(', ')}.`,
-    `The active file is "${activeFile}". You can read any file using your tools.`,
+    `The active file is "${activeFile}".`,
+    ``,
+    `IMPORTANT: This project's files are synced to a directory on disk that you can access.`,
+    `Use your file read/write tools to inspect, create, edit, move, or delete files directly.`,
+    `When the user asks for a change, MAKE the edit yourself rather than pasting code into chat.`,
+    `After modifying files, briefly summarize what you changed in your reply.`,
     ``,
   ]
 
@@ -66,7 +74,7 @@ function buildOpencodePrompt(
 }
 
 export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
-  const { state } = useWorkspace()
+  const { state, dispatch } = useWorkspace()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -151,6 +159,17 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
           ...(selectedProvider ? { provider: selectedProvider } : {}),
           ...(selectedModel ? { model: selectedModel } : {}),
         }
+
+        // Give opencode the current project on disk first, so its agent tools
+        // can read/edit the real files.
+        let syncOk = false
+        try {
+          await syncProjectToDisk(state.files)
+          syncOk = true
+        } catch {
+          // bridge down — chat still works, just no file edits
+        }
+
         await streamOpencode(
           sessionId,
           nextMessages,
@@ -162,6 +181,24 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
           },
           opts,
         )
+
+        // Pull any files opencode created/edited and apply them to the IDE.
+        if (syncOk) {
+          try {
+            const tree = await readProjectFromDisk()
+            const changes = computeProjectChanges(state.files, tree)
+            if (changes.deleted.length || Object.keys(changes.updated).length || Object.keys(changes.created).length) {
+              for (const [p, c] of Object.entries(changes.updated)) dispatch({ type: 'SET_FILE', path: p, content: c })
+              for (const [p, c] of Object.entries(changes.created)) dispatch({ type: 'ADD_FILE', path: p, content: c })
+              for (const p of changes.deleted) dispatch({ type: 'DELETE_FILE', path: p })
+              const n = changes.deleted.length + Object.keys(changes.updated).length + Object.keys(changes.created).length
+              acc += `\n\n_(applied ${n} file change${n === 1 ? '' : 's'} to your project)_`
+              setDraft(acc)
+            }
+          } catch {
+            // ignore — non-fatal
+          }
+        }
       }
       setMessages((prev) => [...prev, { role: 'assistant', content: acc }])
     } catch (e) {
