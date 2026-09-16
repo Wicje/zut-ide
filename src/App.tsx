@@ -447,7 +447,7 @@ export default function App() {
               onViewportChange={setViewport}
               showViewportControls={!state.isSharedView}
             />
-            <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} />
+            <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable />
           </section>
         </div>
       )}

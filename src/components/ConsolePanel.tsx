@@ -4,6 +4,11 @@ import { ChevronDown, ChevronUp, Eraser } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ConsoleEntry } from '../types'
 
+const MIN_HEIGHT = 80
+const MAX_HEIGHT_FRACTION = 0.6
+const DEFAULT_HEIGHT = 160
+const HEIGHT_KEY = 'zut:console:height'
+
 const LEVEL_COLOR: Record<string, string> = {
   log: '#e6edf3',
   info: '#79c0ff',
@@ -24,12 +29,29 @@ interface ConsolePanelProps {
   entries: ConsoleEntry[]
   onClear: () => void
   collapsible?: boolean
+  resizable?: boolean
 }
 
-export default function ConsolePanel({ entries, onClear, collapsible }: ConsolePanelProps) {
+export default function ConsolePanel({ entries, onClear, collapsible, resizable }: ConsolePanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
   const [collapsed, setCollapsed] = useState(false)
+  const [height, setHeight] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem(HEIGHT_KEY))
+      return Number.isFinite(saved) && saved >= MIN_HEIGHT ? saved : DEFAULT_HEIGHT
+    } catch {
+      return DEFAULT_HEIGHT
+    }
+  })
+  const handleRef = useRef<HTMLDivElement>(null)
+  const dragStart = useRef<{ y: number; height: number } | null>(null)
+
+  useEffect(() => {
+    if (resizable && !collapsible) {
+      try { localStorage.setItem(HEIGHT_KEY, String(height)) } catch {}
+    }
+  }, [height, resizable, collapsible])
 
   const errorCount = entries.filter((e) => e.level === 'error').length
 
@@ -43,6 +65,27 @@ export default function ConsolePanel({ entries, onClear, collapsible }: ConsoleP
     const el = scrollRef.current
     if (!el) return
     stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+  }
+
+  function onDragStart(e: React.PointerEvent<HTMLDivElement>) {
+    dragStart.current = { y: e.clientY, height }
+    handleRef.current?.setPointerCapture(e.pointerId)
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'row-resize'
+  }
+
+  function onDragMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragStart.current) return
+    const delta = dragStart.current.y - e.clientY
+    const max = Math.round(window.innerHeight * MAX_HEIGHT_FRACTION)
+    setHeight(Math.min(max, Math.max(MIN_HEIGHT, dragStart.current.height + delta)))
+  }
+
+  function onDragEnd(e: React.PointerEvent<HTMLDivElement>) {
+    dragStart.current = null
+    handleRef.current?.releasePointerCapture(e.pointerId)
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
   }
 
   const header = (
@@ -106,7 +149,23 @@ export default function ConsolePanel({ entries, onClear, collapsible }: ConsoleP
   )
 
   return (
-    <div className={cn('flex shrink-0 flex-col overflow-hidden', collapsible && !collapsed ? 'h-40' : 'h-24')}>
+    <div
+      className={cn('flex shrink-0 flex-col overflow-hidden', collapsible ? (collapsed ? 'h-24' : 'h-40') : '')}
+      style={resizable && !collapsible ? { height } : undefined}
+    >
+      {resizable && !collapsible && (
+        <div
+          ref={handleRef}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize console"
+          className="h-1.5 shrink-0 cursor-row-resize touch-none border-b border-border/30 bg-border/30 transition-colors hover:bg-border/70"
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+        />
+      )}
       {header}
       {(!collapsible || !collapsed) && <div className="min-h-0 flex-1">{body}</div>}
     </div>
