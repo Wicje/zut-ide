@@ -54,9 +54,13 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
   const [busy, setBusy] = useState<string | null>(null)
   const [ghRepoName, setGhRepoName] = useState(state.projectName)
   const [ghPrivate, setGhPrivate] = useState(true)
+  const [ghToken, setGhToken] = useState('')
+  const [ghUseToken, setGhUseToken] = useState(false)
   const [ghResult, setGhResult] = useState<GithubPushResult | null>(null)
   const [ghError, setGhError] = useState<string | null>(null)
   const [vercelResult, setVercelResult] = useState<VercelDeployResult | null>(null)
+  const [vercelToken, setVercelToken] = useState('')
+  const [vercelUseToken, setVercelUseToken] = useState(false)
   const [vercelError, setVercelError] = useState<string | null>(null)
   const [netlifyResult, setNetlifyResult] = useState<string | null>(null)
   const [netlifyError, setNetlifyError] = useState<string | null>(null)
@@ -135,7 +139,9 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
     setGhError(null)
     setGhResult(null)
     try {
-      const result = await pushToGithub(ghRepoName.trim(), ghPrivate, state.files)
+      const token = ghUseToken && ghToken.trim() ? ghToken.trim() : undefined
+      const result = await pushToGithub(ghRepoName.trim(), ghPrivate, state.files, token)
+      if (token) setGhUseToken(false)
       setGhResult(result)
       onLog('info', `Pushed to ${result.url}`)
     } catch (e) {
@@ -152,7 +158,9 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
     setVercelError(null)
     setVercelResult(null)
     try {
-      const result = await deployToVercel(state.projectName, state.files)
+      const token = vercelUseToken && vercelToken.trim() ? vercelToken.trim() : undefined
+      const result = await deployToVercel(state.projectName, state.files, token)
+      if (token) setVercelUseToken(false)
       setVercelResult(result)
       onLog('info', `Deployed to ${result.url}`)
     } catch (e) {
@@ -301,6 +309,37 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
               >
                 {busy === 'connect-github' ? '…' : 'Connect GitHub'}
               </button>
+              {!ghUseToken ? (
+                <button className="link-btn" onClick={() => setGhUseToken(true)}>
+                  or use a GitHub token (PAT)
+                </button>
+              ) : (
+                <div className="publish-row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+                  <input
+                    className="publish-input"
+                    type="password"
+                    value={ghToken}
+                    onChange={(e) => setGhToken(e.target.value)}
+                    placeholder="GitHub Personal Access Token"
+                    style={{ flex: '1 1 200px' }}
+                  />
+                  <button
+                    className="btn primary"
+                    onClick={() => {
+                      setBusy('github')
+                      handlePush()
+                    }}
+                    disabled={busy === 'github' || !ghToken.trim() || !ghRepoName.trim()}
+                  >
+                    {busy === 'github' ? '…' : 'Push with token'}
+                  </button>
+                  <button className="link-btn" onClick={() => { setGhUseToken(false); setGhToken('') }}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+              {ghError && <p className="form-error">{ghError}</p>}
+              {ghResult && <LinkResult link={ghResult.url} />}
             </>
           )}
           {isConnected('github') && (
@@ -348,6 +387,37 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
               >
                 {busy === 'connect-vercel' ? '…' : 'Connect Vercel'}
               </button>
+              {!vercelUseToken ? (
+                <button className="link-btn" onClick={() => setVercelUseToken(true)}>
+                  or use a Vercel token
+                </button>
+              ) : (
+                <div className="publish-row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+                  <input
+                    className="publish-input"
+                    type="password"
+                    value={vercelToken}
+                    onChange={(e) => setVercelToken(e.target.value)}
+                    placeholder="Vercel API token"
+                    style={{ flex: '1 1 200px' }}
+                  />
+                  <button
+                    className="btn primary"
+                    onClick={() => {
+                      setBusy('vercel')
+                      handleVercel()
+                    }}
+                    disabled={busy === 'vercel' || !vercelToken.trim()}
+                  >
+                    {busy === 'vercel' ? '…' : 'Deploy with token'}
+                  </button>
+                  <button className="link-btn" onClick={() => { setVercelUseToken(false); setVercelToken('') }}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+              {vercelError && <p className="form-error">{vercelError}</p>}
+              {vercelResult && <LinkResult link={vercelResult.url} />}
             </>
           )}
           {isConnected('vercel') && (

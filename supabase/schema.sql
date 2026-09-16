@@ -97,7 +97,7 @@ alter table public.connections enable row level security;
 -- Return which providers are connected and their display info (no tokens).
 create or replace function public.get_connections()
 returns jsonb
-language plpgsql
+language sql
 security definer
 set search_path = public
 stable

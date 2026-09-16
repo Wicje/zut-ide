@@ -127,12 +127,13 @@ export async function pushToGithub(
   name: string,
   isPrivate: boolean,
   files: FileMap,
+  token?: string,
 ): Promise<GithubPushResult> {
-  return callFn<GithubPushResult>('github-push', { name, private: isPrivate, files })
+  return callFn<GithubPushResult>('github-push', { name, private: isPrivate, files, ...(token ? { token } : {}) })
 }
 
-export async function deployToVercel(name: string, files: FileMap): Promise<VercelDeployResult> {
-  return callFn<VercelDeployResult>('vercel-deploy', { name, files })
+export async function deployToVercel(name: string, files: FileMap, token?: string): Promise<VercelDeployResult> {
+  return callFn<VercelDeployResult>('vercel-deploy', { name, files, ...(token ? { token } : {}) })
 }
 
 export async function streamClaude(

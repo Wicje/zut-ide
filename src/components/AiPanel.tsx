@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useWorkspace } from '../store/workspace'
 import { streamClaude, type ChatMessage } from '../lib/hosting'
+import {
+  isOpencodeAvailable,
+  createSession,
+  streamOpencode,
+  getProviders,
+  type OpencodeProvider,
+} from '../lib/opencode'
+
+type Backend = 'claude' | 'opencode'
 
 interface AiPanelProps {
   signedIn: boolean
@@ -34,6 +43,28 @@ function buildSystemPrompt(
   return parts.join('\n')
 }
 
+function buildOpencodePrompt(
+  projectName: string,
+  files: Record<string, string>,
+  activeFile: string,
+): string {
+  const names = Object.keys(files).sort()
+  const parts = [
+    `You are zut, a coding assistant in a browser-based web IDE.`,
+    `The user is working on project "${projectName}" with ${names.length} files: ${names.join(', ')}.`,
+    `The active file is "${activeFile}". You can read any file using your tools.`,
+    ``,
+  ]
+
+  const file = files[activeFile]
+  if (file !== undefined) {
+    const body = file.length > MAX_FILE_CHARS ? `${file.slice(0, MAX_FILE_CHARS)}\n…(truncated)` : file
+    parts.push(`Current content of ${activeFile}:\n\`\`\`\n${body}\n\`\`\``)
+  }
+
+  return parts.join('\n')
+}
+
 export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
   const { state } = useWorkspace()
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -43,6 +74,46 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Backend selection
+  const [backend, setBackend] = useState<Backend>('claude')
+  const [opencodeConnected, setOpencodeConnected] = useState<boolean | null>(null)
+  const [opencodeSessionId, setOpencodeSessionId] = useState<string | null>(null)
+  const [providers, setProviders] = useState<OpencodeProvider[]>([])
+  const [selectedProvider, setSelectedProvider] = useState('')
+  const [selectedModel, setSelectedModel] = useState('')
+
+  // Check opencode availability on mount
+  useEffect(() => {
+    isOpencodeAvailable().then((ok) => {
+      setOpencodeConnected(ok)
+      if (ok) {
+        getProviders()
+          .then((p) => {
+            setProviders(p)
+            if (p.length > 0 && !selectedProvider) {
+              setSelectedProvider(p[0].id)
+              if (p[0].models.length > 0) {
+                setSelectedModel(p[0].models[0].id)
+              }
+            }
+          })
+          .catch(() => {})
+      }
+    })
+  }, [])
+
+  // Create opencode session when switching to opencode backend
+  useEffect(() => {
+    if (backend === 'opencode' && opencodeConnected && !opencodeSessionId) {
+      createSession()
+        .then(setOpencodeSessionId)
+        .catch(() => {})
+    }
+  }, [backend, opencodeConnected, opencodeSessionId])
+
+  const activeProvider = providers.find((p) => p.id === selectedProvider)
+  const availableModels = activeProvider?.models ?? []
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
@@ -61,14 +132,37 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
 
     let acc = ''
     try {
-      await streamClaude(
-        nextMessages,
-        buildSystemPrompt(state.projectName, state.files, state.activeFile),
-        (piece) => {
-          acc += piece
-          setDraft(acc)
-        },
-      )
+      if (backend === 'claude') {
+        await streamClaude(
+          nextMessages,
+          buildSystemPrompt(state.projectName, state.files, state.activeFile),
+          (piece) => {
+            acc += piece
+            setDraft(acc)
+          },
+        )
+      } else {
+        let sessionId = opencodeSessionId
+        if (!sessionId) {
+          sessionId = await createSession()
+          setOpencodeSessionId(sessionId)
+        }
+        const opts = {
+          ...(selectedProvider ? { provider: selectedProvider } : {}),
+          ...(selectedModel ? { model: selectedModel } : {}),
+        }
+        await streamOpencode(
+          sessionId,
+          nextMessages,
+          buildOpencodePrompt(state.projectName, state.files, state.activeFile),
+          'You are zut, a coding assistant in a browser-based web IDE. Help the student understand and improve their code.',
+          (piece) => {
+            acc += piece
+            setDraft(acc)
+          },
+          opts,
+        )
+      }
       setMessages((prev) => [...prev, { role: 'assistant', content: acc }])
     } catch (e) {
       setError((e as { message?: string }).message ?? 'AI request failed')
@@ -80,6 +174,17 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
   }
 
   function reset() {
+    setMessages([])
+    setDraft('')
+    setError(null)
+    if (backend === 'opencode') {
+      setOpencodeSessionId(null)
+    }
+  }
+
+  function switchBackend(b: Backend) {
+    if (b === backend) return
+    setBackend(b)
     setMessages([])
     setDraft('')
     setError(null)
@@ -95,9 +200,71 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
         </div>
       </div>
 
-      {!signedIn ? (
+      {/* Backend selector */}
+      <div className="ai-backend-row">
+        <button
+          className={`ai-backend-btn ${backend === 'claude' ? 'active' : ''}`}
+          onClick={() => switchBackend('claude')}
+        >
+          Claude
+        </button>
+        <button
+          className={`ai-backend-btn ${backend === 'opencode' ? 'active' : ''}`}
+          onClick={() => switchBackend('opencode')}
+        >
+          opencode
+          {opencodeConnected === true && <span className="ai-status-dot connected" />}
+          {opencodeConnected === false && <span className="ai-status-dot disconnected" />}
+        </button>
+      </div>
+
+      {/* opencode provider/model selectors */}
+      {backend === 'opencode' && (
+        <div className="ai-opencode-config">
+          {opencodeConnected === false ? (
+            <div className="ai-empty">
+              <p>opencode server not detected.</p>
+              <code>npm run dev:opencode</code>
+            </div>
+          ) : (
+            <>
+              <select
+                className="ai-select"
+                value={selectedProvider}
+                onChange={(e) => {
+                  setSelectedProvider(e.target.value)
+                  setSelectedModel('')
+                  const p = providers.find((pr) => pr.id === e.target.value)
+                  if (p?.models.length) setSelectedModel(p.models[0].id)
+                }}
+              >
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              {availableModels.length > 0 && (
+                <select
+                  className="ai-select"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                >
+                  {availableModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {!signedIn && backend === 'claude' ? (
         <div className="ai-empty">
-          <p>Sign in to chat with the AI assistant about your code.</p>
+          <p>Sign in to chat with Claude about your code.</p>
           <button className="btn primary" onClick={onSignIn}>Sign in</button>
         </div>
       ) : (
@@ -105,8 +272,9 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
           <div className="ai-messages">
             {messages.length === 0 && !draft && (
               <p className="ai-empty">
-                Ask anything about your project — “explain this code”, “add a dark mode”,
-                “why is my layout broken?”.
+                {backend === 'claude'
+                  ? 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".'
+                  : 'Ask the AI to read, edit, or analyze your code. opencode has full file and shell access.'}
               </p>
             )}
             {messages.map((m, i) => (
