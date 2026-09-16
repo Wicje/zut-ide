@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useWorkspace } from '../store/workspace'
 import { deployToNetlify } from '../lib/deploy'
 import {
@@ -12,6 +12,7 @@ import {
   type GithubPushResult,
   type VercelDeployResult,
 } from '../lib/hosting'
+import { checkNodeProject, findNodeEntry } from '../lib/runner'
 import type { ConsoleLevel } from '../types'
 
 interface DeployDialogProps {
@@ -59,6 +60,28 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
   const [vercelError, setVercelError] = useState<string | null>(null)
   const [netlifyResult, setNetlifyResult] = useState<string | null>(null)
   const [netlifyError, setNetlifyError] = useState<string | null>(null)
+  const [nodeResult, setNodeResult] = useState<string | null>(null)
+  const [nodeError, setNodeError] = useState<string | null>(null)
+
+  const nodeProject = useMemo(() => {
+    const pkgRaw = state.files['package.json']
+    if (!pkgRaw) return null
+    let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } = {}
+    try {
+      pkg = JSON.parse(pkgRaw) as typeof pkg
+    } catch {
+      return null
+    }
+    const frameworkByDep: Record<string, string> = {
+      express: 'Express',
+      '@nestjs/core': 'NestJS',
+      next: 'Next.js',
+    }
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+    const framework =
+      Object.entries(frameworkByDep).find(([dep]) => deps[dep])?.[1] ?? 'Node'
+    return { framework, entry: findNodeEntry(state.files) }
+  }, [state.files])
 
   const isConnected = (p: string) => connections.some((c) => c.provider === p)
   const login = (p: string) => connections.find((c) => c.provider === p)?.login ?? null
@@ -141,6 +164,24 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
     }
   }
 
+  async function handleNodeCheck() {
+    if (!nodeProject?.entry) return
+    setBusy('node-check')
+    setNodeError(null)
+    setNodeResult(null)
+    try {
+      await checkNodeProject(state.files, nodeProject.entry.entry)
+      setNodeResult(`OK — ${nodeProject.framework} server bundles cleanly.`)
+      onLog('info', `Server check passed (${nodeProject.entry.entry})`)
+    } catch (e) {
+      const msg = (e as { message?: string }).message ?? 'Check failed'
+      setNodeError(msg.replace(/^BUILD_FAILED:\s*/, ''))
+      onLog('error', `Server check: ${msg.replace(/^BUILD_FAILED:\s*/, '')}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function handleNetlify() {
     setBusy('netlify')
     setNetlifyError(null)
@@ -176,6 +217,31 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
           <p className="share-note">
             Sign in (top-right) to connect GitHub / Vercel and use the AI assistant.
           </p>
+        )}
+
+        {/* ---------- Node check ---------- */}
+        {nodeProject && (
+          <section className="publish-card">
+            <div className="publish-head">
+              <strong>{nodeProject.framework} check</strong>
+              <span className="conn-badge">server code</span>
+            </div>
+            <p className="publish-note">
+              Compile-checks your server code ({nodeProject.entry
+                ? `entry ${nodeProject.entry.entry}`
+                : 'no entry file found'}) without running it. Use the
+              GitHub push above to host it on any Node platform.
+            </p>
+            <button
+              className="btn primary"
+              onClick={handleNodeCheck}
+              disabled={!nodeProject.entry || busy === 'node-check'}
+            >
+              {busy === 'node-check' ? '…' : 'Check server code'}
+            </button>
+            {nodeError && <p className="form-error">{nodeError}</p>}
+            {nodeResult && <p className="publish-note ok">{nodeResult}</p>}
+          </section>
         )}
 
         {/* ---------- GitHub ---------- */}

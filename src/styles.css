@@ -1060,6 +1060,10 @@ button.project-row {
   line-height: 1.45;
 }
 
+.publish-note.ok {
+  color: #22c55e;
+}
+
 .publish-row {
   display: flex;
   align-items: flex-end;

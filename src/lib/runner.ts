@@ -38,6 +38,218 @@ function resolvePath(from: string, ref: string): string {
   return '/' + parts.join('/')
 }
 
+/** Map a bare import specifier to an esm.sh CDN URL so framework packages
+ *  like `react`, `vue`, `express` resolve in the browser preview. */
+function cdnUrl(specifier: string): string {
+  return `https://esm.sh/${specifier}`
+}
+
+/** Plugin for the server-side compile check: resolves the project's own files
+ *  and treats every node builtin + installed package as external. */
+function buildNodeCheckPlugin(files: FileMap): Plugin {
+  return {
+    name: 'zut-node-check',
+    setup(build: PluginBuild) {
+      build.onResolve({ filter: /.*/ }, (args): OnResolveResult | null => {
+        if (/^(https?:)?\/\//.test(args.path)) return { path: args.path, external: true }
+        if (/^[a-z]+:/.test(args.path)) return { path: args.path, external: true }
+        if (!args.path.startsWith('.') && !args.path.startsWith('/')) {
+          // Bare specifier → node builtin or an installed package; external.
+          return { path: args.path, external: true }
+        }
+        const qIdx = args.path.search(/\?/)
+        const clean = qIdx >= 0 ? args.path.slice(0, qIdx) : args.path
+        const importer = args.importer === '<stdin>' ? '/index.html' : args.importer
+        const resolved = resolvePath(importer, clean)
+        if (!(resolved.slice(1) in files)) {
+          return { errors: [{ text: `Could not resolve "${args.path}" (not in this project)` }] }
+        }
+        return { path: resolved, namespace: 'zut-node' }
+      })
+
+      build.onLoad({ filter: /.*/, namespace: 'zut-node' }, (args): OnLoadResult | null => {
+        const key = args.path.slice(1)
+        const source = files[key] ?? ''
+        let loader: 'tsx' | 'ts' | 'jsx' | 'js' | 'json'
+        if (key.endsWith('.tsx')) loader = 'tsx'
+        else if (key.endsWith('.ts') || key.endsWith('.mts')) loader = 'ts'
+        else if (key.endsWith('.jsx')) loader = 'jsx'
+        else if (key.endsWith('.json')) loader = 'json'
+        else loader = 'js'
+        return { contents: source, loader, resolveDir: '/' }
+      })
+    },
+  }
+}
+
+/** Common entry-point names looked up in order for server (Express/Nest) projects. */
+const NODE_ENTRY_NAMES = [
+  'src/main.ts',
+  'src/index.ts',
+  'src/main.js',
+  'src/index.js',
+  'server.js',
+  'server.ts',
+  'index.js',
+  'index.ts',
+  'app.js',
+  'app.ts',
+]
+
+/** Pick the server entry file from package.json metadata or common conventions. */
+export function findNodeEntry(files: FileMap): { entry: string; kind: 'js' | 'ts' } | null {
+  let entry: string | null = null
+  const pkgRaw = files['package.json']
+  if (pkgRaw) {
+    try {
+      const pkg = JSON.parse(pkgRaw) as { main?: string; scripts?: Record<string, string> }
+      if (pkg.main && files[pkg.main] !== undefined && pkg.main !== 'src/index.html') entry = pkg.main
+      if (!entry && pkg.scripts?.start) {
+        const m = pkg.scripts.start.match(/node\s+([^\s&|]+)/)
+        if (m && m[1] && files[m[1]] !== undefined) entry = m[1]
+      }
+    } catch {
+      /* ignore bad package.json */
+    }
+  }
+  if (!entry) {
+    entry = NODE_ENTRY_NAMES.find((n) => files[n] !== undefined) ?? null
+  }
+  if (!entry) return null
+  const kind = entry.endsWith('.ts') || entry.endsWith('.tsx') ? 'ts' : 'js'
+  return { entry, kind }
+}
+
+/** Compile-check a server project (Express / NestJS / Next API routes): bundles
+ *  the entry with node platform and external dependencies, surfacing syntax and
+ *  import-graph errors without executing anything. */
+export async function checkNodeProject(files: FileMap, entry: string): Promise<void> {
+  if (!isInitPending()) throw new Error('Runner not initialized')
+  if (files[entry] === undefined) throw new Error(`Entry file "${entry}" not found`)
+  try {
+    await build({
+      stdin: { contents: `import './${entry}';`, resolveDir: '/', sourcefile: '<stdin>', loader: 'js' },
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      target: ['node18'],
+      outfile: 'out.mjs',
+      write: false,
+      logLevel: 'silent',
+      plugins: [buildNodeCheckPlugin(files)],
+    })
+  } catch (e) {
+    throw new Error('BUILD_FAILED:' + (e as { message?: string }).message)
+  }
+}
+
+/** Minimal structural typing for @vue/compiler-sfc (loaded from the CDN). */
+interface SfcBlock {
+  content: string
+  lang?: string
+  scoped?: boolean
+}
+interface SfcDescriptor {
+  script: SfcBlock | null
+  scriptSetup: SfcBlock | null
+  template: SfcBlock | null
+  styles: SfcBlock[]
+}
+interface SfcCompiler {
+  parse(source: string, options: { filename: string }): {
+    descriptor: SfcDescriptor
+    errors: (Error | { message?: string })[]
+  }
+  compileScript(descriptor: SfcDescriptor, options: { id: string; inlineTemplate?: boolean; templateOptions?: unknown }): {
+    content: string
+  }
+  compileTemplate(options: {
+    source: string
+    filename: string
+    id: string
+    compilerOptions?: { isProd?: boolean }
+  }): { code: string; errors: (Error | { message?: string })[] }
+  compileStyle(options: {
+    source: string
+    filename: string
+    id: string
+    scoped?: boolean
+  }): { code: string; errors: (Error | { message?: string })[] }
+}
+
+/** Lazily load the Vue SFC compiler from the CDN (runs entirely in the browser). */
+let sfcCompilerPromise: Promise<SfcCompiler> | null = null
+function getSfcCompiler(): Promise<SfcCompiler> {
+  if (!sfcCompilerPromise) {
+    sfcCompilerPromise = import(/* @vite-ignore */ 'https://esm.sh/@vue/compiler-sfc@3.5.13' as string) as Promise<SfcCompiler>
+  }
+  return sfcCompilerPromise
+}
+
+/**
+ * Parse a .vue file with @vue/compiler-sfc. In-memory cache avoids re-parsing
+ * the same file for each of its virtual submodules (script / template / style).
+ */
+async function parseVue(key: string, source: string) {
+  const sfc = await getSfcCompiler()
+  const { descriptor, errors } = sfc.parse(source, { filename: key })
+  return { sfc, descriptor, errors }
+}
+
+/** Compile the <style> blocks to plain CSS (scoped treated as global). */
+async function compileVueStyles(key: string, source: string): Promise<OnLoadResult> {
+  const { sfc, descriptor, errors } = await parseVue(key, source)
+  if (errors.length) {
+    return { errors: errors.map((e) => ({ text: (e as { message?: string }).message ?? String(e) })) }
+  }
+  let css = ''
+  for (const style of descriptor.styles) {
+    const res = sfc.compileStyle({ source: style.content, filename: key, id: key, scoped: false })
+    if (res.errors.length) {
+      return { errors: res.errors.map((e) => ({ text: (e as { message?: string }).message ?? String(e) })) }
+    }
+    css += res.code + '\n'
+  }
+  return { contents: css, loader: 'css', resolveDir: '/' }
+}
+
+/** Compile a .vue file into a loadable JS module.
+ *  - `<script setup>`: compileScript with inlineTemplate → self-contained module.
+ *  - plain `<script>`: reassembled from virtual `?zut-script` / `?zut-template` /
+ *    `?zut-style` submodules so the render function attaches to the default export.
+ */
+async function compileVueSfc(key: string, source: string): Promise<OnLoadResult> {
+  const { sfc, descriptor, errors } = await parseVue(key, source)
+  if (errors.length) {
+    return { errors: errors.map((e) => ({ text: (e as { message?: string }).message ?? String(e) })) }
+  }
+  if (!descriptor.script && !descriptor.scriptSetup) {
+    return { errors: [{ text: `Missing <script> block in ${key}` }] }
+  }
+
+  const scriptLang = descriptor.scriptSetup?.lang ?? descriptor.script?.lang
+
+  if (descriptor.scriptSetup) {
+    const script = sfc.compileScript(descriptor, {
+      id: key,
+      inlineTemplate: true,
+      templateOptions: { compilerOptions: { isProd: false } },
+    })
+    const styleImport = descriptor.styles.length ? `import './${key}?zut-style';\n` : ''
+    return { contents: styleImport + script.content, loader: scriptLang === 'ts' ? 'ts' : 'js' }
+  }
+
+  let code = ''
+  if (descriptor.styles.length) code += `import './${key}?zut-style';\n`
+  code += `import script from './${key}?zut-script';\n`
+  if (descriptor.template) {
+    code += `import { render } from './${key}?zut-template';\n`
+    code += `script.render = render;\n`
+  }
+  code += `export default script;\n`
+  return { contents: code, loader: scriptLang === 'ts' ? 'ts' : 'js' }
+}
+
 function buildVirtualFsPlugin(files: FileMap): Plugin {
   return {
     name: 'zut-vfs',
@@ -50,18 +262,58 @@ function buildVirtualFsPlugin(files: FileMap): Plugin {
           return { path: args.path, external: true }
         }
         if (!args.path.startsWith('.') && !args.path.startsWith('/')) {
-          return { errors: [{ text: `Cannot resolve bare import "${args.path}"` }] }
+          return { path: cdnUrl(args.path), external: true }
         }
-        const resolved = resolvePath(args.importer === '<stdin>' ? '/index.html' : args.importer, args.path)
+        const qIdx = args.path.search(/\?/)
+        const query = qIdx >= 0 ? args.path.slice(qIdx) : ''
+        const clean = qIdx >= 0 ? args.path.slice(0, qIdx) : args.path
+        const importer = args.importer === '<stdin>' ? '/index.html' : args.importer
+        const resolved = resolvePath(importer, clean)
         if (!(resolved.slice(1) in files)) {
           return { errors: [{ text: `Could not resolve "${args.path}" (not in this project)` }] }
         }
-        return { path: resolved, namespace: 'zut-vfs' }
+        return { path: resolved + query, namespace: 'zut-vfs' }
       })
 
-      build.onLoad({ filter: /.*/, namespace: 'zut-vfs' }, (args): OnLoadResult | null => {
-        const key = args.path.slice(1)
+      build.onLoad({ filter: /.*/, namespace: 'zut-vfs' }, async (args): Promise<OnLoadResult | null> => {
+        let key = args.path.slice(1)
+        const qIdx = key.indexOf('?')
+        const query = qIdx >= 0 ? key.slice(qIdx) : ''
+        key = qIdx >= 0 ? key.slice(0, qIdx) : key
         const source = files[key] ?? ''
+
+        if (key.endsWith('.vue')) {
+          if (query === '?zut-style') return compileVueStyles(key, source)
+          if (query === '?zut-script') {
+            const { descriptor } = await parseVue(key, source)
+            return {
+              contents: descriptor.script?.content ?? '',
+              loader: descriptor.script?.lang === 'ts' ? 'ts' : 'js',
+              resolveDir: '/',
+            }
+          }
+          if (query === '?zut-template') {
+            const { sfc, descriptor, errors } = await parseVue(key, source)
+            if (errors.length) {
+              return { errors: errors.map((e) => ({ text: (e as { message?: string }).message ?? String(e) })) }
+            }
+            if (!descriptor.template) {
+              return { errors: [{ text: `No <template> in ${key}` }] }
+            }
+            const t = sfc.compileTemplate({
+              source: descriptor.template.content,
+              filename: key,
+              id: key,
+              compilerOptions: { isProd: false },
+            })
+            if (t.errors.length) {
+              return { errors: t.errors.map((e) => ({ text: (e as { message?: string }).message ?? String(e) })) }
+            }
+            return { contents: t.code, loader: 'js', resolveDir: '/' }
+          }
+          return compileVueSfc(key, source)
+        }
+
         let loader: 'tsx' | 'ts' | 'jsx' | 'js' | 'css' | 'json'
         if (key.endsWith('.tsx')) loader = 'tsx'
         else if (key.endsWith('.ts') || key.endsWith('.mts')) loader = 'ts'
@@ -99,7 +351,7 @@ export async function bundleProject(files: FileMap): Promise<BuildResult> {
     result = await build({
       stdin: { contents: entry, resolveDir: '/', sourcefile: '<stdin>', loader: 'js' },
       bundle: true,
-      format: 'iife',
+      format: 'esm',
       platform: 'browser',
       target: ['es2020'],
       outfile: 'out.js',
@@ -186,7 +438,7 @@ export function buildSrcdoc(html: string, bundle: Pick<BuildResult, 'js' | 'css'
     }
   }
   if (bundle && bundle.js.trim()) {
-    const jsBlock = `<script data-zut-bundle="">${bundle.js}</script>`
+    const jsBlock = `<script type="module" data-zut-bundle="">${bundle.js}</script>`
     const bodyEnd = out.match(/<\s*\/\s*body\s*>/i)
     if (bodyEnd) {
       const idx = bodyEnd.index!

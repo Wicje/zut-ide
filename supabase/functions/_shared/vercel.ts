@@ -41,7 +41,15 @@ function projectSettings(files: Record<string, string>) {
         devDependencies?: Record<string, string>
         scripts?: Record<string, string>
       }
-      if (pkg.devDependencies?.vite || pkg.dependencies?.vite) {
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+      if (deps.next) {
+        return {
+          framework: 'nextjs',
+          installCommand: 'npm install',
+          buildCommand: 'npm run build',
+        }
+      }
+      if (deps.vite) {
         return {
           framework: 'vite',
           installCommand: 'npm install',

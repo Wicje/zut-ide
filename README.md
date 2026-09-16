@@ -10,6 +10,10 @@ A browser-based IDE for teaching web development. Students edit files in a VS Co
   Result / Files dock at the bottom — so students can tinker from a phone or tablet too.
 - **Real projects**: JS/TS files can `import`/`export` across files. `.ts`/`.tsx` is compiled in
   the browser with **esbuild-wasm**.
+- **Framework templates**: *New ▾* includes starter projects for **React** and **Vue** (which run
+  live in the preview — React/vue packages are pulled from the esm.sh CDN and `.vue` single-file
+  components are compiled in-browser with `@vue/compiler-sfc`), plus **Next.js**, **Express** and
+  **NestJS** projects for teaching server-side code.
 - **Preview + console**: code runs in a sandboxed `<iframe>`; `console.log`, warnings, DOM errors
   and unhandled promise rejections are streamed into a console panel.
 - **Persistence**: works out of the box with zero backend (localStorage draft). Optionally connect
@@ -30,6 +34,10 @@ A browser-based IDE for teaching web development. Students edit files in a VS Co
 - **GitHub push** — sign in and connect your GitHub account, then publish any project as a new (private or
   public) repository. It's created and pushed for you.
 - **Vercel deploy** — connect your Vercel account and push the project straight to a live `.vercel.app` URL.
+  Next.js projects are auto-detected and built on Vercel.
+- **Server compile-check** — for Express / NestJS / Next.js projects, the *Deploy* dialog can
+  compile-check your server entry (`src/main.ts`, `server.js`, …) in the browser without a Node
+  runtime, surfacing syntax and import-graph errors before you push.
 - **AI assistant** — the *✨ AI* button opens a chat with Claude that can see your project (files + the active
   file) and answer coding questions; the API key stays on the server.
 - **Quick-switch gestures** — on mobile, swipe left/right on the file-tab strip to cycle files.
