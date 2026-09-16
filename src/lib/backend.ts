@@ -1,8 +1,13 @@
 import type { FileMap } from '../types'
 import { supabaseOrNull } from './supabase'
-
-const LOCAL_KEY = 'zut.workspace'
-const LOCAL_PROJECTS_KEY = 'zut.projects'
+import {
+  listLocalProjects,
+  saveLocalProject,
+  deleteLocalProject as deleteLocalProjectDurable,
+  loadActiveWorkspace,
+  saveActiveWorkspace,
+  type LocalProjectRow,
+} from './persistence'
 
 export interface StoredRow {
   id: string
@@ -15,8 +20,8 @@ export interface StoredRow {
 export async function listProjects(): Promise<StoredRow[]> {
   const supabase = supabaseOrNull()
   if (!supabase) {
-    const raw = localStorage.getItem(LOCAL_PROJECTS_KEY)
-    return raw ? (JSON.parse(raw) as StoredRow[]) : []
+    const rows = await listLocalProjects()
+    return rows.map((r): StoredRow => ({ id: r.id, name: r.name, files: r.files, share_token: null, updated_at: r.updated_at }))
   }
   const { data, error } = await supabase
     .from('projects')
@@ -38,10 +43,8 @@ export async function getProject(id: string): Promise<StoredRow> {
 export async function createProject(name: string, files: FileMap): Promise<string> {
   const supabase = supabaseOrNull()
   if (!supabase) {
-    const rows = await readLocalProjects()
-    const row: StoredRow = { id: `local-${Date.now()}`, name, files, share_token: null, updated_at: null }
-    rows.unshift(row)
-    localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(rows.slice(0, 50)))
+    const row: LocalProjectRow = { id: `local-${Date.now()}`, name, files, updated_at: null }
+    await saveLocalProject(row)
     return row.id
   }
   const { data, error } = await supabase
@@ -55,24 +58,21 @@ export async function createProject(name: string, files: FileMap): Promise<strin
 
 export async function updateProject(id: string, name: string, files: FileMap): Promise<void> {
   const supabase = supabaseOrNull()
-  if (!supabase) return
+  if (!supabase) {
+    const rows = await listLocalProjects()
+    if (rows.some((r) => r.id === id)) {
+      await saveLocalProject({ id, name, files, updated_at: new Date().toISOString() })
+    }
+    return
+  }
   const { error } = await supabase.from('projects').update({ name, files, updated_at: new Date().toISOString() }).eq('id', id)
   if (error) throw new Error(error.message)
-  const rows = await readLocalProjects()
-  const row = rows.find((r) => r.id === id)
-  if (row) {
-    row.name = name
-    row.files = files
-    row.updated_at = new Date().toISOString()
-    localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(rows))
-  }
 }
 
 export async function deleteProject(id: string): Promise<void> {
   const supabase = supabaseOrNull()
   if (!supabase) {
-    const rows = await readLocalProjects()
-    localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(rows.filter((r) => r.id !== id)))
+    await deleteLocalProjectDurable(id)
     return
   }
   const { error } = await supabase.from('projects').delete().eq('id', id)
@@ -102,24 +102,10 @@ export async function getSharedProject(token: string): Promise<{ name: string; f
   return { name: data.name, files: data.files }
 }
 
-async function readLocalProjects(): Promise<StoredRow[]> {
-  const raw = localStorage.getItem(LOCAL_PROJECTS_KEY)
-  return raw ? (JSON.parse(raw) as StoredRow[]) : []
-}
-
 export function saveLocalWorkspace(name: string, files: FileMap): void {
-  try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify({ name, files }))
-  } catch {
-    /* storage full */
-  }
+  void saveActiveWorkspace(name, files)
 }
 
 export function loadLocalWorkspace(): { name: string; files: FileMap } | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+  return loadActiveWorkspace()
 }

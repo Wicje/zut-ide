@@ -24,6 +24,13 @@ import { downloadProjectZip } from './lib/download'
 import { emptyProject } from './lib/templates'
 import { formatCode } from './lib/formatter'
 import { importFromUrl } from './lib/importer'
+import {
+  listenForExternalWorkspaceChange,
+  maybeHeartbeatBackup,
+  recordHeartbeatBackup,
+  recoverActiveWorkspace,
+  saveWorkspaceSnapshot,
+} from './lib/persistence'
 import Toolbar from './components/Toolbar'
 import FileExplorer from './components/FileExplorer'
 import CodeEditor from './components/CodeEditor'
@@ -82,6 +89,11 @@ export default function App() {
   const touchStartX = useRef(0)
   const touchStartY = useRef(0)
   const isSwiping = useRef(false)
+  const lastLocalWrite = useRef(0)
+  const lastSnapshotAt = useRef(0)
+  const conflictWarned = useRef(false)
+  const recoveredRef = useRef(false)
+  const firstRunRef = useRef(true)
 
   const run = useCallback(
     async (files?: FileMap) => {
@@ -145,6 +157,28 @@ export default function App() {
     }
   }, [addConsole, loadFiles])
 
+  // Recover from a wiped localStorage using the durable IndexedDB copy.
+  useEffect(() => {
+    if (recoveredRef.current || parseHash()) return
+    recoveredRef.current = true
+    if (loadLocalWorkspace()) return
+    recoverActiveWorkspace().then((durable) => {
+      if (durable && Object.keys(durable.files).length) {
+        loadFiles(durable.files, durable.name)
+        addConsole('info', 'Restored your workspace from durable storage.')
+      }
+    })
+  }, [addConsole, loadFiles])
+
+  // Cross-tab conflict detection: warn once when another tab writes this workspace.
+  useEffect(() => {
+    return listenForExternalWorkspaceChange((updatedAt) => {
+      if (conflictWarned.current || updatedAt <= lastLocalWrite.current + 500) return
+      conflictWarned.current = true
+      addConsole('warn', 'This project was updated in another tab. Refresh to load the latest version.')
+    })
+  }, [addConsole])
+
   useEffect(() => {
     const onHashChange = () => {
       const shared = parseHash()
@@ -167,7 +201,22 @@ export default function App() {
 
   useEffect(() => {
     if (state.isSharedView) return
+    lastLocalWrite.current = Date.now()
     saveLocalWorkspace(state.projectName, state.files)
+    const now = Date.now()
+    if (now - lastSnapshotAt.current > 30_000) {
+      lastSnapshotAt.current = now
+      void saveWorkspaceSnapshot(state.projectId, state.projectName, state.files)
+    }
+    if (firstRunRef.current) {
+      firstRunRef.current = false
+      return
+    }
+    if (maybeHeartbeatBackup(state.projectName)) {
+      void downloadProjectZip(state.projectName || 'project', state.files).then(() => {
+        recordHeartbeatBackup(state.projectName || 'project')
+      })
+    }
   }, [state.files, state.projectName, state.isSharedView])
 
   useEffect(() => {
@@ -233,11 +282,14 @@ export default function App() {
     setShareLink(null); setSrcDoc('')
     if (parseHash()) history.replaceState(null, '', window.location.pathname)
     dispatch({ type: 'SET_PROJECT_ID', id: null })
+    conflictWarned.current = false
+    lastLocalWrite.current = 0
+    firstRunRef.current = true
     loadFiles(files, name)
   }
 
   async function openProject(id: string) {
-    if (id.startsWith('local-')) { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); return }
+    if (id.startsWith('local-')) { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); conflictWarned.current = false; lastLocalWrite.current = 0; firstRunRef.current = true; return }
     setShowProjects(false)
     try {
       const p = await getProject(id)
@@ -458,7 +510,7 @@ export default function App() {
           projects={projects}
           hasLocalDraft={hasLocalDraft}
           onOpen={openProject}
-          onOpenLocal={() => { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); setShowProjects(false) }}
+          onOpenLocal={() => { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); conflictWarned.current = false; lastLocalWrite.current = 0; firstRunRef.current = true; setShowProjects(false) }}
           onDelete={removeProject}
           onClose={() => setShowProjects(false)}
         />
