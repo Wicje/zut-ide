@@ -134,10 +134,11 @@ export function slugify(input: string): string {
 
 export async function listMudbaseFunctions(): Promise<MudbaseFunction[]> {
   const pid = requireMudbaseProjectId()
-  const res = await request<{ data?: { functions?: MudbaseFunction[] } }>(
+  // The spec wraps the list in `data`, the live API returns it top-level — accept both.
+  const res = await request<{ data?: { functions?: MudbaseFunction[] }; functions?: MudbaseFunction[] }>(
     `/api/functions/projects/${pid}/functions?limit=100`,
   )
-  return res.data?.functions ?? []
+  return res.data?.functions ?? res.functions ?? []
 }
 
 export interface CreateMudbaseFunctionInput {
@@ -150,12 +151,13 @@ export interface CreateMudbaseFunctionInput {
 
 export async function createMudbaseFunction(input: CreateMudbaseFunctionInput): Promise<MudbaseFunction> {
   const pid = requireMudbaseProjectId()
-  const res = await request<{ data?: MudbaseFunction }>(
+  const res = await request<MudbaseFunction & { data?: MudbaseFunction }>(
     `/api/functions/projects/${pid}/functions`,
     { method: 'POST', body: JSON.stringify(input) },
   )
-  if (!res.data?._id) throw new Error('Mudbase did not return the created function.')
-  return res.data
+  const fn = res.data ?? res
+  if (!fn._id) throw new Error('Mudbase did not return the created function.')
+  return fn
 }
 
 export async function updateMudbaseFunction(
@@ -163,12 +165,13 @@ export async function updateMudbaseFunction(
   patch: Partial<CreateMudbaseFunctionInput> & { isActive?: boolean },
 ): Promise<MudbaseFunction> {
   const pid = requireMudbaseProjectId()
-  const res = await request<{ data?: MudbaseFunction }>(
+  const res = await request<MudbaseFunction & { data?: MudbaseFunction }>(
     `/api/functions/projects/${pid}/functions/${functionId}`,
     { method: 'PUT', body: JSON.stringify(patch) },
   )
-  if (!res.data?._id) throw new Error('Mudbase did not return the updated function.')
-  return res.data
+  const fn = res.data ?? res
+  if (!fn._id) throw new Error('Mudbase did not return the updated function.')
+  return fn
 }
 
 export async function deleteMudbaseFunction(functionId: string): Promise<void> {
@@ -181,12 +184,13 @@ export async function deleteMudbaseFunction(functionId: string): Promise<void> {
 
 export async function setMudbaseFunctionActive(functionId: string, active: boolean): Promise<MudbaseFunction> {
   const pid = requireMudbaseProjectId()
-  const res = await request<{ data?: MudbaseFunction }>(
+  const res = await request<MudbaseFunction & { data?: MudbaseFunction }>(
     `/api/functions/projects/${pid}/functions/${functionId}/${active ? 'activate' : 'deactivate'}`,
     { method: 'POST' },
   )
-  if (!res.data?._id) throw new Error('Mudbase did not return the updated function.')
-  return res.data
+  const fn = res.data ?? res
+  if (!fn._id) throw new Error('Mudbase did not return the updated function.')
+  return fn
 }
 
 export async function executeMudbaseFunction(
@@ -194,12 +198,13 @@ export async function executeMudbaseFunction(
   payload: unknown,
 ): Promise<{ executionId: string; status: string }> {
   const pid = requireMudbaseProjectId()
-  const res = await request<{ data?: { executionId?: string; status?: string } }>(
+  const res = await request<{ data?: { executionId?: string; status?: string }; executionId?: string; status?: string }>(
     `/api/functions/projects/${pid}/functions/${functionId}/execute`,
     { method: 'POST', body: JSON.stringify({ payload }) },
   )
-  if (!res.data?.executionId) throw new Error('Mudbase did not return an execution id.')
-  return { executionId: res.data.executionId, status: res.data.status ?? 'queued' }
+  const data = res.data ?? res
+  if (!data.executionId) throw new Error('Mudbase did not return an execution id.')
+  return { executionId: data.executionId, status: data.status ?? 'queued' }
 }
 
 export async function getMudbaseExecutionStatus(
@@ -207,11 +212,12 @@ export async function getMudbaseExecutionStatus(
   executionId: string,
 ): Promise<MudbaseExecutionStatus> {
   const pid = requireMudbaseProjectId()
-  const res = await request<{ data?: MudbaseExecutionStatus }>(
+  const res = await request<MudbaseExecutionStatus & { data?: MudbaseExecutionStatus }>(
     `/api/functions/projects/${pid}/functions/${functionId}/executions/${executionId}`,
   )
-  if (!res.data) throw new Error('Mudbase did not return execution status.')
-  return res.data
+  const status = res.data ?? res
+  if (!status || typeof status.status !== 'string') throw new Error('Mudbase did not return execution status.')
+  return status
 }
 
 /** Poll an execution until it leaves queued/provisioning/running. Returns the last status. */
@@ -241,10 +247,11 @@ export async function getMudbaseLogs(
   limit = 20,
 ): Promise<{ executions: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats }> {
   const pid = requireMudbaseProjectId()
-  const res = await request<{ data?: { executions?: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats } }>(
+  const res = await request<{ data?: { executions?: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats }; executions?: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats }>(
     `/api/functions/projects/${pid}/functions/${functionId}/logs?limit=${limit}`,
   )
-  return { executions: res.data?.executions ?? [], stats: res.data?.stats }
+  const data = res.data ?? res
+  return { executions: data.executions ?? [], stats: data.stats }
 }
 
 /** POST to the public webhook endpoint — synchronous response with each function's result. */
