@@ -1,6 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkspace } from '../store/workspace'
 import { streamClaude, type ChatMessage } from '../lib/hosting'
+import {
+  CHATGPT_MODELS,
+  DEFAULT_MODEL,
+  GEMINI_MODELS,
+  clearApiKey,
+  getApiKey,
+  setApiKey,
+  streamChatGPT,
+  streamGemini,
+  type DirectProvider,
+} from '../lib/ai'
 import {
   isOpencodeAvailable,
   createSession,
@@ -23,7 +34,28 @@ import {
 import { Loader2, Send, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type Backend = 'claude' | 'opencode'
+type Backend = 'claude' | 'chatgpt' | 'gemini' | 'opencode'
+
+const BACKENDS: { id: Backend; label: string }[] = [
+  { id: 'claude', label: 'Claude' },
+  { id: 'chatgpt', label: 'ChatGPT' },
+  { id: 'gemini', label: 'Gemini' },
+  { id: 'opencode', label: 'opencode' },
+]
+
+const BACKEND_ENDPOINT: Record<Backend, string> = {
+  claude: 'Anthropic, via the zut cloud proxy',
+  chatgpt: 'OpenAI — your key, stored only in this browser',
+  gemini: 'Google AI — your key, stored only in this browser',
+  opencode: 'your local opencode server',
+}
+
+const BACKEND_HINT: Record<Backend, string> = {
+  claude: 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".',
+  chatgpt: 'Ask anything about your project. Uses your own OpenAI key — requests go straight from your browser to OpenAI.',
+  gemini: 'Ask anything about your project. Uses your own Google AI key — requests go straight from your browser to Google.',
+  opencode: 'Ask the AI to read, edit, or analyze your code. opencode has full file and shell access.',
+}
 
 interface AiPanelProps {
   signedIn: boolean
@@ -101,6 +133,10 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
   const [providers, setProviders] = useState<OpencodeProvider[]>([])
   const [selectedProvider, setSelectedProvider] = useState('')
   const [selectedModel, setSelectedModel] = useState('')
+  const [chatgptModel, setChatgptModel] = useState<string>(DEFAULT_MODEL.chatgpt)
+  const [geminiModel, setGeminiModel] = useState<string>(DEFAULT_MODEL.gemini)
+  const [keyInput, setKeyInput] = useState('')
+  const [keyTick, setKeyTick] = useState(0)
 
   // Check opencode availability on mount
   useEffect(() => {
@@ -134,6 +170,13 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
   const activeProvider = providers.find((p) => p.id === selectedProvider)
   const availableModels = activeProvider?.models ?? []
 
+  const directProvider: DirectProvider | null =
+    backend === 'chatgpt' || backend === 'gemini' ? backend : null
+  const directKey = useMemo(
+    () => (directProvider ? getApiKey(directProvider) : null),
+    [directProvider, keyTick],
+  )
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [messages, draft])
@@ -159,6 +202,26 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
             acc += piece
             setDraft(acc)
           },
+        )
+      } else if (backend === 'chatgpt') {
+        await streamChatGPT(
+          nextMessages,
+          buildSystemPrompt(state.projectName, state.files, state.activeFile),
+          (piece) => {
+            acc += piece
+            setDraft(acc)
+          },
+          { model: chatgptModel },
+        )
+      } else if (backend === 'gemini') {
+        await streamGemini(
+          nextMessages,
+          buildSystemPrompt(state.projectName, state.files, state.activeFile),
+          (piece) => {
+            acc += piece
+            setDraft(acc)
+          },
+          { model: geminiModel },
         )
       } else {
         let sessionId = opencodeSessionId
@@ -272,43 +335,54 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
 
         {/* Backend selector */}
         <div className="flex shrink-0 items-center gap-1 px-3 py-2.5">
-          <div className="flex rounded-lg border bg-muted/40 p-0.5">
-            {(['claude', 'opencode'] as const).map((b) => (
-              <button
-                key={b}
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors',
-                  backend === b ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground',
-                )}
-                onClick={() => switchBackend(b)}
-              >
-                {b === 'claude' ? 'Claude' : 'opencode'}
-                {b === 'opencode' && (
-                  <span
-                    className={cn(
-                      'ml-1.5 inline-block size-1.5 rounded-full align-middle',
-                      opencodeConnected === true
-                        ? 'bg-emerald-400'
-                        : opencodeConnected === false
-                          ? 'bg-red-400'
-                          : 'bg-muted-foreground',
-                    )}
-                  />
-                )}
-              </button>
-            ))}
+          <div className="flex flex-wrap rounded-lg border bg-muted/40 p-0.5">
+            {BACKENDS.map((b) => {
+              const missingKey =
+                (b.id === 'chatgpt' || b.id === 'gemini') && !getApiKey(b.id as DirectProvider)
+              return (
+                <button
+                  key={b.id}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                    backend === b.id ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => switchBackend(b.id)}
+                >
+                  {b.label}
+                  {b.id === 'opencode' && (
+                    <span
+                      className={cn(
+                        'ml-1.5 inline-block size-1.5 rounded-full align-middle',
+                        opencodeConnected === true
+                          ? 'bg-emerald-400'
+                          : opencodeConnected === false
+                            ? 'bg-red-400'
+                            : 'bg-muted-foreground',
+                      )}
+                    />
+                  )}
+                  {missingKey && (
+                    <span className="ml-1.5 inline-block size-1.5 rounded-full bg-amber-400 align-middle" title="API key needed" />
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* opencode provider/model config */}
-        {backend === 'opencode' && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pb-2.5">
-            {opencodeConnected === false ? (
+        {/* Per-backend config */}
+        <div className="flex shrink-0 flex-col gap-2 px-3 pb-2.5">
+          <p className="text-[11px] leading-4 text-muted-foreground">
+            {backend === 'claude' ? 'Anthropic, via the zut cloud proxy.' : BACKEND_ENDPOINT[backend]}
+          </p>
+
+          {backend === 'opencode' &&
+            (opencodeConnected === false ? (
               <p className="text-xs text-muted-foreground">
                 opencode server not detected. Run <code className="rounded bg-muted px-1 font-mono">npm run dev:opencode</code>
               </p>
             ) : (
-              <>
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   className="h-8 w-auto rounded-md border border-input bg-background px-2 text-xs"
                   value={selectedProvider}
@@ -338,10 +412,67 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
                     ))}
                   </select>
                 )}
-              </>
-            )}
-          </div>
-        )}
+              </div>
+            ))}
+
+          {(backend === 'chatgpt' || backend === 'gemini') && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-medium text-muted-foreground">Model</label>
+                <select
+                  className="h-8 w-auto rounded-md border border-input bg-background px-2 text-xs"
+                  value={backend === 'chatgpt' ? chatgptModel : geminiModel}
+                  onChange={(e) =>
+                    backend === 'chatgpt' ? setChatgptModel(e.target.value) : setGeminiModel(e.target.value)
+                  }
+                >
+                  {(backend === 'chatgpt' ? CHATGPT_MODELS : GEMINI_MODELS).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {directKey ? (
+                <div className="flex items-center justify-between rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2.5 py-1.5">
+                  <span className="text-[11px] text-emerald-400">API key saved in this browser</span>
+                  <button
+                    className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    onClick={() => {
+                      clearApiKey(backend as DirectProvider)
+                      setKeyTick((t) => t + 1)
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="password"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    placeholder={backend === 'chatgpt' ? 'sk-… (OpenAI API key)' : 'AIza… (Google AI API key)'}
+                    className="h-8 flex-1 font-mono text-xs"
+                    autoComplete="off"
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    disabled={!keyInput.trim()}
+                    onClick={() => {
+                      setApiKey(backend as DirectProvider, keyInput.trim())
+                      setKeyInput('')
+                      setKeyTick((t) => t + 1)
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <Separator />
 
@@ -356,9 +487,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
               <div className="flex flex-col gap-2 px-3 py-3">
                 {messages.length === 0 && !draft && (
                   <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                    {backend === 'claude'
-                      ? 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".'
-                      : 'Ask the AI to read, edit, or analyze your code. opencode has full file and shell access.'}
+                    {BACKEND_HINT[backend]}
                   </p>
                 )}
                 {messages.map((m, i) => (
