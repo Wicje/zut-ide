@@ -6,9 +6,6 @@ import {
   typescriptStarter,
   reactStarter,
   vueStarter,
-  nextStarter,
-  expressStarter,
-  nestStarter,
 } from '../lib/templates'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,11 +65,8 @@ const NEW_PROJECTS = [
   { label: 'Empty project', name: 'my-project', files: () => emptyProject() },
   { label: 'JavaScript playground', name: 'js-playground', files: () => javascriptStarter() },
   { label: 'TypeScript playground', name: 'ts-playground', files: () => typescriptStarter() },
-  { label: 'React', name: 'react-app', files: () => reactStarter() },
+  { label: 'React + Router + TanStack', name: 'react-app', files: () => reactStarter() },
   { label: 'Vue', name: 'vue-app', files: () => vueStarter() },
-  { label: 'Next.js (deploy to Vercel)', name: 'next-app', files: () => nextStarter() },
-  { label: 'Express API', name: 'express-api', files: () => expressStarter() },
-  { label: 'NestJS API', name: 'nestjs-api', files: () => nestStarter() },
 ] as const
 
 export default function Toolbar(props: ToolbarProps) {
