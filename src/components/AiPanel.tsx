@@ -718,6 +718,24 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
                     ))}
                   </div>
                 )}
+                {proposals.length === 0 &&
+                  directProvider &&
+                  !busy &&
+                  !error &&
+                  messages.length > 0 &&
+                  messages[messages.length - 1].role === 'assistant' && (
+                    <div className="flex justify-start px-1">
+                      <button
+                        className="rounded-full border border-dashed border-border px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:border-violet-400/50 hover:text-foreground"
+                        onClick={() =>
+                          send('Please output each file you want to change as a complete ```edit:path/to/file fenced block so I can review and accept it.')
+                        }
+                        title="Some models need a nudge to emit reviewable file changes"
+                      >
+                        No file changes detected — ask for edit format
+                      </button>
+                    </div>
+                  )}
                 <div ref={endRef} />
               </div>
             </ScrollArea>

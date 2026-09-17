@@ -14,7 +14,8 @@
 //
 // Env:
 //   PORT / ZUT_RUNTIME_PORT   port to listen on        (default 8787)
-//   HOST                      interface to bind        (default 0.0.0.0)
+//   HOST                      interface to bind        (default 127.0.0.1;
+//                             set 0.0.0.0 behind a TLS proxy WITH a token)
 //   ZUT_RUNTIME_TOKEN         optional shared secret; when set, requests must
 //                             send `Authorization: Bearer <token>`
 //   ZUT_RUNTIME_MAX_BODY      max request bytes         (default 8 MB)
@@ -32,7 +33,7 @@ import http from 'node:http'
 import { build } from 'esbuild'
 
 const PORT = Number(process.env.PORT ?? process.env.ZUT_RUNTIME_PORT ?? 8787)
-const HOST = process.env.HOST ?? '0.0.0.0'
+const HOST = process.env.HOST ?? '127.0.0.1'
 const TOKEN = process.env.ZUT_RUNTIME_TOKEN ?? ''
 const MAX_BODY = Number(process.env.ZUT_RUNTIME_MAX_BODY ?? 8 * 1024 * 1024)
 const VERSION = '0.1.0'
@@ -485,4 +486,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`zut-runtime listening on http://${HOST}:${PORT}  (auth ${TOKEN ? 'on' : 'off'}, mudbase ${mudbaseConfigured() ? 'on' : 'off'})`)
+  if (!['127.0.0.1', 'localhost', '::1'].includes(HOST) && !TOKEN) {
+    console.warn('[zut-runtime] WARNING: bound to a non-local interface with auth OFF — anyone on the network can build and deploy. Set ZUT_RUNTIME_TOKEN.')
+  }
 })

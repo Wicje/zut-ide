@@ -161,4 +161,7 @@ await fs.mkdir(ROOT, { recursive: true })
 server.listen(PORT, HOST, () => {
   console.log(`[zut-bridge] listening on http://${HOST}:${PORT}  (auth ${TOKEN ? 'on' : 'off'})`)
   console.log(`[zut-bridge] workspace ${ROOT}`)
+  if (!['127.0.0.1', 'localhost', '::1'].includes(HOST) && !TOKEN) {
+    console.warn('[zut-bridge] WARNING: bound to a non-local interface with auth OFF — anyone on the network can write files. Set ZUT_BRIDGE_TOKEN.')
+  }
 })

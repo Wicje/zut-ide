@@ -1,0 +1,44 @@
+name: Beta feedback
+description: Testing zut? Tell us what happened.
+title: "[beta]: "
+labels: [beta]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: What did you try?
+      options:
+        - Coding without AI (editor, preview, run)
+        - Coding with AI (chat, proposed changes, accept/reject)
+        - Deploy (Netlify, GitHub, Vercel, Serverless)
+        - Import / share / save
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Laptop / desktop
+        - Chromebook
+        - Phone / tablet
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: ai-provider
+    attributes:
+      label: AI provider (if you used AI)
+      description: e.g. OpenRouter, Claude, ChatGPT, Gemini, opencode — and the model name if you remember it
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what you got instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors (if any)
+      description: Any red text in the zut console panel, or the exact error message shown.
