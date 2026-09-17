@@ -7,6 +7,7 @@ import {
   formatBuildErrors,
   initRunner,
 } from './lib/runner'
+import { bundleProjectRemote, canUseRemote } from './lib/runtime'
 import { supabaseOrNull } from './lib/supabase'
 import {
   createProject,
@@ -91,7 +92,11 @@ export default function App() {
   const [shareLink, setShareLink] = useState<string | null>(null)
   const [status, setStatus] = useState<RunStatus>('idle')
   const [hasLocalDraft, setHasLocalDraft] = useState(false)
-  const [wasmReady] = useState(() => initRunner())
+  const wasmPromise = useRef<Promise<void> | null>(null)
+  const ensureWasm = useCallback(() => {
+    if (!wasmPromise.current) wasmPromise.current = initRunner()
+    return wasmPromise.current
+  }, [])
   const isMobile = useMediaQuery('(max-width: 860px)')
   const [mobileView, setMobileView] = useState<'code' | 'result' | 'files'>('code')
   const fileStripRef = useRef<HTMLDivElement>(null)
@@ -122,8 +127,20 @@ export default function App() {
       setStatus('running')
       clearConsole()
       try {
-        await wasmReady
-        const bundle = await bundleProject(target)
+        let bundle
+        if (canUseRemote(target)) {
+          try {
+            bundle = await bundleProjectRemote(target)
+          } catch (e) {
+            if ((e as Error).message.startsWith('BUILD_FAILED:')) throw e
+            addConsole('warn', 'Remote runtime unavailable — building in the browser instead.')
+            await ensureWasm()
+            bundle = await bundleProject(target)
+          }
+        } else {
+          await ensureWasm()
+          bundle = await bundleProject(target)
+        }
         setSrcDoc(buildSrcdoc(target['index.html'], bundle))
         setRunKey((k) => k + 1)
         setStatus('done')
@@ -143,7 +160,7 @@ export default function App() {
         setStatus('error')
       }
     },
-    [state.files, addConsole, clearConsole, wasmReady],
+    [state.files, addConsole, clearConsole, ensureWasm],
   )
 
   const openLocation = useCallback(

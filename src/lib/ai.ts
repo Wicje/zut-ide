@@ -1,11 +1,39 @@
 import type { ChatMessage } from './hosting'
 
-export type DirectProvider = 'chatgpt' | 'gemini'
+export type DirectProvider = 'openrouter' | 'anthropic' | 'chatgpt' | 'gemini'
+
+export const OPENROUTER_MODELS = [
+  'google/gemini-2.5-flash',
+  'anthropic/claude-sonnet-4.5',
+  'openai/gpt-5-mini',
+  'openai/gpt-4o-mini',
+  'deepseek/deepseek-chat',
+  'qwen/qwen-2.5-coder-32b-instruct',
+  'meta-llama/llama-3.3-70b-instruct',
+  'z-ai/glm-5.2:free',
+  'google/gemma-4-31b-it:free',
+] as const
+
+export const ANTHROPIC_MODELS = [
+  'claude-sonnet-4-5',
+  'claude-sonnet-5',
+  'claude-opus-5',
+  'claude-haiku-4-5',
+] as const
 
 export const CHATGPT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'] as const
 export const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] as const
 
+export const PROVIDER_MODELS: Record<DirectProvider, readonly string[]> = {
+  openrouter: OPENROUTER_MODELS,
+  anthropic: ANTHROPIC_MODELS,
+  chatgpt: CHATGPT_MODELS,
+  gemini: GEMINI_MODELS,
+}
+
 export const DEFAULT_MODEL: Record<DirectProvider, string> = {
+  openrouter: 'google/gemini-2.5-flash',
+  anthropic: 'claude-sonnet-4-5',
   chatgpt: 'gpt-4o-mini',
   gemini: 'gemini-2.5-flash',
 }
@@ -123,6 +151,93 @@ export async function streamChatGPT(
       if (piece) onDelta(piece)
     },
   )
+}
+
+/** OpenRouter — one key and an OpenAI-compatible API for many models. */
+export async function streamOpenRouter(
+  messages: ChatMessage[],
+  system: string,
+  onDelta: DeltaHandler,
+  opts: { model: string },
+): Promise<void> {
+  const key = getApiKey('openrouter')
+  if (!key) throw new Error('Add an OpenRouter API key to chat.')
+
+  await consumeSse(
+    await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+        'HTTP-Referer': typeof location !== 'undefined' ? location.origin : 'https://zut.dev',
+        'X-Title': 'zut IDE',
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        messages: [{ role: 'system', content: system }, ...toOpenAiHistory(messages)],
+        stream: true,
+      }),
+    }),
+    (json) => {
+      const piece = (json as { choices?: Array<{ delta?: { content?: string } }> }).choices?.[0]?.delta?.content
+      if (piece) onDelta(piece)
+    },
+  )
+}
+
+/** Anthropic's Messages API, called straight from the browser with the user's
+ *  own key (opt-in via the `anthropic-dangerous-direct-browser-access` header). */
+export async function streamAnthropic(
+  messages: ChatMessage[],
+  system: string,
+  onDelta: DeltaHandler,
+  opts: { model: string; maxTokens?: number },
+): Promise<void> {
+  const key = getApiKey('anthropic')
+  if (!key) throw new Error('Add an Anthropic API key to chat.')
+
+  await consumeSse(
+    await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        max_tokens: opts.maxTokens ?? 4096,
+        system,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        stream: true,
+      }),
+    }),
+    (json) => {
+      const event = json as { type?: string; delta?: { text?: string } }
+      if (event.type === 'content_block_delta' && event.delta?.text) onDelta(event.delta.text)
+    },
+  )
+}
+
+/** Route a chat request to whichever BYOK provider the student picked. */
+export async function streamDirect(
+  provider: DirectProvider,
+  messages: ChatMessage[],
+  system: string,
+  onDelta: DeltaHandler,
+  opts: { model: string },
+): Promise<void> {
+  switch (provider) {
+    case 'openrouter':
+      return streamOpenRouter(messages, system, onDelta, opts)
+    case 'anthropic':
+      return streamAnthropic(messages, system, onDelta, opts)
+    case 'chatgpt':
+      return streamChatGPT(messages, system, onDelta, opts)
+    case 'gemini':
+      return streamGemini(messages, system, onDelta, opts)
+  }
 }
 
 export async function streamGemini(

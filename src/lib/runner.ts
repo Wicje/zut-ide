@@ -44,6 +44,14 @@ function cdnUrl(specifier: string): string {
   return `https://esm.sh/${specifier}`
 }
 
+/** Directory a relative import resolves against. Prefer the `resolveDir` from
+ *  our virtual `onLoad` (always `/`), which stays correct even for namespaced
+ *  importers like `zut-vfs:/main.ts` that would otherwise break nested imports. */
+function resolveBase(args: { resolveDir?: string; importer: string }): string {
+  if (args.resolveDir) return args.resolveDir.replace(/\/?$/, '/')
+  return args.importer === '<stdin>' ? '/index.html' : args.importer
+}
+
 /** Plugin for the server-side compile check: resolves the project's own files
  *  and treats every node builtin + installed package as external. */
 function buildNodeCheckPlugin(files: FileMap): Plugin {
@@ -59,7 +67,7 @@ function buildNodeCheckPlugin(files: FileMap): Plugin {
         }
         const qIdx = args.path.search(/\?/)
         const clean = qIdx >= 0 ? args.path.slice(0, qIdx) : args.path
-        const importer = args.importer === '<stdin>' ? '/index.html' : args.importer
+        const importer = resolveBase(args)
         const resolved = resolvePath(importer, clean)
         if (!(resolved.slice(1) in files)) {
           return { errors: [{ text: `Could not resolve "${args.path}" (not in this project)` }] }
@@ -267,7 +275,7 @@ function buildVirtualFsPlugin(files: FileMap): Plugin {
         const qIdx = args.path.search(/\?/)
         const query = qIdx >= 0 ? args.path.slice(qIdx) : ''
         const clean = qIdx >= 0 ? args.path.slice(0, qIdx) : args.path
-        const importer = args.importer === '<stdin>' ? '/index.html' : args.importer
+        const importer = resolveBase(args)
         const resolved = resolvePath(importer, clean)
         if (!(resolved.slice(1) in files)) {
           return { errors: [{ text: `Could not resolve "${args.path}" (not in this project)` }] }

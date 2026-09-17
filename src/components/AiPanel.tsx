@@ -2,14 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkspace } from '../store/workspace'
 import { streamClaude, type ChatMessage } from '../lib/hosting'
 import {
-  CHATGPT_MODELS,
   DEFAULT_MODEL,
-  GEMINI_MODELS,
+  PROVIDER_MODELS,
   clearApiKey,
   getApiKey,
   setApiKey,
-  streamChatGPT,
-  streamGemini,
+  streamDirect,
   type DirectProvider,
 } from '../lib/ai'
 import {
@@ -22,6 +20,7 @@ import {
 import type { EditorSelection } from '../types'
 import {
   isOpencodeAvailable,
+  isBridgeAvailable,
   createSession,
   streamOpencode,
   getProviders,
@@ -42,27 +41,66 @@ import {
 import { FileCode2, Loader2, Send, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type Backend = 'claude' | 'chatgpt' | 'gemini' | 'opencode'
+type Backend = DirectProvider | 'claude' | 'opencode'
+
+const DIRECT_PROVIDERS: DirectProvider[] = ['openrouter', 'anthropic', 'chatgpt', 'gemini']
+
+function isDirect(backend: Backend): backend is DirectProvider {
+  return (DIRECT_PROVIDERS as string[]).includes(backend)
+}
 
 const BACKENDS: { id: Backend; label: string }[] = [
-  { id: 'claude', label: 'Claude' },
+  { id: 'openrouter', label: 'OpenRouter' },
+  { id: 'anthropic', label: 'Claude' },
+  { id: 'claude', label: 'zut Cloud' },
   { id: 'chatgpt', label: 'ChatGPT' },
   { id: 'gemini', label: 'Gemini' },
   { id: 'opencode', label: 'opencode' },
 ]
 
-const BACKEND_ENDPOINT: Record<Backend, string> = {
-  claude: 'Anthropic, via the zut cloud proxy',
-  chatgpt: 'OpenAI — your key, stored only in this browser',
-  gemini: 'Google AI — your key, stored only in this browser',
-  opencode: 'your local opencode server',
+const DIRECT_INFO: Record<
+  DirectProvider,
+  { endpoint: string; hint: string; placeholder: string }
+> = {
+  openrouter: {
+    endpoint: 'OpenRouter — one key for Claude, GPT, Gemini, Llama and more. Your key, stored only in this browser.',
+    hint: 'Ask anything about your project. One OpenRouter key unlocks many models.',
+    placeholder: 'sk-or-… (OpenRouter API key)',
+  },
+  anthropic: {
+    endpoint: 'Anthropic — your key, stored only in this browser.',
+    hint: 'Ask anything about your project. Uses your own Anthropic key — requests go straight from your browser to Anthropic.',
+    placeholder: 'sk-ant-… (Anthropic API key)',
+  },
+  chatgpt: {
+    endpoint: 'OpenAI — your key, stored only in this browser.',
+    hint: 'Ask anything about your project. Uses your own OpenAI key — requests go straight from your browser to OpenAI.',
+    placeholder: 'sk-… (OpenAI API key)',
+  },
+  gemini: {
+    endpoint: 'Google AI — your key, stored only in this browser.',
+    hint: 'Ask anything about your project. Uses your own Google AI key — requests go straight from your browser to Google.',
+    placeholder: 'AIza… (Google AI API key)',
+  },
 }
 
-const BACKEND_HINT: Record<Backend, string> = {
-  claude: 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".',
-  chatgpt: 'Ask anything about your project. Uses your own OpenAI key — requests go straight from your browser to OpenAI.',
-  gemini: 'Ask anything about your project. Uses your own Google AI key — requests go straight from your browser to Google.',
-  opencode: 'Ask the AI to read, edit, or analyze your code. opencode has full file and shell access.',
+const CLOUD_INFO: Record<'claude' | 'opencode', { endpoint: string; hint: string }> = {
+  claude: {
+    endpoint: 'Anthropic, via the zut cloud proxy.',
+    hint: 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".',
+  },
+  opencode: {
+    endpoint: 'your AI agent server (opencode).',
+    hint: 'Ask the AI to read, edit, or analyze your code. The agent runs on your server, not in the browser.',
+  },
+}
+
+function endpointFor(backend: Backend): string {
+  return isDirect(backend) ? DIRECT_INFO[backend].endpoint : CLOUD_INFO[backend].endpoint
+}
+
+function hintFor(backend: Backend): string {
+  return isDirect(backend) ? DIRECT_INFO[backend].hint : CLOUD_INFO[backend].hint
 }
 
 interface AiPanelProps {
@@ -244,19 +282,20 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Backend selection
-  const [backend, setBackend] = useState<Backend>('claude')
+  const [backend, setBackend] = useState<Backend>('openrouter')
   const [opencodeConnected, setOpencodeConnected] = useState<boolean | null>(null)
+  const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null)
   const [opencodeSessionId, setOpencodeSessionId] = useState<string | null>(null)
   const [providers, setProviders] = useState<OpencodeProvider[]>([])
   const [selectedProvider, setSelectedProvider] = useState('')
   const [selectedModel, setSelectedModel] = useState('')
-  const [chatgptModel, setChatgptModel] = useState<string>(DEFAULT_MODEL.chatgpt)
-  const [geminiModel, setGeminiModel] = useState<string>(DEFAULT_MODEL.gemini)
+  const [models, setModels] = useState<Record<DirectProvider, string>>({ ...DEFAULT_MODEL })
   const [keyInput, setKeyInput] = useState('')
   const [keyTick, setKeyTick] = useState(0)
 
   // Check opencode availability on mount
   useEffect(() => {
+    isBridgeAvailable().then(setBridgeConnected)
     isOpencodeAvailable().then((ok) => {
       setOpencodeConnected(ok)
       if (ok) {
@@ -287,8 +326,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
   const activeProvider = providers.find((p) => p.id === selectedProvider)
   const availableModels = activeProvider?.models ?? []
 
-  const directProvider: DirectProvider | null =
-    backend === 'chatgpt' || backend === 'gemini' ? backend : null
+  const directProvider: DirectProvider | null = isDirect(backend) ? backend : null
   const directKey = useMemo(
     () => (directProvider ? getApiKey(directProvider) : null),
     [directProvider, keyTick],
@@ -311,7 +349,18 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
 
     let acc = ''
     try {
-      if (backend === 'claude') {
+      if (directProvider) {
+        await streamDirect(
+          directProvider,
+          nextMessages,
+          buildSystemPrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
+          (piece) => {
+            acc += piece
+            setDraft(acc)
+          },
+          { model: models[directProvider] },
+        )
+      } else if (backend === 'claude') {
         await streamClaude(
           nextMessages,
           buildSystemPrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
@@ -319,26 +368,6 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
             acc += piece
             setDraft(acc)
           },
-        )
-      } else if (backend === 'chatgpt') {
-        await streamChatGPT(
-          nextMessages,
-          buildSystemPrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
-          (piece) => {
-            acc += piece
-            setDraft(acc)
-          },
-          { model: chatgptModel },
-        )
-      } else if (backend === 'gemini') {
-        await streamGemini(
-          nextMessages,
-          buildSystemPrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
-          (piece) => {
-            acc += piece
-            setDraft(acc)
-          },
-          { model: geminiModel },
         )
       } else {
         let sessionId = opencodeSessionId
@@ -486,8 +515,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
         <div className="flex shrink-0 items-center gap-1 px-3 py-2.5">
           <div className="flex flex-wrap rounded-lg border bg-muted/40 p-0.5">
             {BACKENDS.map((b) => {
-              const missingKey =
-                (b.id === 'chatgpt' || b.id === 'gemini') && !getApiKey(b.id as DirectProvider)
+              const missingKey = isDirect(b.id) && !getApiKey(b.id)
               return (
                 <button
                   key={b.id}
@@ -521,9 +549,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
 
         {/* Per-backend config */}
         <div className="flex shrink-0 flex-col gap-2 px-3 pb-2.5">
-          <p className="text-[11px] leading-4 text-muted-foreground">
-            {backend === 'claude' ? 'Anthropic, via the zut cloud proxy.' : BACKEND_ENDPOINT[backend]}
-          </p>
+          <p className="text-[11px] leading-4 text-muted-foreground">{endpointFor(backend)}</p>
 
           {backend === 'opencode' &&
             (opencodeConnected === false ? (
@@ -564,18 +590,23 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
               </div>
             ))}
 
-          {(backend === 'chatgpt' || backend === 'gemini') && (
+          {backend === 'opencode' && opencodeConnected && bridgeConnected === false && (
+            <p className="text-[11px] text-amber-400">
+              File sync unavailable — the agent can chat but can't edit files. Run{' '}
+              <code className="rounded bg-muted px-1 font-mono">npm run dev:bridge</code>.
+            </p>
+          )}
+
+          {directProvider && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <label className="text-[11px] font-medium text-muted-foreground">Model</label>
                 <select
-                  className="h-8 w-auto rounded-md border border-input bg-background px-2 text-xs"
-                  value={backend === 'chatgpt' ? chatgptModel : geminiModel}
-                  onChange={(e) =>
-                    backend === 'chatgpt' ? setChatgptModel(e.target.value) : setGeminiModel(e.target.value)
-                  }
+                  className="h-8 w-auto max-w-full rounded-md border border-input bg-background px-2 text-xs"
+                  value={models[directProvider]}
+                  onChange={(e) => setModels((prev) => ({ ...prev, [directProvider]: e.target.value }))}
                 >
-                  {(backend === 'chatgpt' ? CHATGPT_MODELS : GEMINI_MODELS).map((m) => (
+                  {PROVIDER_MODELS[directProvider].map((m) => (
                     <option key={m} value={m}>
                       {m}
                     </option>
@@ -588,7 +619,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
                   <button
                     className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                     onClick={() => {
-                      clearApiKey(backend as DirectProvider)
+                      clearApiKey(directProvider)
                       setKeyTick((t) => t + 1)
                     }}
                   >
@@ -601,7 +632,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
                     type="password"
                     value={keyInput}
                     onChange={(e) => setKeyInput(e.target.value)}
-                    placeholder={backend === 'chatgpt' ? 'sk-… (OpenAI API key)' : 'AIza… (Google AI API key)'}
+                    placeholder={DIRECT_INFO[directProvider].placeholder}
                     className="h-8 flex-1 font-mono text-xs"
                     autoComplete="off"
                   />
@@ -610,7 +641,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
                     className="h-8"
                     disabled={!keyInput.trim()}
                     onClick={() => {
-                      setApiKey(backend as DirectProvider, keyInput.trim())
+                      setApiKey(directProvider, keyInput.trim())
                       setKeyInput('')
                       setKeyTick((t) => t + 1)
                     }}
@@ -636,7 +667,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
               <div className="flex flex-col gap-2 px-3 py-3">
                 {messages.length === 0 && !draft && (
                   <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                    {BACKEND_HINT[backend]}
+                    {hintFor(backend)}
                   </p>
                 )}
                 {messages.map((m, i) => (

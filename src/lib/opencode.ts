@@ -32,6 +32,8 @@ export interface ProjectChange {
 const DEFAULT_URL = 'http://127.0.0.1:4096'
 const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:4331'
 
+const BRIDGE_TOKEN = import.meta.env.VITE_OPENCODE_BRIDGE_TOKEN as string | undefined
+
 function getBaseUrl(): string {
   return (import.meta.env.VITE_OPENCODE_URL as string) || DEFAULT_URL
 }
@@ -40,10 +42,18 @@ function getBridgeUrl(): string {
   return (import.meta.env.VITE_OPENCODE_BRIDGE_URL as string) || DEFAULT_BRIDGE_URL
 }
 
+/** Headers for the file bridge, including its shared secret when configured. */
+function bridgeHeaders(extra?: Record<string, string>): Record<string, string> {
+  return { ...extra, ...(BRIDGE_TOKEN ? { Authorization: `Bearer ${BRIDGE_TOKEN}` } : {}) }
+}
+
 /** Whether the file bridge (disk sync) is reachable. */
 export async function isBridgeAvailable(): Promise<boolean> {
   try {
-    const res = await fetch(`${getBridgeUrl()}/health`, { signal: AbortSignal.timeout(2000) })
+    const res = await fetch(`${getBridgeUrl()}/health`, {
+      headers: bridgeHeaders(),
+      signal: AbortSignal.timeout(2000),
+    })
     return res.ok
   } catch {
     return false
@@ -54,7 +64,7 @@ export async function isBridgeAvailable(): Promise<boolean> {
 export async function syncProjectToDisk(files: FileMap): Promise<void> {
   const res = await fetch(`${getBridgeUrl()}/write`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ files }),
   })
   if (!res.ok) {
@@ -65,7 +75,7 @@ export async function syncProjectToDisk(files: FileMap): Promise<void> {
 
 /** Read the disk workspace back (files opencode may have created/edited/deleted). */
 export async function readProjectFromDisk(): Promise<FileMap> {
-  const res = await fetch(`${getBridgeUrl()}/read-tree`)
+  const res = await fetch(`${getBridgeUrl()}/read-tree`, { headers: bridgeHeaders() })
   if (!res.ok) throw new Error(`opencode file read failed (${res.status})`)
   const json = (await res.json()) as { files?: FileMap }
   return json.files ?? {}

@@ -13,6 +13,8 @@ import {
   type VercelDeployResult,
 } from '../lib/hosting'
 import { checkNodeProject, findNodeEntry } from '../lib/runner'
+import { mudbaseEnabled } from '../lib/mudbase'
+import MudbasePanel from './MudbasePanel'
 import type { ConsoleLevel } from '../types'
 import {
   Dialog,
@@ -38,6 +40,7 @@ import {
   Link2,
   X,
   Stethoscope,
+  Server,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -125,6 +128,11 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
       Object.entries(frameworkByDep).find(([dep]) => deps[dep])?.[1] ?? 'Node'
     return { framework, entry: findNodeEntry(state.files) }
   }, [state.files])
+
+  const hasMudbase = mudbaseEnabled()
+  const canCloud = hostingEnabled() && signedIn
+  const showTabs = hasMudbase || canCloud
+  const defaultTab = nodeProject && canCloud ? 'node' : hasMudbase ? 'mudbase' : 'github'
 
   const isConnected = (p: string) => connections.some((c) => c.provider === p)
   const login = (p: string) => connections.find((c) => c.provider === p)?.login ?? null
@@ -271,35 +279,52 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
         <DialogHeader>
           <DialogTitle>Publish project</DialogTitle>
           <DialogDescription>
-            {!hostingEnabled()
-              ? 'Cloud publishing (GitHub push, Vercel deploy, AI) needs Supabase configured. See README.md.'
-              : !signedIn
+            {!hasMudbase && !hostingEnabled()
+              ? 'Publishing needs configuration — see README.md (GitHub/Vercel/AI need Supabase; the serverless tab needs VITE_MUDBASE_API_KEY + VITE_MUDBASE_PROJECT_ID).'
+              : !signedIn && !hasMudbase
                 ? 'Sign in (top-right) to connect GitHub / Vercel and use the AI assistant.'
-                : 'Deploy or push “{name}” to a hosting provider.'.replace('{name}', state.projectName)}
+                : `Deploy or push "${state.projectName}" to a hosting provider.`}
           </DialogDescription>
         </DialogHeader>
 
-        {hostingEnabled() && signedIn && (
-          <Tabs defaultValue={nodeProject ? 'node' : 'github'} className="flex min-h-0 flex-1 flex-col">
+        {showTabs && (
+          <Tabs defaultValue={defaultTab} className="flex min-h-0 flex-1 flex-col">
             <TabsList className="w-full justify-start">
-              {nodeProject && (
+              {hasMudbase && (
+                <TabsTrigger value="mudbase">
+                  <Server className="mr-1.5 size-3.5" /> Serverless
+                </TabsTrigger>
+              )}
+              {canCloud && nodeProject && (
                 <TabsTrigger value="node">
                   <Stethoscope className="mr-1.5 size-3.5" /> Check
                 </TabsTrigger>
               )}
-              <TabsTrigger value="github">
-                <GitBranch className="mr-1.5 size-3.5" /> GitHub
-              </TabsTrigger>
-              <TabsTrigger value="vercel">
-                <Triangle className="mr-1.5 size-3.5" /> Vercel
-              </TabsTrigger>
-              <TabsTrigger value="netlify">
-                <Cloud className="mr-1.5 size-3.5" /> Netlify
-              </TabsTrigger>
+              {canCloud && (
+                <TabsTrigger value="github">
+                  <GitBranch className="mr-1.5 size-3.5" /> GitHub
+                </TabsTrigger>
+              )}
+              {canCloud && (
+                <TabsTrigger value="vercel">
+                  <Triangle className="mr-1.5 size-3.5" /> Vercel
+                </TabsTrigger>
+              )}
+              {canCloud && (
+                <TabsTrigger value="netlify">
+                  <Cloud className="mr-1.5 size-3.5" /> Netlify
+                </TabsTrigger>
+              )}
             </TabsList>
 
-            <div className="min-h-0 flex-1">
-              {nodeProject && (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {hasMudbase && (
+                <TabsContent value="mudbase">
+                  <MudbasePanel files={state.files} projectName={state.projectName} onLog={onLog} />
+                </TabsContent>
+              )}
+
+              {canCloud && nodeProject && (
                 <TabsContent value="node">
                   <div className="grid gap-3">
                     <p className="text-sm text-muted-foreground">

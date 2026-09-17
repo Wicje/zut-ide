@@ -60,6 +60,28 @@ The app runs fine with no configuration — try it before touching Supabase.
 npm run build && npm run preview
 ```
 
+## Optional: remote runtime (build on a server, not the laptop)
+
+By default projects are bundled in the browser with esbuild-wasm. On low-end
+machines you can move that work to a server instead:
+
+```bash
+npm run runtime            # → http://localhost:8787  (PORT to change)
+```
+
+Then point the IDE at it:
+
+```bash
+# .env.local
+VITE_RUNTIME_URL=http://localhost:8787
+```
+
+When `VITE_RUNTIME_URL` is set, the browser POSTs the project's files to
+`/build` and gets back the JS/CSS bundle. If the service is unreachable (or the
+project uses `.vue` files, which still need the browser compiler), the IDE
+falls back to the in-browser runner automatically. Run the service with
+`ZUT_RUNTIME_TOKEN=...` and set `VITE_RUNTIME_TOKEN` to require a shared secret.
+
 ## Optional: Supabase (accounts, cloud save, sharing)
 
 1. Create a project at [supabase.com](https://supabase.com).
@@ -131,14 +153,63 @@ server only; the browser never sees them.
 
 1. `index.html` is the app entry point.
 2. `<link rel="stylesheet" href="...">` and `<script src="...">` tags pointing at project files are
-   collected, then all JS/TS/CSS is bundled with esbuild (browser, IIFE). TS type-checking is done
-   live by the editor; esbuild strips types for execution.
+   collected, then all JS/TS/CSS is bundled with esbuild. This runs in the browser by default, or on
+   the [remote runtime](#optional-remote-runtime-build-on-a-server-not-the-laptop) when configured.
+   TS type-checking is done live by the editor; esbuild strips types for execution.
 3. The bundled JS/CSS is inlined into a self-contained HTML string rendered in a sandboxed `<iframe>`
    (`allow-scripts`, no `same-origin` → the preview cannot touch the app).
 4. A tiny harness inside the iframe reroutes `console.*`, `window.onerror` and
    `unhandledrejection` back to the IDE via `postMessage`.
 
 Build errors (missing files, syntax errors, bad imports) are shown as red entries in the console.
+
+## AI: bring your own key, or self-host the agent
+
+The **✨ AI** panel has two ways to run:
+
+**1. Bring your own key (no sign-in, no zut server).** Pick a provider, paste a key, and chat. Keys
+are stored only in this browser (`localStorage`, key `zut:ai:key:<provider>`) and requests go straight
+from the browser to the provider:
+
+| Provider | Notes |
+| --- | --- |
+| **OpenRouter** (default) | One key for Claude, GPT, Gemini, Llama and more. Get one at [openrouter.ai/keys](https://openrouter.ai/keys). Free models are listed too. |
+| **Claude** | Direct Anthropic API key from [console.anthropic.com](https://console.anthropic.com). |
+| **ChatGPT** | OpenAI API key. |
+| **Gemini** | Google AI Studio key. |
+
+Everything else in the IDE works without any key — only the AI panel needs one. Without a key, the
+provider's tab shows an amber dot and a key prompt.
+
+**2. Self-host the agent (the AI edits your files).** This runs the [opencode](https://opencode.ai)
+agent on a server so it can read/write the project with real tools, while the student's device only
+renders the browser UI. Run all three server-side pieces on the same machine:
+
+```bash
+npm run dev:server   # runtime + file bridge + opencode agent
+```
+
+or individually: `npm run runtime`, `npm run dev:bridge`, `npm run dev:opencode`.
+Point the browser at them:
+
+```bash
+# .env.local
+VITE_RUNTIME_URL=https://runtime.example.com
+VITE_OPENCODE_URL=https://agent.example.com
+VITE_OPENCODE_BRIDGE_URL=https://bridge.example.com
+```
+
+When exposing these to a network, set a shared secret so only your IDE can call them:
+
+```bash
+ZUT_RUNTIME_TOKEN=$(openssl rand -hex 32) \
+ZUT_BRIDGE_TOKEN=$(openssl rand -hex 32) \
+npm run dev:server
+```
+
+and put the matching values in `VITE_RUNTIME_TOKEN` / `VITE_OPENCODE_BRIDGE_TOKEN`. The bridge binds
+`127.0.0.1` by default; set `ZUT_BRIDGE_HOST=0.0.0.0` behind a TLS reverse proxy (and always keep the
+token set when you do).
 
 ## Notes & limitations
 
@@ -153,7 +224,9 @@ Build errors (missing files, syntax errors, bad imports) are shown as red entrie
   (or `npm run build` when a `package.json` with a build script / Vite is present); for heavy apps
   prefer linking the pushed GitHub repo inside Vercel instead. OAuth uses a popup — allow popups for
   the site.
-- **AI** runs on your Anthropic key at your cost. The button requires signing in (to attribute usage).
+- **AI** works two ways: bring your own key (OpenRouter/Anthropic/OpenAI/Gemini, stored in this
+  browser, billed by that provider) or sign in to use the zut cloud proxy. The self-hosted agent
+  option runs opencode on a server.
 - Importing some dynamic pages may fail if the site blocks cross-origin fetches or requires JS
   rendering. CodePen, raw GitHub, and plain HTML/CSS/JS pages work best.
 
@@ -163,6 +236,9 @@ Build errors (missing files, syntax errors, bad imports) are shown as red entrie
 src/
   App.tsx                # routing, run loop, autosave, cloud sync, feature wiring
   lib/runner.ts          # esbuild bundling + srcdoc + console harness
+  lib/runtime.ts         # client for the optional remote bundling service
+  lib/ai.ts              # BYOK chat providers (OpenRouter, Anthropic, OpenAI, Gemini)
+  lib/opencode.ts        # opencode agent + disk-sync bridge client
   lib/backend.ts         # Supabase + localStorage persistence
   lib/supabase.ts        # client init / config check
   lib/templates.ts       # starting templates
@@ -180,7 +256,9 @@ src/
     Toolbar.tsx          # run / autosave / save / share / zip / deploy / AI
     Login.tsx, ProjectList.tsx, ShareDialog.tsx
     DeployDialog.tsx     # Publish hub: GitHub push, Vercel, Netlify
-    AiPanel.tsx          # Claude chat assistant
+    AiPanel.tsx          # AI chat: BYOK providers + optional self-hosted agent
+runtime/server.mjs       # self-hostable bundling service (native esbuild)
+scripts/file-bridge.mjs  # syncs the project to disk for the opencode agent
 supabase/schema.sql      # tables + RLS + share RPCs + OAuth connections
 supabase/functions/
   _shared/               # auth, OAuth state, GitHub, Vercel helpers
