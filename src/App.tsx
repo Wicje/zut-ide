@@ -43,7 +43,7 @@ import ImportDialog from './components/ImportDialog'
 import DeployDialog from './components/DeployDialog'
 import HistoryDialog from './components/HistoryDialog'
 import AiPanel from './components/AiPanel'
-import { AlertTriangle, Braces, MonitorPlay, FolderOpen } from 'lucide-react'
+import { AlertTriangle, Braces, MonitorPlay, FolderOpen, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { EditorSelection, FileMap, RunStatus } from './types'
 
@@ -94,6 +94,13 @@ export default function App() {
   const [wasmReady] = useState(() => initRunner())
   const isMobile = useMediaQuery('(max-width: 860px)')
   const [mobileView, setMobileView] = useState<'code' | 'result' | 'files'>('code')
+  const fileStripRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isMobile || !state.activeFile) return
+    const el = fileStripRef.current?.querySelector<HTMLElement>(`[data-file="${CSS.escape(state.activeFile)}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }, [isMobile, state.activeFile])
   const [viewport, setViewport] = useState<'auto' | number>('auto')
   const [formatting, setFormatting] = useState(false)
   const [reveal, setReveal] = useState<{ token: number; line?: number; column?: number } | null>(null)
@@ -437,6 +444,7 @@ export default function App() {
         <div className="flex min-h-0 flex-1 flex-col">
           <div
             className="flex shrink-0 gap-1 overflow-x-auto border-b bg-muted/40 px-2 py-1.5"
+            ref={fileStripRef}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
@@ -446,6 +454,7 @@ export default function App() {
               return (
                 <button
                   key={file}
+                  data-file={file}
                   className={cn(
                     'shrink-0 rounded-md px-2.5 py-1 font-mono text-xs transition-colors',
                     active
@@ -492,7 +501,10 @@ export default function App() {
             )}
           </div>
 
-          <nav className="grid shrink-0 grid-cols-3 border-t bg-background/90 backdrop-blur">
+          <nav
+            className="grid shrink-0 grid-cols-4 border-t bg-background/90 backdrop-blur"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
             <MobileNavButton
               active={mobileView === 'code'}
               icon={<Braces className="size-5" />}
@@ -511,6 +523,12 @@ export default function App() {
               icon={<FolderOpen className="size-5" />}
               label="Files"
               onClick={() => setMobileView('files')}
+            />
+            <MobileNavButton
+              active={showAi}
+              icon={<Sparkles className="size-5" />}
+              label="AI"
+              onClick={() => setShowAi(true)}
             />
           </nav>
         </div>
