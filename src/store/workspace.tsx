@@ -20,6 +20,7 @@ export interface WorkspaceState {
   runStatus: RunStatus
   saved: boolean
   error: string | null
+  hydrated: boolean
 }
 
 type Action =
@@ -51,6 +52,7 @@ function initialState(): WorkspaceState {
     runStatus: 'idle',
     saved: true,
     error: null,
+    hydrated: false,
   }
 }
 
@@ -69,6 +71,7 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         readOnly: Boolean(action.readOnly),
         isSharedView: Boolean(action.isSharedView),
         saved: true,
+        hydrated: true,
       }
     }
     case 'SET_FILE':
@@ -125,7 +128,7 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
 interface WorkspaceApi {
   state: WorkspaceState
   dispatch: Dispatch<Action>
-  addConsole: (level: ConsoleLevel, message: string) => void
+  addConsole: (level: ConsoleLevel, message: string, meta?: { file?: string; line?: number; column?: number }) => void
   clearConsole: () => void
   loadFiles: (files: FileMap, name: string, opts?: { projectId?: string | null; readOnly?: boolean; isSharedView?: boolean; activeFile?: string }) => void
 }
@@ -135,8 +138,11 @@ const WorkspaceContext = createContext<WorkspaceApi | null>(null)
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, initialState)
 
-  const addConsole = useCallback((level: ConsoleLevel, message: string) => {
-    dispatch({ type: 'APPEND_CONSOLE', entry: { id: ++consoleId, level, message, timestamp: Date.now() } })
+  const addConsole = useCallback((level: ConsoleLevel, message: string, meta?: { file?: string; line?: number; column?: number }) => {
+    dispatch({
+      type: 'APPEND_CONSOLE',
+      entry: { id: ++consoleId, level, message, timestamp: Date.now(), ...meta },
+    })
   }, [])
 
   const clearConsole = useCallback(() => dispatch({ type: 'CLEAR_CONSOLE' }), [])

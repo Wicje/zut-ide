@@ -7,6 +7,9 @@ export interface ConsoleEntry {
   level: ConsoleLevel
   message: string
   timestamp: number
+  file?: string
+  line?: number
+  column?: number
 }
 
 export interface Project {
@@ -29,5 +32,5 @@ export interface StoredProjectRow {
 
 export interface RunnerError {
   message: string
-  location?: { line?: number; column?: number }
+  location?: { line?: number; column?: number; file?: string }
 }

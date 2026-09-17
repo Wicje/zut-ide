@@ -64,6 +64,16 @@ function useMediaQuery(query: string): boolean {
   return matches
 }
 
+function resolveErrorFile(file: string | undefined, files: FileMap): string | undefined {
+  if (!file || file === '<stdin>') return undefined
+  const cleaned = file.replace(/^[a-zA-Z][\w-]*:\/*/, '').replace(/^\.?\/+/, '')
+  const candidates = [cleaned, cleaned.split('/').pop() ?? '']
+  for (const candidate of candidates) {
+    if (candidate && candidate in files) return candidate
+  }
+  return undefined
+}
+
 export default function App() {
   const { state, dispatch, addConsole, clearConsole, loadFiles } = useWorkspace()
   const [user, setUser] = useState<{ email?: string | null } | null | undefined>(undefined)
@@ -86,6 +96,7 @@ export default function App() {
   const [mobileView, setMobileView] = useState<'code' | 'result' | 'files'>('code')
   const [viewport, setViewport] = useState<'auto' | number>('auto')
   const [formatting, setFormatting] = useState(false)
+  const [reveal, setReveal] = useState<{ token: number; line?: number; column?: number } | null>(null)
 
   const sortedFiles = Object.keys(state.files).sort()
   const touchStartX = useRef(0)
@@ -111,13 +122,30 @@ export default function App() {
       } catch (e) {
         setSrcDoc('')
         for (const err of formatBuildErrors(e)) {
-          const loc = err.location ? ` (line ${err.location.line}${err.location.column ? `:${err.location.column}` : ''})` : ''
-          addConsole('error', `Build error${loc}: ${err.message}`)
+          const file = resolveErrorFile(err.location?.file, target)
+          const loc = err.location
+            ? ` (line ${err.location.line}${err.location.column ? `:${err.location.column}` : ''})`
+            : ''
+          addConsole(
+            'error',
+            file ? `Build error: ${err.message}` : `Build error${loc}: ${err.message}`,
+            { file, line: err.location?.line, column: err.location?.column },
+          )
         }
         setStatus('error')
       }
     },
     [state.files, addConsole, clearConsole, wasmReady],
+  )
+
+  const openLocation = useCallback(
+    (file: string, line?: number, column?: number) => {
+      if (!(file in state.files)) return
+      dispatch({ type: 'SET_ACTIVE', path: file })
+      setMobileView('code')
+      setReveal({ token: Date.now(), line, column })
+    },
+    [dispatch, state.files],
   )
 
   useEffect(() => {
@@ -202,7 +230,7 @@ export default function App() {
   }, [state.files, autoplay, run])
 
   useEffect(() => {
-    if (state.isSharedView) return
+    if (state.isSharedView || !state.hydrated) return
     lastLocalWrite.current = Date.now()
     saveLocalWorkspace(state.projectName, state.files)
     if (firstRunRef.current) {
@@ -440,6 +468,7 @@ export default function App() {
                     value={state.files[state.activeFile] ?? ''}
                     readOnly={state.isSharedView || state.readOnly}
                     onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
+                    reveal={reveal}
                   />
                 ) : (
                   <div className="grid h-full place-content-center text-sm text-muted-foreground">
@@ -451,7 +480,7 @@ export default function App() {
             {mobileView === 'result' && (
               <div className="flex h-full flex-col">
                 <Preview srcDoc={srcDoc} runKey={runKey} status={status} />
-                <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} collapsible />
+                <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} collapsible onOpenLocation={openLocation} />
               </div>
             )}
             {mobileView === 'files' && (
@@ -495,6 +524,7 @@ export default function App() {
                 value={state.files[state.activeFile] ?? ''}
                 readOnly={state.isSharedView || state.readOnly}
                 onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
+                reveal={reveal}
               />
             ) : (
               <div className="grid h-full place-content-center text-sm text-muted-foreground">
@@ -511,7 +541,7 @@ export default function App() {
               onViewportChange={setViewport}
               showViewportControls={!state.isSharedView}
             />
-            <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable />
+            <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable onOpenLocation={openLocation} />
           </section>
         </div>
       )}

@@ -565,6 +565,21 @@ export function formatBuildErrors(e: unknown): RunnerError[] {
   const prefix = 'BUILD_FAILED:'
   const raw = failures.startsWith(prefix) ? failures.slice(prefix.length) : failures
   const errors: RunnerError[] = []
+
+  // esbuild-wasm throws errors with a structured `.errors` / `.notes` array.
+  const structured = (e as { errors?: Array<{ text?: string; location?: { file?: string; line?: number; column?: number } }> }).errors
+  if (Array.isArray(structured) && structured.length) {
+    for (const err of structured) {
+      errors.push({
+        message: err.text ?? raw,
+        location: err.location
+          ? { line: err.location.line, column: err.location.column, file: err.location.file }
+          : parseLocationFromText(err.text ?? ''),
+      })
+    }
+    return errors
+  }
+
   try {
     const parsed = JSON.parse(raw)
     if (Array.isArray(parsed.errors)) {
@@ -572,15 +587,30 @@ export function formatBuildErrors(e: unknown): RunnerError[] {
         errors.push({
           message: err.text,
           location: err.location
-            ? { line: err.location.line, column: err.location.column }
-            : undefined,
+            ? {
+                line: err.location.line,
+                column: err.location.column,
+                file: err.location.file,
+              }
+            : parseLocationFromText(err.text ?? ''),
         })
       }
     } else {
-      errors.push({ message: raw })
+      errors.push({ message: raw, location: parseLocationFromText(raw) })
     }
   } catch {
-    errors.push({ message: raw })
+    errors.push({ message: raw, location: parseLocationFromText(raw) })
   }
-  return errors.length ? errors : [{ message: raw }]
+  return errors.length ? errors : [{ message: raw, location: parseLocationFromText(raw) }]
+}
+
+/** esbuild-wasm sometimes reports errors as plain text like
+ *  "…\nzut-vfs:/script.js:1:15: ERROR: …". Extract the file/line/column. */
+function parseLocationFromText(text: string): { file?: string; line?: number; column?: number } | undefined {
+  const m = text.match(/(?:^|\n)([\w@.\/:-]+):(\d+):(\d+):/)
+  if (!m) return undefined
+  const line = Number(m[2])
+  const column = Number(m[3])
+  if (!Number.isFinite(line) || !Number.isFinite(column)) return undefined
+  return { file: m[1], line, column }
 }

@@ -30,9 +30,10 @@ interface ConsolePanelProps {
   onClear: () => void
   collapsible?: boolean
   resizable?: boolean
+  onOpenLocation?: (file: string, line?: number, column?: number) => void
 }
 
-export default function ConsolePanel({ entries, onClear, collapsible, resizable }: ConsolePanelProps) {
+export default function ConsolePanel({ entries, onClear, collapsible, resizable, onOpenLocation }: ConsolePanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
   const [collapsed, setCollapsed] = useState(false)
@@ -135,11 +136,26 @@ export default function ConsolePanel({ entries, onClear, collapsible, resizable 
       ) : (
         entries.map((e) => {
           const color = LEVEL_COLOR[e.level] ?? '#e6edf3'
+          const clickable = Boolean(e.file && onOpenLocation)
           return (
-            <div key={e.id} className="whitespace-pre-wrap break-all">
+            <div
+              key={e.id}
+              className={cn(
+                'whitespace-pre-wrap break-all',
+                clickable && 'cursor-pointer rounded-sm -mx-1 px-1 hover:bg-muted/50',
+              )}
+              onClick={clickable ? () => onOpenLocation!(e.file!, e.line, e.column) : undefined}
+              title={clickable ? `Open ${e.file}${e.line ? `:${e.line}` : ''}` : undefined}
+            >
               <span className="mr-2 select-none text-[10px] font-semibold" style={{ color }}>
                 {LEVEL_LABEL[e.level] ?? e.level}
               </span>
+              {clickable && (
+                <span className="mr-2 underline decoration-dotted underline-offset-2 text-sky-400">
+                  {e.file}
+                  {e.line ? `:${e.line}` : ''}
+                </span>
+              )}
               <span style={{ color }}>{e.message}</span>
             </div>
           )
