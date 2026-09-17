@@ -43,7 +43,7 @@ interface FileExplorerProps {
 }
 
 export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerProps) {
-  const { state, dispatch } = useWorkspace()
+  const { state, dispatch, addConsole } = useWorkspace()
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -62,6 +62,7 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
   function addFile(kind: (typeof FILE_KINDS)[number]) {
     const path = uniqueName(kind.file)
     dispatch({ type: 'ADD_FILE', path, content: kind.content })
+    addConsole('info', `Added ${path}.`)
   }
 
   function confirmDelete(path: string) {
@@ -187,28 +188,47 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
             return (
               <li
                 key={file}
+                tabIndex={0}
+                role="button"
+                aria-label={`Open ${file}`}
+                aria-current={active ? 'true' : undefined}
                 className={cn(
-                  'group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  'group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60 text-foreground/90',
                 )}
                 onClick={() => dispatch({ type: 'SET_ACTIVE', path: file })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    dispatch({ type: 'SET_ACTIVE', path: file })
+                  }
+                }}
               >
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-emerald-400 transition-opacity',
+                    active ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
                 <span className="w-8 shrink-0 font-mono text-[10px] font-semibold" style={{ color }}>
                   {languageBadge(file)}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{file}</span>
                 {!readOnly && (
-                  <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                  <span className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-within:opacity-100">
                     <button
-                      className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      title="Rename"
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title={`Rename ${file}`}
+                      aria-label={`Rename ${file}`}
                       onClick={(e) => { e.stopPropagation(); startRename(file) }}
                     >
                       <Pencil className="size-3.5" />
                     </button>
                     <button
-                      className="rounded p-0.5 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                      title="Delete"
+                      className="rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                      title={`Delete ${file}`}
+                      aria-label={`Delete ${file}`}
                       onClick={(e) => { e.stopPropagation(); confirmDelete(file) }}
                     >
                       <Trash2 className="size-3.5" />

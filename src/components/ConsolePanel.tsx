@@ -147,7 +147,8 @@ export default function ConsolePanel({ entries, onClear, collapsible, resizable,
               onClick={clickable ? () => onOpenLocation!(e.file!, e.line, e.column) : undefined}
               title={clickable ? `Open ${e.file}${e.line ? `:${e.line}` : ''}` : undefined}
             >
-              <span className="mr-2 select-none text-[10px] font-semibold" style={{ color }}>
+              <span className="mr-2 inline-flex select-none items-center gap-1 text-[10px] font-semibold" style={{ color }}>
+                <span aria-hidden className="inline-block size-1.5 rounded-full" style={{ backgroundColor: color }} />
                 {LEVEL_LABEL[e.level] ?? e.level}
               </span>
               {clickable && (

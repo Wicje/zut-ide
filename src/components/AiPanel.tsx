@@ -29,6 +29,7 @@ import {
   computeProjectChanges,
   type OpencodeProvider,
 } from '../lib/opencode'
+import { cloudAgentTurn, cloudEnabled } from '../lib/cloud'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -41,7 +42,7 @@ import {
 import { FileCode2, Loader2, Send, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type Backend = DirectProvider | 'claude' | 'opencode'
+type Backend = DirectProvider | 'claude' | 'opencode' | 'zut-cloud'
 
 const DIRECT_PROVIDERS: DirectProvider[] = ['openrouter', 'anthropic', 'chatgpt', 'gemini']
 
@@ -50,6 +51,7 @@ function isDirect(backend: Backend): backend is DirectProvider {
 }
 
 const BACKENDS: { id: Backend; label: string }[] = [
+  { id: 'zut-cloud', label: 'Cloud agent' },
   { id: 'openrouter', label: 'OpenRouter' },
   { id: 'anthropic', label: 'Claude' },
   { id: 'claude', label: 'zut Cloud' },
@@ -84,8 +86,11 @@ const DIRECT_INFO: Record<
   },
 }
 
-const CLOUD_INFO: Record<'claude' | 'opencode', { endpoint: string; hint: string }> = {
-  claude: {
+const CLOUD_INFO: Record<'claude' | 'opencode' | 'zut-cloud', { endpoint: string; hint: string }> = {
+  'zut-cloud': {
+    endpoint: 'zut-cloud VPS — agent edits your files on the server. Works from phones & Chromebooks.',
+    hint: 'Ask for a change — "add dark mode", "fix the layout" — the agent edits files directly. Sign in required.',
+  },  claude: {
     endpoint: 'Anthropic, via the zut cloud proxy.',
     hint: 'Ask anything about your project — "explain this code", "add a dark mode", "why is my layout broken?".',
   },
@@ -281,8 +286,8 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Backend selection
-  const [backend, setBackend] = useState<Backend>('openrouter')
+  // Backend selection (default to cloud agent when the VPS is configured)
+  const [backend, setBackend] = useState<Backend>(() => (cloudEnabled() ? 'zut-cloud' : 'openrouter'))
   const [opencodeConnected, setOpencodeConnected] = useState<boolean | null>(null)
   const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null)
   const [opencodeSessionId, setOpencodeSessionId] = useState<string | null>(null)
@@ -369,6 +374,20 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
             setDraft(acc)
           },
         )
+      } else if (backend === 'zut-cloud') {
+        if (!signedIn) throw new Error('Sign in to use the cloud agent.')
+        if (!cloudEnabled()) throw new Error('Cloud is not configured (VITE_CLOUD_URL).')
+        setDraft('Working on your files…')
+        const r = await cloudAgentTurn(state.files, trimmed, {
+          projectId: state.projectId,
+          model: models.openrouter ? `openrouter/${models.openrouter}` : undefined,
+        })
+        for (const [p, c] of Object.entries(r.updated)) dispatch({ type: 'SET_FILE', path: p, content: c })
+        for (const [p, c] of Object.entries(r.created)) dispatch({ type: 'ADD_FILE', path: p, content: c })
+        for (const p of r.deleted) dispatch({ type: 'DELETE_FILE', path: p })
+        const n = r.deleted.length + Object.keys(r.updated).length + Object.keys(r.created).length
+        acc = n > 0 ? `${r.reply}\n\n_(applied ${n} file change${n === 1 ? '' : 's'} to your project)_` : r.reply
+        setDraft(acc)
       } else {
         let sessionId = opencodeSessionId
         if (!sessionId) {
@@ -420,7 +439,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
           }
         }
       }
-      if (backend !== 'opencode') {
+      if (backend !== 'opencode' && backend !== 'zut-cloud') {
         const edits = parseEdits(acc, state.files)
         if (edits.length) {
           setProposals((prev) => [

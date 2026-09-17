@@ -1,0 +1,33 @@
+services:
+  zut-cloud:
+    build: ..
+    image: zut-cloud:latest
+    restart: unless-stopped
+    env_file:
+      - ./cloud.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      DATA_ROOT: /data
+    volumes:
+      - zut-data:/data
+    expose:
+      - 8787
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - zut-cloud
+
+volumes:
+  zut-data:
+  caddy-data:
+  caddy-config:

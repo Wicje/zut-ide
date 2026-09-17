@@ -7,7 +7,10 @@
 
 import type { FileMap } from '../types'
 
-const baseUrl = (import.meta.env.VITE_RUNTIME_URL as string | undefined)?.replace(/\/+$/, '')
+const baseUrl = (
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ||
+  (import.meta.env.VITE_CLOUD_URL as string | undefined)
+)?.replace(/\/+$/, '')
 const token = import.meta.env.VITE_RUNTIME_TOKEN as string | undefined
 
 export interface RemoteBundle {

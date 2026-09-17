@@ -36,6 +36,7 @@ import {
   FilePlus2,
   Globe,
   History,
+  Paintbrush,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -91,7 +92,7 @@ export default function Toolbar(props: ToolbarProps) {
         ) : (
           <>
             <Input
-              className="h-8 w-40 border-transparent bg-transparent font-medium focus-visible:bg-muted/60 md:w-56"
+              className="h-8 w-28 min-w-0 border-transparent bg-transparent font-medium focus-visible:bg-muted/60 sm:w-40 md:w-56"
               value={nameInput}
               placeholder="Project name"
               onChange={(e) => setNameInput(e.target.value)}
@@ -162,22 +163,22 @@ export default function Toolbar(props: ToolbarProps) {
 
         <Separator orientation="vertical" className="mx-1 h-5" />
 
-        <Button size="sm" className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500" onClick={props.onRun}>
+        <Button size="sm" className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500" onClick={props.onRun} title="Run preview (Ctrl+Enter)">
           <Play className="size-3.5 fill-current" />
           <span className="hidden sm:inline">Run</span>
         </Button>
 
         {editable && (
           <>
-            <Button variant="ghost" size="sm" onClick={props.onSave}>
+            <Button variant="ghost" size="sm" onClick={props.onSave} title="Save (Ctrl+S)">
               <Save className="size-4 md:mr-1.5" />
               <span className="hidden md:inline">Save</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={props.onFormat} disabled={props.formatting}>
+            <Button variant="ghost" size="sm" onClick={props.onFormat} disabled={props.formatting} title="Format active file (Prettier)">
               {props.formatting ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Sparkles className="size-4 md:mr-1.5" />
+                <Paintbrush className="size-4 md:mr-1.5" />
               )}
               <span className="hidden md:inline">Format</span>
             </Button>

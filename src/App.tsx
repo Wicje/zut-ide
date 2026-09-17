@@ -7,7 +7,7 @@ import {
   formatBuildErrors,
   initRunner,
 } from './lib/runner'
-import { bundleProjectRemote, canUseRemote } from './lib/runtime'
+import { bundleProjectRemote, canUseRemote, runtimeEnabled } from './lib/runtime'
 import { supabaseOrNull } from './lib/supabase'
 import {
   createProject,
@@ -44,6 +44,7 @@ import ImportDialog from './components/ImportDialog'
 import DeployDialog from './components/DeployDialog'
 import HistoryDialog from './components/HistoryDialog'
 import AiPanel from './components/AiPanel'
+import StatusBar from './components/StatusBar'
 import { AlertTriangle, Braces, MonitorPlay, FolderOpen, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { EditorSelection, FileMap, RunStatus } from './types'
@@ -120,12 +121,21 @@ export default function App() {
   const conflictWarned = useRef(false)
   const recoveredRef = useRef(false)
   const firstRunRef = useRef(true)
+  const entriesRef = useRef(state.consoleEntries)
+  entriesRef.current = state.consoleEntries
 
   const run = useCallback(
     async (files?: FileMap) => {
       const target = files ?? state.files
       setStatus('running')
+      // Autoplay fires ~900ms after every edit/new-file, which would instantly
+      // erase fresh receipts ("Created …", "Added …"). Preserve a recent
+      // info message across the wipe so actions stay visibly acknowledged.
+      const recentInfo = [...entriesRef.current]
+        .reverse()
+        .find((e) => e.level === 'info' && Date.now() - e.timestamp < 3000)
       clearConsole()
+      if (recentInfo) addConsole('info', recentInfo.message)
       try {
         let bundle
         if (canUseRemote(target)) {
@@ -341,7 +351,28 @@ export default function App() {
     lastLocalWrite.current = 0
     firstRunRef.current = true
     loadFiles(files, name)
+    addConsole('info', `Created "${name}" with ${Object.keys(files).length} files. Press Run to preview.`)
   }
+
+  // IDE shortcuts: Ctrl/Cmd+Enter = Run, Ctrl/Cmd+S = Save.
+  const runRef = useRef(run)
+  runRef.current = run
+  const saveRef = useRef(save)
+  saveRef.current = save
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key === 'Enter') {
+        e.preventDefault()
+        void runRef.current()
+      } else if (mod && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        void saveRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   async function openProject(id: string) {
     if (id.startsWith('local-')) { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); conflictWarned.current = false; lastLocalWrite.current = 0; firstRunRef.current = true; return }
@@ -507,7 +538,7 @@ export default function App() {
             )}
             {mobileView === 'result' && (
               <div className="flex h-full flex-col">
-                <Preview srcDoc={srcDoc} runKey={runKey} status={status} />
+                <Preview srcDoc={srcDoc} runKey={runKey} status={status} onRun={() => run()} />
                 <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} collapsible onOpenLocation={openLocation} />
               </div>
             )}
@@ -578,10 +609,23 @@ export default function App() {
               viewport={viewport}
               onViewportChange={setViewport}
               showViewportControls={!state.isSharedView}
+              onRun={() => run()}
             />
             <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable onOpenLocation={openLocation} />
           </section>
         </div>
+      )}
+
+      {!isMobile && (
+        <StatusBar
+          status={status}
+          saved={state.saved}
+          projectName={state.projectName}
+          fileCount={Object.keys(state.files).length}
+          activeFile={state.activeFile}
+          errorCount={state.consoleEntries.filter((e) => e.level === 'error').length}
+          cloudBuild={runtimeEnabled()}
+        />
       )}
 
       {showLogin && <Login onClose={() => setShowLogin(false)} onSignedIn={() => { setShowLogin(false); refreshProjects() }} />}

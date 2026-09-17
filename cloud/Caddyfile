@@ -1,0 +1,10 @@
+# Replace cloud.YOURDOMAIN with your VPS hostname (e.g. zut.onenetwork.ng
+# or a subdomain you point at the VPS IP in the OneNetwork panel).
+# Caddy gets TLS automatically. The app never talks to :8787 directly.
+{
+	email {$ACME_EMAIL}
+}
+
+{$CLOUD_HOST} {
+	reverse_proxy zut-cloud:8787
+}

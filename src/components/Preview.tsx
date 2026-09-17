@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
-import { Smartphone, Tablet, Monitor, Loader2, CircleAlert, CircleCheck } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Smartphone, Tablet, Monitor, Loader2, CircleAlert, CircleCheck, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RunStatus } from '../types'
 
@@ -10,6 +11,7 @@ interface PreviewProps {
   viewport?: 'auto' | number
   onViewportChange?: (v: 'auto' | number) => void
   showViewportControls?: boolean
+  onRun?: () => void
 }
 
 const STATUS_LABEL: Record<RunStatus, string> = {
@@ -39,12 +41,18 @@ export default function Preview({
   viewport = 'auto',
   onViewportChange,
   showViewportControls,
+  onRun,
 }: PreviewProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-muted/30 px-3">
-        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Result
+        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Preview
+          {viewport !== 'auto' && (
+            <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">
+              {viewport}px
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-2">
           {showViewportControls && onViewportChange && (
@@ -98,9 +106,16 @@ export default function Preview({
             />
           </div>
         ) : (
-          <div className="grid h-full place-content-center px-6 text-center text-sm text-muted-foreground">
-            <Monitor className="mx-auto mb-3 size-10 opacity-40" />
-            Click Run to see your page here.
+          <div className="grid h-full place-content-center gap-3 px-6 text-center">
+            <Monitor className="mx-auto size-10 opacity-40" />
+            <p className="text-sm text-muted-foreground">
+              {status === 'error' ? 'The last build failed — check the console.' : 'Click Run to see your page here.'}
+            </p>
+            {onRun && status !== 'error' && (
+              <Button size="sm" className="mx-auto gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500" onClick={onRun}>
+                <Play className="size-3.5 fill-current" /> Run preview
+              </Button>
+            )}
           </div>
         )}
       </div>

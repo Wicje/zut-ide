@@ -155,6 +155,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       projectId: opts?.projectId ?? null,
       readOnly: opts?.readOnly,
       isSharedView: opts?.isSharedView,
+      activeFile: opts?.activeFile,
     })
   }, [])
 
