@@ -158,7 +158,7 @@ export async function streamOpenRouter(
   messages: ChatMessage[],
   system: string,
   onDelta: DeltaHandler,
-  opts: { model: string },
+  opts: { model: string; maxTokens?: number },
 ): Promise<void> {
   const key = getApiKey('openrouter')
   if (!key) throw new Error('Add an OpenRouter API key to chat.')
@@ -174,6 +174,9 @@ export async function streamOpenRouter(
       },
       body: JSON.stringify({
         model: opts.model,
+        // Cap output tokens: many student keys are low-credit, and the
+        // provider default can exceed what the key can afford.
+        max_tokens: opts.maxTokens ?? 4096,
         messages: [{ role: 'system', content: system }, ...toOpenAiHistory(messages)],
         stream: true,
       }),
@@ -226,7 +229,7 @@ export async function streamDirect(
   messages: ChatMessage[],
   system: string,
   onDelta: DeltaHandler,
-  opts: { model: string },
+  opts: { model: string; maxTokens?: number },
 ): Promise<void> {
   switch (provider) {
     case 'openrouter':
