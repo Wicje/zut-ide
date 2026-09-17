@@ -45,7 +45,7 @@ import HistoryDialog from './components/HistoryDialog'
 import AiPanel from './components/AiPanel'
 import { AlertTriangle, Braces, MonitorPlay, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { FileMap, RunStatus } from './types'
+import type { EditorSelection, FileMap, RunStatus } from './types'
 
 function parseHash(): string | null {
   const m = window.location.hash.match(/^#\/p\/([\w-]+)/)
@@ -97,6 +97,7 @@ export default function App() {
   const [viewport, setViewport] = useState<'auto' | number>('auto')
   const [formatting, setFormatting] = useState(false)
   const [reveal, setReveal] = useState<{ token: number; line?: number; column?: number } | null>(null)
+  const [aiSelection, setAiSelection] = useState<EditorSelection | null>(null)
 
   const sortedFiles = Object.keys(state.files).sort()
   const touchStartX = useRef(0)
@@ -469,6 +470,7 @@ export default function App() {
                     readOnly={state.isSharedView || state.readOnly}
                     onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
                     reveal={reveal}
+                    onSelectionChange={setAiSelection}
                   />
                 ) : (
                   <div className="grid h-full place-content-center text-sm text-muted-foreground">
@@ -525,6 +527,7 @@ export default function App() {
                 readOnly={state.isSharedView || state.readOnly}
                 onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
                 reveal={reveal}
+                onSelectionChange={setAiSelection}
               />
             ) : (
               <div className="grid h-full place-content-center text-sm text-muted-foreground">
@@ -577,7 +580,14 @@ export default function App() {
           onClose={() => setShowHistory(false)}
         />
       )}
-      {showAi && <AiPanel signedIn={Boolean(user)} onSignIn={() => setShowLogin(true)} onClose={() => setShowAi(false)} />}
+      {showAi && (
+        <AiPanel
+          signedIn={Boolean(user)}
+          onSignIn={() => setShowLogin(true)}
+          onClose={() => setShowAi(false)}
+          selection={aiSelection}
+        />
+      )}
     </div>
   )
 }

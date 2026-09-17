@@ -13,6 +13,14 @@ import {
   type DirectProvider,
 } from '../lib/ai'
 import {
+  diffLines,
+  diffStat,
+  parseEdits,
+  stripEditBlocks,
+  type ProposedEdit,
+} from '../lib/aiEdits'
+import type { EditorSelection } from '../types'
+import {
   isOpencodeAvailable,
   createSession,
   streamOpencode,
@@ -31,7 +39,7 @@ import {
   SheetContent,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Loader2, Send, Sparkles, Trash2 } from 'lucide-react'
+import { FileCode2, Loader2, Send, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Backend = 'claude' | 'chatgpt' | 'gemini' | 'opencode'
@@ -61,14 +69,38 @@ interface AiPanelProps {
   signedIn: boolean
   onSignIn: () => void
   onClose: () => void
+  selection?: EditorSelection | null
 }
 
 const MAX_FILE_CHARS = 4000
+const MAX_SELECTION_CHARS = 4000
+
+const EDIT_PROTOCOL = [
+  'When you propose a code change, output the complete new file so the user can review it as a diff.',
+  'For each file you create or modify, include a fenced block in exactly this form:',
+  '',
+  '```edit:path/to/file',
+  '<the full new contents of the file>',
+  '```',
+  '',
+  'Put your explanation in normal prose outside the blocks. Only emit an edit block when you intend to change that file.',
+].join('\n')
+
+function languageForPath(path: string): string {
+  const lower = path.toLowerCase()
+  if (lower.endsWith('.ts') || lower.endsWith('.tsx') || lower.endsWith('.mts')) return 'ts'
+  if (lower.endsWith('.js') || lower.endsWith('.jsx') || lower.endsWith('.mjs')) return 'js'
+  if (lower.endsWith('.css')) return 'css'
+  if (lower.endsWith('.json')) return 'json'
+  if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html'
+  return ''
+}
 
 function buildSystemPrompt(
   projectName: string,
   files: Record<string, string>,
   activeFile: string,
+  selection?: EditorSelection | null,
 ): string {
   const names = Object.keys(files).sort()
   const parts = [
@@ -86,6 +118,22 @@ function buildSystemPrompt(
     parts.push(``, `Active file: ${activeFile}`, `<${activeFile}>`, body, `</${activeFile}>`)
   }
 
+  if (selection && selection.text) {
+    const body =
+      selection.text.length > MAX_SELECTION_CHARS
+        ? `${selection.text.slice(0, MAX_SELECTION_CHARS)}\n…(truncated)`
+        : selection.text
+    parts.push(
+      ``,
+      `The user has selected lines ${selection.startLine}-${selection.endLine} of ${selection.file}:`,
+      '```' + languageForPath(selection.file),
+      body,
+      '```',
+      `Focus your answer on this selection unless told otherwise.`,
+    )
+  }
+
+  parts.push(``, EDIT_PROTOCOL)
   return parts.join('\n')
 }
 
@@ -93,6 +141,7 @@ function buildOpencodePrompt(
   projectName: string,
   files: Record<string, string>,
   activeFile: string,
+  selection?: EditorSelection | null,
 ): string {
   const names = Object.keys(files).sort()
   const parts = [
@@ -113,16 +162,84 @@ function buildOpencodePrompt(
     parts.push(`Current content of ${activeFile}:\n\`\`\`\n${body}\n\`\`\``)
   }
 
+  if (selection && selection.text) {
+    const body =
+      selection.text.length > MAX_SELECTION_CHARS
+        ? `${selection.text.slice(0, MAX_SELECTION_CHARS)}\n…(truncated)`
+        : selection.text
+    parts.push(`The user selected lines ${selection.startLine}-${selection.endLine} of ${selection.file}:\n\`\`\`\n${body}\n\`\`\``)
+  }
+
   return parts.join('\n')
 }
 
-export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
+function ProposalCard({
+  path,
+  before,
+  content,
+  exists,
+  onAccept,
+  onReject,
+}: {
+  path: string
+  before: string
+  content: string
+  exists: boolean
+  onAccept: () => void
+  onReject: () => void
+}) {
+  const lines = useMemo(() => diffLines(before, content), [before, content])
+  const { added, removed } = diffStat(lines)
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-2.5">
+      <div className="flex items-center gap-2">
+        <FileCode2 className="size-3.5 shrink-0 text-violet-300" />
+        <span className="truncate font-mono text-[12px] text-foreground">{path}</span>
+        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {exists ? 'update' : 'new file'}
+        </span>
+        <span className="ml-auto shrink-0 font-mono text-[10px] text-emerald-400">+{added}</span>
+        <span className="shrink-0 font-mono text-[10px] text-red-400">−{removed}</span>
+      </div>
+      <div className="max-h-56 overflow-auto rounded-md border border-border/50 bg-background/60 font-mono text-[11px] leading-[1.5]">
+        {lines.map((line, i) => (
+          <div
+            key={i}
+            className={cn(
+              'whitespace-pre px-2',
+              line.type === 'add' && 'bg-emerald-500/10 text-emerald-300',
+              line.type === 'remove' && 'bg-red-500/10 text-red-300',
+              line.type === 'same' && 'text-muted-foreground',
+            )}
+          >
+            {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+            {line.text || ' '}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onReject}>
+          Reject
+        </Button>
+        <Button size="sm" className="h-7 text-xs" onClick={onAccept}>
+          Accept
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPanelProps) {
   const { state, dispatch } = useWorkspace()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [proposals, setProposals] = useState<(ProposedEdit & { id: number })[]>([])
+  const proposalSeq = useRef(0)
+  const selectionRef = useRef(selection)
+  selectionRef.current = selection
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -197,7 +314,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
       if (backend === 'claude') {
         await streamClaude(
           nextMessages,
-          buildSystemPrompt(state.projectName, state.files, state.activeFile),
+          buildSystemPrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
           (piece) => {
             acc += piece
             setDraft(acc)
@@ -206,7 +323,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
       } else if (backend === 'chatgpt') {
         await streamChatGPT(
           nextMessages,
-          buildSystemPrompt(state.projectName, state.files, state.activeFile),
+          buildSystemPrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
           (piece) => {
             acc += piece
             setDraft(acc)
@@ -216,7 +333,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
       } else if (backend === 'gemini') {
         await streamGemini(
           nextMessages,
-          buildSystemPrompt(state.projectName, state.files, state.activeFile),
+          buildSystemPrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
           (piece) => {
             acc += piece
             setDraft(acc)
@@ -247,7 +364,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
         await streamOpencode(
           sessionId,
           nextMessages,
-          buildOpencodePrompt(state.projectName, state.files, state.activeFile),
+          buildOpencodePrompt(state.projectName, state.files, state.activeFile, selectionRef.current),
           'You are zut, a coding assistant in a browser-based web IDE. Help the student understand and improve their code.',
           (piece) => {
             acc += piece
@@ -274,6 +391,15 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
           }
         }
       }
+      if (backend !== 'opencode') {
+        const edits = parseEdits(acc, state.files)
+        if (edits.length) {
+          setProposals((prev) => [
+            ...prev,
+            ...edits.map((e) => ({ ...e, id: ++proposalSeq.current })),
+          ])
+        }
+      }
       setMessages((prev) => [...prev, { role: 'assistant', content: acc }])
     } catch (e) {
       setError((e as { message?: string }).message ?? 'AI request failed')
@@ -284,10 +410,32 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
     }
   }
 
+  function applyProposal(p: ProposedEdit) {
+    dispatch(p.exists ? { type: 'SET_FILE', path: p.path, content: p.content } : { type: 'ADD_FILE', path: p.path, content: p.content })
+    dispatch({ type: 'SET_ACTIVE', path: p.path })
+  }
+
+  function acceptProposal(id: number) {
+    const p = proposals.find((x) => x.id === id)
+    if (!p) return
+    applyProposal(p)
+    setProposals((prev) => prev.filter((x) => x.id !== id))
+  }
+
+  function rejectProposal(id: number) {
+    setProposals((prev) => prev.filter((x) => x.id !== id))
+  }
+
+  function acceptAllProposals() {
+    for (const p of proposals) applyProposal(p)
+    setProposals([])
+  }
+
   function reset() {
     setMessages([])
     setDraft('')
     setError(null)
+    setProposals([])
     if (backend === 'opencode') {
       setOpencodeSessionId(null)
     }
@@ -299,6 +447,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
     setMessages([])
     setDraft('')
     setError(null)
+    setProposals([])
   }
 
   const [open, setOpen] = useState(true)
@@ -500,19 +649,57 @@ export default function AiPanel({ signedIn, onSignIn, onClose }: AiPanelProps) {
                         : 'self-start border border-border/60 bg-muted/40',
                     )}
                   >
-                    {m.content}
+                    {m.role === 'user' ? m.content : stripEditBlocks(m.content) || m.content}
                   </div>
                 ))}
                 {draft && (
                   <div className="self-start max-w-[90%] whitespace-pre-wrap rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-[13px] leading-relaxed break-words">
-                    {draft}
+                    {backend === 'opencode' ? draft : stripEditBlocks(draft) || draft}
                     <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-emerald-400 align-text-bottom" />
                   </div>
                 )}
                 {error && <p className="px-1 text-xs text-destructive">{error}</p>}
+                {proposals.length > 0 && (
+                  <div className="mt-1 flex flex-col gap-2">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        Proposed changes ({proposals.length})
+                      </span>
+                      {proposals.length > 1 && (
+                        <button
+                          className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                          onClick={acceptAllProposals}
+                        >
+                          Accept all
+                        </button>
+                      )}
+                    </div>
+                    {proposals.map((p) => (
+                      <ProposalCard
+                        key={p.id}
+                        path={p.path}
+                        exists={p.exists}
+                        before={state.files[p.path] ?? ''}
+                        content={p.content}
+                        onAccept={() => acceptProposal(p.id)}
+                        onReject={() => rejectProposal(p.id)}
+                      />
+                    ))}
+                  </div>
+                )}
                 <div ref={endRef} />
               </div>
             </ScrollArea>
+
+            {selection && selection.text && (
+              <div className="flex shrink-0 items-center gap-2 border-t px-3 py-2 text-[11px] text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
+                  {selection.file}:{selection.startLine}
+                  {selection.endLine !== selection.startLine ? `-${selection.endLine}` : ''}
+                </span>
+                <span className="truncate">selection included in your next message</span>
+              </div>
+            )}
 
             <div className="flex shrink-0 items-center gap-2 border-t p-3">
               <form

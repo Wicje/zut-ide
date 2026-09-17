@@ -1,6 +1,7 @@
 import Editor from '@monaco-editor/react'
 import { useEffect, useRef } from 'react'
 import type { editor } from 'monaco-editor'
+import type { EditorSelection } from '../types'
 import '../lib/monaco'
 
 function languageForPath(path: string): string {
@@ -26,14 +27,22 @@ interface CodeEditorProps {
   readOnly?: boolean
   onChange?: (value: string) => void
   reveal?: RevealTarget | null
+  onSelectionChange?: (selection: EditorSelection | null) => void
 }
 
-export default function CodeEditor({ path, value, readOnly, onChange, reveal }: CodeEditorProps) {
+export default function CodeEditor({ path, value, readOnly, onChange, reveal, onSelectionChange }: CodeEditorProps) {
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const onSelectionRef = useRef(onSelectionChange)
+  onSelectionRef.current = onSelectionChange
+  const pathRef = useRef(path)
+  pathRef.current = path
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null)
+  const selectionSubRef = useRef<{ dispose: () => void } | null>(null)
+
+  useEffect(() => () => selectionSubRef.current?.dispose(), [])
 
   useEffect(() => {
     if (!reveal || !editorRef.current) return
@@ -93,6 +102,22 @@ export default function CodeEditor({ path, value, readOnly, onChange, reveal }: 
         editorRef.current = editor
         monacoRef.current = monaco
         monaco.editor.setModelLanguage(editor.getModel()!, languageForPath(path))
+        selectionSubRef.current = editor.onDidChangeCursorSelection(() => {
+          const handler = onSelectionRef.current
+          if (!handler) return
+          const selection = editor.getSelection()
+          const model = editor.getModel()
+          if (!selection || !model || selection.isEmpty()) {
+            handler(null)
+            return
+          }
+          handler({
+            file: pathRef.current,
+            text: model.getValueInRange(selection),
+            startLine: selection.startLineNumber,
+            endLine: selection.endLineNumber,
+          })
+        })
       }}
     />
   )

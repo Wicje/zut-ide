@@ -34,3 +34,10 @@ export interface RunnerError {
   message: string
   location?: { line?: number; column?: number; file?: string }
 }
+
+export interface EditorSelection {
+  file: string
+  text: string
+  startLine: number
+  endLine: number
+}
