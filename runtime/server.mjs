@@ -18,6 +18,13 @@
 //   ZUT_RUNTIME_TOKEN         optional shared secret; when set, requests must
 //                             send `Authorization: Bearer <token>`
 //   ZUT_RUNTIME_MAX_BODY      max request bytes         (default 8 MB)
+//   ZUT_MUDBASE_API_KEY       optional: server-side Mudbase key for /mudbase/*
+//   ZUT_MUDBASE_PROJECT_ID    optional: Mudbase project for /mudbase/*
+//   MUDBASE_BASE_URL          Mudbase API base          (default https://api.mudbase.dev)
+//
+// /mudbase/* is a least-privilege proxy: the browser never holds the Mudbase
+// key, responses are normalized to one stable shape, and every call is logged
+// for metering. Point the IDE at it with VITE_MUDBASE_PROXY_URL.
 //
 // Point the IDE at it with VITE_RUNTIME_URL (and VITE_RUNTIME_TOKEN if set).
 
@@ -234,6 +241,182 @@ async function bundleProject(files) {
   return { js, css, referenced: refs, meta }
 }
 
+const MB_KEY = process.env.ZUT_MUDBASE_API_KEY ?? ''
+const MB_PID = process.env.ZUT_MUDBASE_PROJECT_ID ?? ''
+const MB_BASE = (process.env.MUDBASE_BASE_URL ?? 'https://api.mudbase.dev').replace(/\/+$/, '')
+const mudbaseConfigured = () => Boolean(MB_KEY && MB_PID)
+
+async function mudbase(path, init) {
+  const res = await fetch(`${MB_BASE}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': MB_KEY, ...init?.headers },
+  })
+  const text = await res.text()
+  let json = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch {
+    /* non-json response */
+  }
+  if (!res.ok) {
+    const err = new Error(json?.error ?? json?.message ?? `Mudbase request failed (${res.status})`)
+    err.status = res.status
+    throw err
+  }
+  return json
+}
+
+/** Accept the spec's `{data}` envelope and the live API's top-level shape,
+ *  so the browser only ever sees one stable contract. */
+function pick(body, key) {
+  return body?.data?.[key] ?? body?.[key]
+}
+
+function cleanId(seg) {
+  return typeof seg === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(seg) ? seg : null
+}
+
+async function handleMudbase(req, url) {
+  const seg = url.pathname.split('/').filter(Boolean)
+  // seg[0] === 'mudbase', seg[1] === 'functions', ...
+  const raw = await readBody(req)
+  let body = {}
+  if (raw) {
+    try {
+      body = JSON.parse(raw)
+    } catch {
+      const err = new Error('Request body must be valid JSON.')
+      err.status = 400
+      throw err
+    }
+  }
+
+  if (seg[1] !== 'functions') {
+    // POST /mudbase/webhook — forwards to the public trigger endpoint so the
+    // project id never leaves the server. (Shares the server's rate-limit
+    // bucket: 120 req / 15 min per IP at the time of writing.)
+    if (req.method === 'POST' && seg.length === 2 && seg[1] === 'webhook') {
+      const res = await mudbase(`/api/functions/webhook/${MB_PID}`, {
+        method: 'POST',
+        body: JSON.stringify(body ?? {}),
+      })
+      const data = res?.data ?? res
+      return { triggered: data?.triggered ?? 0, results: data?.results ?? [] }
+    }
+    const err = new Error('Not found')
+    err.status = 404
+    throw err
+  }
+
+  // GET /mudbase/functions
+  if (req.method === 'GET' && seg.length === 2) {
+    const limit = url.searchParams.get('limit') ?? '100'
+    const res = await mudbase(`/api/functions/projects/${MB_PID}/functions?limit=${encodeURIComponent(limit)}`)
+    return { functions: pick(res, 'functions') ?? [] }
+  }
+
+  // POST /mudbase/functions
+  if (req.method === 'POST' && seg.length === 2) {
+    const res = await mudbase(`/api/functions/projects/${MB_PID}/functions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: body.name,
+        description: body.description,
+        code: body.code,
+        trigger: body.trigger,
+        environment: body.environment,
+      }),
+    })
+    const fn = res?.data ?? res
+    if (!fn?._id) {
+      const err = new Error('Mudbase did not return the created function.')
+      err.status = 502
+      throw err
+    }
+    return fn
+  }
+
+  const id = cleanId(seg[2])
+  if (!id) {
+    const err = new Error('Not found')
+    err.status = 404
+    throw err
+  }
+
+  // PUT /mudbase/functions/:id | DELETE /mudbase/functions/:id
+  if (seg.length === 3 && (req.method === 'PUT' || req.method === 'DELETE')) {
+    if (req.method === 'DELETE') {
+      await mudbase(`/api/functions/projects/${MB_PID}/functions/${id}`, { method: 'DELETE' })
+      return { ok: true }
+    }
+    const res = await mudbase(`/api/functions/projects/${MB_PID}/functions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    })
+    const fn = res?.data ?? res
+    if (!fn?._id) {
+      const err = new Error('Mudbase did not return the updated function.')
+      err.status = 502
+      throw err
+    }
+    return fn
+  }
+
+  // POST /mudbase/functions/:id/activate | /deactivate
+  if (req.method === 'POST' && seg.length === 4 && (seg[3] === 'activate' || seg[3] === 'deactivate')) {
+    const res = await mudbase(`/api/functions/projects/${MB_PID}/functions/${id}/${seg[3]}`, { method: 'POST' })
+    const fn = res?.data ?? res
+    if (!fn?._id) {
+      const err = new Error('Mudbase did not return the updated function.')
+      err.status = 502
+      throw err
+    }
+    return fn
+  }
+
+  // POST /mudbase/functions/:id/execute
+  if (req.method === 'POST' && seg.length === 4 && seg[3] === 'execute') {
+    const res = await mudbase(`/api/functions/projects/${MB_PID}/functions/${id}/execute`, {
+      method: 'POST',
+      body: JSON.stringify({ payload: body.payload ?? null }),
+    })
+    const data = res?.data ?? res
+    if (!data?.executionId) {
+      const err = new Error('Mudbase did not return an execution id.')
+      err.status = 502
+      throw err
+    }
+    return { executionId: data.executionId, status: data.status ?? 'queued' }
+  }
+
+  // GET /mudbase/functions/:id/executions/:executionId
+  const eid = cleanId(seg[4])
+  if (req.method === 'GET' && seg.length === 5 && seg[3] === 'executions' && eid) {
+    const res = await mudbase(`/api/functions/projects/${MB_PID}/functions/${id}/executions/${eid}`)
+    const status = res?.data ?? res
+    if (!status || typeof status.status !== 'string') {
+      const err = new Error('Mudbase did not return execution status.')
+      err.status = 502
+      throw err
+    }
+    return status
+  }
+
+  // GET /mudbase/functions/:id/logs
+  if (req.method === 'GET' && seg.length === 4 && seg[3] === 'logs') {
+    const limit = url.searchParams.get('limit') ?? '20'
+    const res = await mudbase(
+      `/api/functions/projects/${MB_PID}/functions/${id}/logs?limit=${encodeURIComponent(limit)}`,
+    )
+    const data = res?.data ?? res
+    return { executions: data?.executions ?? [], stats: data?.stats }
+  }
+
+  const err = new Error('Not found')
+  err.status = 404
+  throw err
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
 
@@ -244,7 +427,34 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    send(res, 200, { ok: true, service: 'zut-runtime', version: VERSION })
+    send(res, 200, { ok: true, service: 'zut-runtime', version: VERSION, mudbase: mudbaseConfigured() })
+    return
+  }
+
+  // Public capability flag — reveals nothing sensitive.
+  if (req.method === 'GET' && url.pathname === '/mudbase/status') {
+    send(res, 200, { configured: mudbaseConfigured() })
+    return
+  }
+
+  if (url.pathname === '/mudbase' || url.pathname.startsWith('/mudbase/')) {
+    if (!authorized(req)) {
+      send(res, 401, { error: 'Unauthorized' })
+      return
+    }
+    if (!mudbaseConfigured()) {
+      send(res, 503, { error: 'Mudbase is not configured on this runtime.' })
+      return
+    }
+    try {
+      const t0 = Date.now()
+      const result = await handleMudbase(req, url)
+      console.log(`[zut-runtime] mudbase ${req.method} ${url.pathname} ok ${Date.now() - t0}ms`)
+      send(res, 200, result)
+    } catch (e) {
+      const status = typeof e?.status === 'number' && e.status >= 400 && e.status < 500 ? e.status : 502
+      send(res, status, { error: e?.message ?? 'Mudbase request failed' })
+    }
     return
   }
 
@@ -274,5 +484,5 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`zut-runtime listening on http://${HOST}:${PORT}  (auth ${TOKEN ? 'on' : 'off'})`)
+  console.log(`zut-runtime listening on http://${HOST}:${PORT}  (auth ${TOKEN ? 'on' : 'off'}, mudbase ${mudbaseConfigured() ? 'on' : 'off'})`)
 })

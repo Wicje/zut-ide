@@ -358,7 +358,9 @@ export default function MudbasePanel({ files, projectName, onLog }: MudbasePanel
       <div className="grid gap-3">
         <Alert className="py-2">
           <AlertDescription className="text-xs">
-            Configure <code className="rounded bg-muted px-1 font-mono">VITE_MUDBASE_API_KEY</code> and{' '}
+            Configure <code className="rounded bg-muted px-1 font-mono">VITE_MUDBASE_PROXY_URL</code>{' '}
+            (recommended — the key stays on your server) or{' '}
+            <code className="rounded bg-muted px-1 font-mono">VITE_MUDBASE_API_KEY</code> and{' '}
             <code className="rounded bg-muted px-1 font-mono">VITE_MUDBASE_PROJECT_ID</code> in{' '}
             <code className="rounded bg-muted px-1 font-mono">.env</code> (see README.md) to deploy
             serverless functions with a live, linkable endpoint.

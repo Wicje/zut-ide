@@ -9,8 +9,17 @@ export const MUDBASE_BASE_URL =
 const apiKey = import.meta.env.VITE_MUDBASE_API_KEY as string | undefined
 const projectId = import.meta.env.VITE_MUDBASE_PROJECT_ID as string | undefined
 
+/** Least-privilege proxy (see runtime/server.mjs). When set, the browser never
+ *  holds the Mudbase key — all calls go through the runtime service. */
+const PROXY_URL = (import.meta.env.VITE_MUDBASE_PROXY_URL as string | undefined)?.replace(/\/+$/, '')
+const RUNTIME_TOKEN = import.meta.env.VITE_RUNTIME_TOKEN as string | undefined
+
+export function mudbaseProxyEnabled(): boolean {
+  return Boolean(PROXY_URL)
+}
+
 export function mudbaseEnabled(): boolean {
-  return Boolean(apiKey && projectId)
+  return mudbaseProxyEnabled() || Boolean(apiKey && projectId)
 }
 
 export function mudbaseProjectId(): string | null {
@@ -120,6 +129,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return json as T
 }
 
+/** Same envelope handling through the proxy (which already normalizes). */
+async function prequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${PROXY_URL}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(RUNTIME_TOKEN ? { Authorization: `Bearer ${RUNTIME_TOKEN}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  })
+  const text = await res.text()
+  let json: unknown = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch {
+    /* non-json response */
+  }
+  if (!res.ok) {
+    const err = (json as ApiError | null) ?? {}
+    throw new Error(err.error ?? err.message ?? `Mudbase request failed (${res.status})`)
+  }
+  return json as T
+}
+
 /** Turn a project name / file name into a safe function slug. */
 export function slugify(input: string): string {
   return (
@@ -133,6 +166,10 @@ export function slugify(input: string): string {
 }
 
 export async function listMudbaseFunctions(): Promise<MudbaseFunction[]> {
+  if (mudbaseProxyEnabled()) {
+    const res = await prequest<{ functions?: MudbaseFunction[] }>('/functions?limit=100')
+    return res.functions ?? []
+  }
   const pid = requireMudbaseProjectId()
   // The spec wraps the list in `data`, the live API returns it top-level — accept both.
   const res = await request<{ data?: { functions?: MudbaseFunction[] }; functions?: MudbaseFunction[] }>(
@@ -150,6 +187,14 @@ export interface CreateMudbaseFunctionInput {
 }
 
 export async function createMudbaseFunction(input: CreateMudbaseFunctionInput): Promise<MudbaseFunction> {
+  if (mudbaseProxyEnabled()) {
+    const fn = await prequest<MudbaseFunction>('/functions', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+    if (!fn?._id) throw new Error('Mudbase did not return the created function.')
+    return fn
+  }
   const pid = requireMudbaseProjectId()
   const res = await request<MudbaseFunction & { data?: MudbaseFunction }>(
     `/api/functions/projects/${pid}/functions`,
@@ -164,6 +209,14 @@ export async function updateMudbaseFunction(
   functionId: string,
   patch: Partial<CreateMudbaseFunctionInput> & { isActive?: boolean },
 ): Promise<MudbaseFunction> {
+  if (mudbaseProxyEnabled()) {
+    const fn = await prequest<MudbaseFunction>(`/functions/${functionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    })
+    if (!fn?._id) throw new Error('Mudbase did not return the updated function.')
+    return fn
+  }
   const pid = requireMudbaseProjectId()
   const res = await request<MudbaseFunction & { data?: MudbaseFunction }>(
     `/api/functions/projects/${pid}/functions/${functionId}`,
@@ -175,6 +228,10 @@ export async function updateMudbaseFunction(
 }
 
 export async function deleteMudbaseFunction(functionId: string): Promise<void> {
+  if (mudbaseProxyEnabled()) {
+    await prequest<{ ok?: boolean }>(`/functions/${functionId}`, { method: 'DELETE' })
+    return
+  }
   const pid = requireMudbaseProjectId()
   await request<{ success?: boolean }>(
     `/api/functions/projects/${pid}/functions/${functionId}`,
@@ -183,6 +240,13 @@ export async function deleteMudbaseFunction(functionId: string): Promise<void> {
 }
 
 export async function setMudbaseFunctionActive(functionId: string, active: boolean): Promise<MudbaseFunction> {
+  if (mudbaseProxyEnabled()) {
+    const fn = await prequest<MudbaseFunction>(`/functions/${functionId}/${active ? 'activate' : 'deactivate'}`, {
+      method: 'POST',
+    })
+    if (!fn?._id) throw new Error('Mudbase did not return the updated function.')
+    return fn
+  }
   const pid = requireMudbaseProjectId()
   const res = await request<MudbaseFunction & { data?: MudbaseFunction }>(
     `/api/functions/projects/${pid}/functions/${functionId}/${active ? 'activate' : 'deactivate'}`,
@@ -197,6 +261,14 @@ export async function executeMudbaseFunction(
   functionId: string,
   payload: unknown,
 ): Promise<{ executionId: string; status: string }> {
+  if (mudbaseProxyEnabled()) {
+    const res = await prequest<{ executionId?: string; status?: string }>(`/functions/${functionId}/execute`, {
+      method: 'POST',
+      body: JSON.stringify({ payload }),
+    })
+    if (!res?.executionId) throw new Error('Mudbase did not return an execution id.')
+    return { executionId: res.executionId, status: res.status ?? 'queued' }
+  }
   const pid = requireMudbaseProjectId()
   const res = await request<{ data?: { executionId?: string; status?: string }; executionId?: string; status?: string }>(
     `/api/functions/projects/${pid}/functions/${functionId}/execute`,
@@ -211,6 +283,11 @@ export async function getMudbaseExecutionStatus(
   functionId: string,
   executionId: string,
 ): Promise<MudbaseExecutionStatus> {
+  if (mudbaseProxyEnabled()) {
+    const status = await prequest<MudbaseExecutionStatus>(`/functions/${functionId}/executions/${executionId}`)
+    if (!status || typeof status.status !== 'string') throw new Error('Mudbase did not return execution status.')
+    return status
+  }
   const pid = requireMudbaseProjectId()
   const res = await request<MudbaseExecutionStatus & { data?: MudbaseExecutionStatus }>(
     `/api/functions/projects/${pid}/functions/${functionId}/executions/${executionId}`,
@@ -246,6 +323,12 @@ export async function getMudbaseLogs(
   functionId: string,
   limit = 20,
 ): Promise<{ executions: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats }> {
+  if (mudbaseProxyEnabled()) {
+    const res = await prequest<{ executions?: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats }>(
+      `/functions/${functionId}/logs?limit=${limit}`,
+    )
+    return { executions: res.executions ?? [], stats: res.stats }
+  }
   const pid = requireMudbaseProjectId()
   const res = await request<{ data?: { executions?: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats }; executions?: MudbaseExecutionLog[]; stats?: MudbaseFunctionStats }>(
     `/api/functions/projects/${pid}/functions/${functionId}/logs?limit=${limit}`,
@@ -258,6 +341,13 @@ export async function getMudbaseLogs(
 export async function invokeMudbaseWebhook(
   body: unknown,
 ): Promise<{ triggered: number; results: MudbaseWebhookResult[] }> {
+  if (mudbaseProxyEnabled()) {
+    const res = await prequest<{ triggered?: number; results?: MudbaseWebhookResult[] }>('/webhook', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+    return { triggered: res.triggered ?? 0, results: res.results ?? [] }
+  }
   const res = await fetch(mudbaseWebhookUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(apiKey ? { 'X-API-Key': apiKey } : {}) },

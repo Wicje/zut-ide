@@ -82,6 +82,30 @@ project uses `.vue` files, which still need the browser compiler), the IDE
 falls back to the in-browser runner automatically. Run the service with
 `ZUT_RUNTIME_TOKEN=...` and set `VITE_RUNTIME_TOKEN` to require a shared secret.
 
+## Optional: serverless backend (Mudbase, key never in the browser)
+
+The **Deploy → Serverless** tab ships a project file as a Mudbase function with a
+live endpoint. Recommended setup — the key lives on your server:
+
+```bash
+ZUT_MUDBASE_API_KEY=... ZUT_MUDBASE_PROJECT_ID=... npm run runtime
+```
+
+```bash
+# .env.local
+VITE_RUNTIME_URL=http://localhost:8787
+VITE_MUDBASE_PROXY_URL=http://localhost:8787/mudbase
+```
+
+Every proxy call is logged with timing (`mudbase METHOD /path ok Nms`) — the raw
+material for metering paid deploys later.
+
+Personal/local use only: skip the proxy and put a **functions-scoped** key in
+the browser bundle. Mint it at [mudbase.dev/console](https://www.mudbase.dev/console)
+(Settings → API Keys) with ONLY `functions` create/read/update/delete on one
+project, then **revoke any full-access key**. Never commit a real key — and note
+that minting keys needs org-level login; an API key cannot mint new keys.
+
 ## Optional: Supabase (accounts, cloud save, sharing)
 
 1. Create a project at [supabase.com](https://supabase.com).
