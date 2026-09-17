@@ -185,6 +185,7 @@ function serializeError(e) {
 
 /** Bundle a project's referenced JS/TS/CSS into one JS + one CSS payload. */
 async function bundleProject(files) {
+  const started = Date.now()
   if (!files || typeof files !== 'object') {
     return { errors: [{ text: 'Request must include a `files` object.' }] }
   }
@@ -221,7 +222,16 @@ async function bundleProject(files) {
     if (out.path.endsWith('.css')) css += text
     else js += text
   }
-  return { js, css, referenced: refs }
+  // Usage metadata: the basis for metering paid heavy builds later.
+  const meta = {
+    durationMs: Date.now() - started,
+    files: Object.keys(files).length,
+    inputBytes: Object.values(files).reduce((n, s) => n + Buffer.byteLength(String(s)), 0),
+    jsBytes: Buffer.byteLength(js),
+    cssBytes: Buffer.byteLength(css),
+  }
+  console.log(`[zut-runtime] build ok files=${meta.files} in=${meta.inputBytes}B out=${meta.jsBytes + meta.cssBytes}B ${meta.durationMs}ms`)
+  return { js, css, referenced: refs, meta }
 }
 
 const server = http.createServer(async (req, res) => {
