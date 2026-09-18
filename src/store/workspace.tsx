@@ -12,6 +12,7 @@ import type { ConsoleEntry, ConsoleLevel, FileMap, RunStatus } from '../types'
 export interface WorkspaceState {
   files: FileMap
   activeFile: string
+  aiTouched: Record<string, number> // path -> timestamp of last AI-applied change
   projectId: string | null
   projectName: string
   isSharedView: boolean
@@ -30,6 +31,7 @@ type Action =
   | { type: 'DELETE_FILE'; path: string }
   | { type: 'RENAME_FILE'; oldPath: string; newPath: string }
   | { type: 'SET_ACTIVE'; path: string }
+  | { type: 'MARK_AI_TOUCHED'; paths: string[] }
   | { type: 'SET_NAME'; name: string }
   | { type: 'SET_PROJECT_ID'; id: string | null }
   | { type: 'SET_RUN_STATUS'; status: RunStatus }
@@ -44,6 +46,7 @@ function initialState(): WorkspaceState {
   return {
     files: {},
     activeFile: '',
+    aiTouched: {},
     projectId: null,
     projectName: 'untitled',
     isSharedView: false,
@@ -66,6 +69,7 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         ...state,
         files: action.files,
         activeFile: active,
+        aiTouched: {},
         projectId: action.projectId,
         projectName: action.name,
         readOnly: Boolean(action.readOnly),
@@ -104,8 +108,18 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         saved: false,
       }
     }
-    case 'SET_ACTIVE':
-      return { ...state, activeFile: action.path }
+    case 'SET_ACTIVE': {
+      // Opening a file acknowledges AI changes to it — badge clears.
+      const next = { ...state.aiTouched }
+      delete next[action.path]
+      return { ...state, activeFile: action.path, aiTouched: next }
+    }
+    case 'MARK_AI_TOUCHED': {
+      const next = { ...state.aiTouched }
+      const now = Date.now()
+      for (const p of action.paths) next[p] = now
+      return { ...state, aiTouched: next }
+    }
     case 'SET_NAME':
       return { ...state, projectName: action.name, saved: false }
     case 'SET_PROJECT_ID':

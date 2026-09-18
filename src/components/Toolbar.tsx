@@ -6,6 +6,8 @@ import {
   typescriptStarter,
   reactStarter,
   vueStarter,
+  pythonStarter,
+  goStarter,
 } from '../lib/templates'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -90,6 +92,21 @@ const FRAMEWORKS = [
     desc: 'Single-file components',
     name: 'vue-app',
     files: () => vueStarter(),
+  },
+] as const
+
+const PROGRAMS = [
+  {
+    label: 'Python',
+    desc: 'main.py, runs on remote runtime',
+    name: 'python-app',
+    files: () => pythonStarter(),
+  },
+  {
+    label: 'Go',
+    desc: 'main.go, runs on remote runtime',
+    name: 'go-app',
+    files: () => goStarter(),
   },
 ] as const
 
@@ -191,7 +208,7 @@ export default function Toolbar(props: ToolbarProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-64">
-                  <DropdownMenuLabel>Starters (optional)</DropdownMenuLabel>
+                  <DropdownMenuLabel>Examples (optional)</DropdownMenuLabel>
                   {STARTERS.map((p) => (
                     <DropdownMenuItem key={p.label} onSelect={() => props.onNewProject(p.files(), p.name)}>
                       <FilePlus2 className="mr-2 size-4 shrink-0 text-muted-foreground" />
@@ -204,6 +221,17 @@ export default function Toolbar(props: ToolbarProps) {
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Frameworks</DropdownMenuLabel>
                   {FRAMEWORKS.map((p) => (
+                    <DropdownMenuItem key={p.label} onSelect={() => props.onNewProject(p.files(), p.name)}>
+                      <FilePlus2 className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                      <span className="flex min-w-0 flex-col">
+                        <span>{p.label}</span>
+                        <span className="truncate text-[11px] text-muted-foreground">{p.desc}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Languages (no AI needed)</DropdownMenuLabel>
+                  {PROGRAMS.map((p) => (
                     <DropdownMenuItem key={p.label} onSelect={() => props.onNewProject(p.files(), p.name)}>
                       <FilePlus2 className="mr-2 size-4 shrink-0 text-muted-foreground" />
                       <span className="flex min-w-0 flex-col">
@@ -291,6 +319,7 @@ export default function Toolbar(props: ToolbarProps) {
               size="sm"
               className="hidden gap-1.5 sm:inline-flex"
               onClick={props.onOpenAi}
+              title="AI assistant (Ctrl+K) — optional, the IDE works without it"
             >
               <Sparkles className="size-4 text-violet-400" /> AI
             </Button>

@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useWorkspace } from '../store/workspace'
 import type { FileMap } from '../types'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +46,18 @@ interface FileExplorerProps {
 export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerProps) {
   const { state, dispatch, addConsole } = useWorkspace()
   const [dragOver, setDragOver] = useState(false)
+  const [creating, setCreating] = useState<{ content: string; name: string } | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const createInputRef = useRef<HTMLInputElement>(null)
+
+  // Radix returns focus to the + trigger when its menu closes, stealing the
+  // input's autofocus. Re-claim focus after the menu finishes closing.
+  useEffect(() => {
+    if (!creating) return
+    const t = setTimeout(() => createInputRef.current?.focus(), 60)
+    return () => clearTimeout(t)
+  }, [creating])
 
   const files = Object.keys(state.files).sort()
 
@@ -59,17 +71,32 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
     return `${name}${i}${ext}`
   }
 
-  function addFile(kind: (typeof FILE_KINDS)[number]) {
-    const raw = window.prompt('File name:', kind.file)
-    if (raw === null) return // cancelled — stay on the current file
-    const name = raw.trim() || kind.file
-    if (name.includes('/') || name === '' || name === '.' || name === '..') {
-      window.alert('Use a plain file name like "about.html" (no folders yet).')
+  function startCreate(kind: (typeof FILE_KINDS)[number]) {
+    setCreating({ content: kind.content, name: kind.file })
+    setCreateError(null)
+  }
+
+  function commitCreate() {
+    if (!creating) return
+    const name = creating.name.trim()
+    if (!name) {
+      setCreateError('Give the file a name — e.g. about.html.')
+      return
+    }
+    if (name.includes('/') || name === '.' || name === '..') {
+      setCreateError('Plain file names only — no folders yet (e.g. about.html).')
       return
     }
     const path = uniqueName(name)
-    dispatch({ type: 'ADD_FILE', path, content: kind.content })
+    dispatch({ type: 'ADD_FILE', path, content: creating.content })
     addConsole('info', path === name ? `Added ${path}.` : `Added ${path} (named to avoid a clash).`)
+    setCreating(null)
+    setCreateError(null)
+  }
+
+  function cancelCreate() {
+    setCreating(null)
+    setCreateError(null)
   }
 
   function confirmDelete(path: string) {
@@ -166,9 +193,15 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
                   <Plus className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent
+                align="end"
+                className="w-52"
+                // Don't yank focus back to the + trigger on close: the inline
+                // naming input needs it (Radix restores focus after exit).
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
                 {FILE_KINDS.map((k) => (
-                  <DropdownMenuItem key={k.label} onSelect={() => addFile(k)}>
+                  <DropdownMenuItem key={k.label} onSelect={() => startCreate(k)}>
                     <FilePlus2 className="mr-2 size-4 text-muted-foreground" />
                     <span className="font-mono text-xs" style={{ color: COLORS[k.label] }}>
                       {k.label}
@@ -189,6 +222,26 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
 
       <ScrollArea className="min-h-0 flex-1">
         <ul className="p-1.5">
+          {!readOnly && creating && (
+            <li className="px-0.5 py-0.5">
+              <Input
+                autoFocus
+                ref={createInputRef}
+                value={creating.name}
+                onChange={(e) => {
+                  setCreating({ ...creating, name: e.target.value })
+                  setCreateError(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitCreate()
+                  else if (e.key === 'Escape') cancelCreate()
+                }}
+                className="h-7 font-mono text-[13px]"
+                aria-label="New file name — Enter to create, Esc to cancel"
+              />
+              {createError && <p className="px-2 pt-1 text-[11px] text-red-400">{createError}</p>}
+            </li>
+          )}
           {files.map((file) => {
             const active = state.activeFile === file
             const color = COLORS[languageBadge(file)] ?? '#9da5b1'
@@ -222,6 +275,12 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
                   {languageBadge(file)}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{file}</span>
+                {!active && state.aiTouched[file] != null && (
+                  <span
+                    className="size-1.5 shrink-0 rounded-full bg-violet-400"
+                    title="Changed by AI — open to review"
+                  />
+                )}
                 {!readOnly && (
                   <span className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-within:opacity-100">
                     <button

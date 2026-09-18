@@ -43,6 +43,15 @@ export function diffLines(oldText: string, newText: string): DiffLine[] {
   const n = a.length
   const m = b.length
 
+  // Guard: the table is O(n*m) numbers. Minified/generated monsters would
+  // spike browser memory — fall back to an honest whole-file replace view.
+  if (n * m > 4_000_000) {
+    return [
+      ...a.map((text): DiffLine => ({ type: 'remove', text })),
+      ...b.map((text): DiffLine => ({ type: 'add', text })),
+    ]
+  }
+
   const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0))
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {

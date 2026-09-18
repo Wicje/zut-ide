@@ -1,12 +1,15 @@
-// zut-runtime — a tiny, dependency-light bundling service.
+// zut-runtime — a tiny, dependency-light compute service for weak devices.
 //
-// Moves the heavy part of running a project (esbuild) off the student's device
-// and onto a server, so low-end laptops and phones never have to crunch a WASM
-// compiler. The browser posts the project's files; the service returns a bundle.
+// Moves heavy work off phones and <2GB Chromebooks and onto a server:
+//   POST /build  { files }                  -> { js, css, referenced } (web)
+//   POST /run    { files, entry, stdin }     -> { stdout, stderr, exitCode, durationMs } (python/go)
+//   GET  /health                             -> { ok, service, version, runners }
 //
-//   POST /build  { files: Record<string,string> }  ->  { js, css, referenced }
-//                                                       or { errors: [...] }
-//   GET  /health                                    ->  { ok, service, version }
+// AI is never required: plain code + Run works with no key.
+// /run executes `python3 <entry>` or `go run <entry>` in an isolated temp dir
+// with timeouts + output caps. No container yet — run behind auth on a
+// single-tenant host (same posture as the opencode agent). Set a token when
+// binding to a network.
 //
 // Run it:
 //   node runtime/server.mjs
@@ -30,13 +33,20 @@
 // Point the IDE at it with VITE_RUNTIME_URL (and VITE_RUNTIME_TOKEN if set).
 
 import http from 'node:http'
+import { spawn } from 'node:child_process'
+import { promises as fs } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { build } from 'esbuild'
 
 const PORT = Number(process.env.PORT ?? process.env.ZUT_RUNTIME_PORT ?? 8787)
 const HOST = process.env.HOST ?? '127.0.0.1'
 const TOKEN = process.env.ZUT_RUNTIME_TOKEN ?? ''
 const MAX_BODY = Number(process.env.ZUT_RUNTIME_MAX_BODY ?? 8 * 1024 * 1024)
-const VERSION = '0.1.0'
+const RUN_TIMEOUT_MS = Number(process.env.ZUT_RUN_TIMEOUT_MS ?? 8000)
+const RUN_MAX_OUTPUT = Number(process.env.ZUT_RUN_MAX_OUTPUT ?? 256 * 1024)
+const RUN_MAX_FILES = Number(process.env.ZUT_RUN_MAX_FILES ?? 100)
+const VERSION = '0.2.0'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -242,6 +252,71 @@ async function bundleProject(files) {
   return { js, css, referenced: refs, meta }
 }
 
+function cleanRelPath(p) {
+  const clean = path.normalize(String(p)).replace(/\\/g, '/')
+  if (clean.startsWith('/') || clean.split('/').includes('..') || clean === '' || clean === '.') return null
+  if (clean.includes('\0')) return null
+  return clean.replace(/^\.\//, '')
+}
+
+/** Execute a Python/Go entry in an isolated temp dir with timeout + output caps. */
+async function runProgram(files, entry, stdin = '') {
+  const rel = cleanRelPath(entry)
+  if (!rel) return { error: `Unsafe entry path: ${entry}`, status: 400 }
+  const kind = rel.endsWith('.py') ? 'python' : rel.endsWith('.go') ? 'go' : null
+  if (!kind) return { error: 'Only .py and .go entries are supported (main.py / main.go).', status: 400 }
+  if (!files || typeof files !== 'object') return { error: 'Request must include a `files` object.', status: 400 }
+  const names = Object.keys(files)
+  if (names.length > RUN_MAX_FILES) return { error: `Too many files (limit ${RUN_MAX_FILES}).`, status: 400 }
+  if (!(rel in files)) return { error: `Entry file "${rel}" not found.`, status: 400 }
+  for (const n of names) if (!cleanRelPath(n)) return { error: `Unsafe path: ${n}`, status: 400 }
+
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'zut-run-'))
+  try {
+    for (const [name, content] of Object.entries(files)) {
+      // Only materialize code-adjacent files; skip web cruft if present.
+      if (name === 'index.html') continue
+      const full = path.join(dir, cleanRelPath(name))
+      await fs.mkdir(path.dirname(full), { recursive: true })
+      await fs.writeFile(full, String(content ?? ''), 'utf8')
+    }
+    const cmd = kind === 'python' ? 'python3' : 'go'
+    const args = kind === 'python' ? [rel] : ['run', rel]
+    const started = Date.now()
+    const result = await new Promise((resolve) => {
+      const child = spawn(cmd, args, { cwd: dir, timeout: RUN_TIMEOUT_MS })
+      let stdout = ''
+      let stderr = ''
+      let truncated = false
+      const push = (buf, isErr) => {
+        let s = buf.toString('utf8')
+        const room = RUN_MAX_OUTPUT - (stdout.length + stderr.length)
+        if (room <= 0) { truncated = true; return }
+        if (s.length > room) { s = s.slice(0, room); truncated = true }
+        if (isErr) stderr += s; else stdout += s
+      }
+      child.stdout?.on('data', (d) => push(d, false))
+      child.stderr?.on('data', (d) => push(d, true))
+      child.on('error', (e) => resolve({ stdout, stderr: stderr + `\n[${cmd} not available: ${e.message}]`, exitCode: 127, truncated, durationMs: Date.now() - started }))
+      const kill = setTimeout(() => { try { child.kill('SIGKILL') } catch {} }, RUN_TIMEOUT_MS + 1000)
+      if (stdin) { try { child.stdin?.write(String(stdin).slice(0, 64 * 1024)); child.stdin?.end() } catch {} }
+      else { try { child.stdin?.end() } catch {} }
+      child.on('close', (code, signal) => {
+        clearTimeout(kill)
+        if (signal === 'SIGTERM' || signal === 'SIGKILL') {
+          resolve({ stdout, stderr: stderr + `\n[timeout after ${RUN_TIMEOUT_MS}ms]`, exitCode: 124, truncated: true, durationMs: Date.now() - started })
+        } else {
+          resolve({ stdout, stderr, exitCode: code ?? 1, truncated, durationMs: Date.now() - started })
+        }
+      })
+    })
+    console.log(`[zut-runtime] run ok kind=${kind} entry=${rel} exit=${result.exitCode} ${result.durationMs}ms`)
+    return result
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+}
+
 const MB_KEY = process.env.ZUT_MUDBASE_API_KEY ?? ''
 const MB_PID = process.env.ZUT_MUDBASE_PROJECT_ID ?? ''
 const MB_BASE = (process.env.MUDBASE_BASE_URL ?? 'https://api.mudbase.dev').replace(/\/+$/, '')
@@ -428,7 +503,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    send(res, 200, { ok: true, service: 'zut-runtime', version: VERSION, mudbase: mudbaseConfigured() })
+    send(res, 200, { ok: true, service: 'zut-runtime', version: VERSION, mudbase: mudbaseConfigured(), runners: ['web', 'python', 'go'] })
     return
   }
 
@@ -477,6 +552,32 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, result)
     } catch (e) {
       send(res, 400, { error: e?.message ?? 'Build failed' })
+    }
+    return
+  }
+
+  if (req.method === 'POST' && url.pathname === '/run') {
+    if (!authorized(req)) {
+      send(res, 401, { error: 'Unauthorized' })
+      return
+    }
+    try {
+      const raw = await readBody(req)
+      let body
+      try {
+        body = raw ? JSON.parse(raw) : {}
+      } catch {
+        send(res, 400, { error: 'Request body must be valid JSON.' })
+        return
+      }
+      const result = await runProgram(body.files, body.entry, body.stdin ?? '')
+      if (result.error) {
+        send(res, result.status ?? 400, { error: result.error })
+        return
+      }
+      send(res, 200, result)
+    } catch (e) {
+      send(res, 400, { error: e?.message ?? 'Run failed' })
     }
     return
   }

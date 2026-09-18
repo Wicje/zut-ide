@@ -35,7 +35,12 @@ export async function importFromUrl(url: string): Promise<ImportResult> {
   }
 
   // Regular URL — fetch and parse
-  const res = await fetch(clean)
+  let res: Response
+  try {
+    res = await fetch(clean)
+  } catch (e) {
+    throw friendlyFetchError(e, clean)
+  }
   if (!res.ok) throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`)
   const contentType = res.headers.get('content-type') ?? ''
   const text = await res.text()
@@ -56,6 +61,26 @@ export async function importFromUrl(url: string): Promise<ImportResult> {
   return importHtml(text, clean)
 }
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host || url
+  } catch {
+    return url
+  }
+}
+
+/** Browser fetches fail with a bare TypeError when a site blocks
+ *  cross-origin reads — translate that into something a learner can act on. */
+function friendlyFetchError(e: unknown, url: string): Error {
+  if (e instanceof TypeError) {
+    return new Error(
+      `Couldn't read ${hostOf(url)} — most sites block cross-origin imports (CORS). ` +
+        `Try a raw GitHub file, a CodePen link, or paste the code instead.`,
+    )
+  }
+  return e instanceof Error ? e : new Error(String(e))
+}
+
 function extractFilename(url: string): string {
   try {
     const u = new URL(url)
@@ -70,7 +95,12 @@ async function importCodePen(url: string): Promise<ImportResult> {
   // CodePen embed URLs have /pen/, /full/, /details/
   // We can fetch the embed which has data attributes for HTML/CSS/JS
   const embedUrl = url.replace(/\/(pen|full|details)\//, '/embed/')
-  const res = await fetch(embedUrl)
+  let res: Response
+  try {
+    res = await fetch(embedUrl)
+  } catch (e) {
+    throw friendlyFetchError(e, embedUrl)
+  }
   const html = await res.text()
 
   const files: FileMap = {}
@@ -128,7 +158,12 @@ function decodeTextarea(s: string): string {
 }
 
 async function importRawFile(url: string): Promise<ImportResult> {
-  const res = await fetch(url)
+  let res: Response
+  try {
+    res = await fetch(url)
+  } catch (e) {
+    throw friendlyFetchError(e, url)
+  }
   if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`)
   const text = await res.text()
   const filename = extractFilename(url) || 'imported.txt'

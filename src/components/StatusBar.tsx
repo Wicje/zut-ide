@@ -12,6 +12,15 @@ interface StatusBarProps {
   activeFile: string
   errorCount: number
   cloudBuild: boolean
+  aiTouched: Record<string, number>
+}
+
+function ago(ts: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000))
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  return `${Math.floor(m / 60)}h ago`
 }
 
 /** VS Code-style status bar: the single glanceable row that says "this is an IDE". */
@@ -25,7 +34,9 @@ export default function StatusBar({
   activeFile,
   errorCount,
   cloudBuild,
+  aiTouched,
 }: StatusBarProps) {
+  const aiLatest = Object.entries(aiTouched).sort((a, b) => b[1] - a[1])[0]
   return (
     <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-border/60 bg-muted/30 px-3 text-[11px] text-muted-foreground select-none">
       {/* Left: run state */}
@@ -70,6 +81,18 @@ export default function StatusBar({
       {activeFile && (
         <span className="hidden min-w-0 truncate font-mono text-muted-foreground/80 lg:inline">
           {activeFile}
+        </span>
+      )}
+
+      {aiLatest && (
+        <span
+          className="hidden min-w-0 items-center gap-1 truncate sm:flex"
+          title={`AI changed ${aiLatest[0]} — open the file to review`}
+        >
+          <span className="size-1.5 shrink-0 rounded-full bg-violet-400" aria-hidden />
+          <span className="truncate font-mono text-muted-foreground">
+            AI · {aiLatest[0]} · {ago(aiLatest[1])}
+          </span>
         </span>
       )}
 

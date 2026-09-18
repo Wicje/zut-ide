@@ -289,3 +289,53 @@ const count = ref(0);
 `,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Polyglot starters: no index.html, so the runner treats them as programs
+// and executes the entry on the remote runtime (see src/lib/projectKind.ts).
+// They run without any AI key — plain code + Run.
+// ---------------------------------------------------------------------------
+
+export function pythonStarter(): FileMap {
+  return {
+    'main.py': `"""Run with Ctrl+Enter. Works on phones with <2GB RAM:
+the code executes on the remote runtime, not on your device."""
+
+def main():
+    name = input("What's your name? ").strip() or "world"
+    print(f"Hello, {name}!")
+
+    squares = [n * n for n in range(5)]
+    print("squares:", squares)
+
+
+if __name__ == "__main__":
+    main()
+`,
+    'requirements.txt': `# one package per line, pip-style
+# requests
+`,
+  }
+}
+
+export function goStarter(): FileMap {
+  return {
+    'go.mod': `module zut-app
+
+go 1.22
+`,
+    'main.go': `// Run with Ctrl+Enter. Executes on the remote runtime so
+// weak devices never compile locally.
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Hello from Go!")
+	for i := 0; i < 5; i++ {
+		fmt.Printf("2^%d = %d\\n", i, 1<<i)
+	}
+}
+`,
+  }
+}

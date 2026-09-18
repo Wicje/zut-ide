@@ -1,22 +1,26 @@
-# zut — full AI coding on a Chromebook or phone. Nothing to install.
+# zut — full coding on a Chromebook or phone. Nothing to install.
 
-A browser IDE + cloud agent for HTML / CSS / JavaScript / TypeScript. Students edit files,
-hit Run, and see the result in a live preview — on hardware that could never run
-a local toolchain. Heavy work (builds, AI file edits) runs on zut-cloud; the
-device just renders the UI.
+A browser IDE + optional cloud backend for people on phones, Chromebooks, and
+other gadgets with &lt;2GB RAM. Edit files, hit Run, see the result — on hardware
+that could never run a local toolchain. Heavy work (builds, program runs, AI
+file edits) runs on zut-cloud; the device just renders the UI.
+
+AI is optional: plain code + Run works with no key, no sign-in, no server.
+When you want it, bring your own key or use the cloud agent.
 
 - **Editor**: Monaco (VS Code's editor) with IntelliSense and red-squiggle type errors for JS/TS.
-- **Multiple files**: `index.html`, `style.css`, `script.js`, `script.ts`, JSON, text — anything.
-- **Mobile friendly**: below ~860 px the IDE becomes a scrollable file-tab strip with a Code /
-  Result / Files dock at the bottom — so students can tinker from a phone or tablet too.
-- **Real projects**: JS/TS files can `import`/`export` across files. `.ts`/`.tsx` is compiled in
+- **Multiple files**: `index.html`, `style.css`, `script.js`, `script.ts`, `main.py`, `main.go`, JSON, text — anything.
+- **Mobile + desktop**: one UI that fits both. Below ~860 px the IDE becomes a scrollable file-tab strip with a Code /
+  Result / Files dock at the bottom; on desktop it's explorer / editor / output + console. Same RunOutput component either way.
+- **Web projects**: JS/TS files can `import`/`export` across files. `.ts`/`.tsx` is compiled in
   the browser with **esbuild-wasm**.
+- **Python + Go**: *New ▾ → Languages* includes `main.py` and `main.go` starters. Programs execute on the remote runtime (`POST /run`) so weak devices never compile locally. Stdin is built into the Output panel.
 - **Framework templates**: *New ▾* includes starter projects for **React** and **Vue** (which run
   live in the preview — React/vue packages are pulled from the esm.sh CDN and `.vue` single-file
-  components are compiled in-browser with `@vue/compiler-sfc`), plus **Next.js**, **Express** and
-  **NestJS** projects for teaching server-side code.
-- **Preview + console**: code runs in a sandboxed `<iframe>`; `console.log`, warnings, DOM errors
-  and unhandled promise rejections are streamed into a console panel.
+  components are compiled in-browser with `@vue/compiler-sfc`). Server frameworks (Next.js / Express / NestJS)
+  are compile-checked only, not executed — use the Deploy dialog hints or a Mudbase function for a real backend.
+- **Preview + console**: web code runs in a sandboxed `<iframe>`; `console.log`, warnings, DOM errors
+  and unhandled promise rejections are streamed into a console panel. Python/Go output (stdout/stderr + exit code) renders in the same Output panel as terminal text.
 - **Persistence**: works out of the box with zero backend (localStorage draft). Optionally connect
   **Supabase** for accounts, cloud save, a project library, and read-only share links.
 - **Save to disk**: download any project as a ZIP.
@@ -65,13 +69,15 @@ npm run build && npm run preview
 
 | Keys | Action |
 | --- | --- |
-| `Ctrl/⌘ + Enter` | Run preview |
+| `Ctrl/⌘ + Enter` | Run (preview for web, execute for Python/Go) |
 | `Ctrl/⌘ + S` | Save (device, or cloud when signed in) |
+| `Ctrl/⌘ + K` | Toggle AI assistant (optional) |
 
-## Optional: remote runtime (build on a server, not the laptop)
+## Optional: remote runtime (build + run on a server, not the phone)
 
-By default projects are bundled in the browser with esbuild-wasm. On low-end
-machines you can move that work to a server instead:
+By default web projects are bundled in the browser with esbuild-wasm. On low-end
+machines (phones, &lt;2GB Chromebooks) you can move that work to a server instead.
+Python/Go **always** need the server — they never execute on-device:
 
 ```bash
 npm run runtime            # → http://localhost:8787  (PORT to change)
@@ -85,10 +91,17 @@ VITE_RUNTIME_URL=http://localhost:8787
 ```
 
 When `VITE_RUNTIME_URL` is set, the browser POSTs the project's files to
-`/build` and gets back the JS/CSS bundle. If the service is unreachable (or the
-project uses `.vue` files, which still need the browser compiler), the IDE
-falls back to the in-browser runner automatically. Run the service with
+`/build` (web) or `/run` (Python/Go with optional stdin) and renders the result.
+If the service is unreachable (or the project uses `.vue` files, which still need
+the browser compiler), web falls back to the in-browser runner automatically;
+programs show a "needs runtime" hint instead of failing silently. Run the service with
 `ZUT_RUNTIME_TOKEN=...` and set `VITE_RUNTIME_TOKEN` to require a shared secret.
+Tune with `ZUT_RUN_TIMEOUT_MS` (default 8000) and `ZUT_RUN_MAX_OUTPUT` (default 256KB).
+
+Short-term host: Render.com works for a few days — deploy `cloud/Dockerfile` as a
+Web Service (Starter 2GB, health check `/health`), set `CORS_ORIGIN` to your
+frontend, then use its URL as `VITE_RUNTIME_URL` / `VITE_CLOUD_URL`. See
+[cloud/DEPLOY.md](cloud/DEPLOY.md) for VPS vs Render notes.
 
 ## Optional: serverless backend (Mudbase, key never in the browser)
 
@@ -183,10 +196,14 @@ server only; the browser never sees them.
 
 ## How running code works
 
-1. `index.html` is the app entry point.
+Project kind is detected from files (`src/lib/projectKind.ts`):
+- `index.html` present → **web**. Steps 1-4 below.
+- else `main.py` / `app.py` → **Python**; `main.go` / `go.mod` → **Go**. Step 5.
+
+1. `index.html` is the web entry point.
 2. `<link rel="stylesheet" href="...">` and `<script src="...">` tags pointing at project files are
    collected, then all JS/TS/CSS is bundled with esbuild. This runs in the browser by default, or on
-   the [remote runtime](#optional-remote-runtime-build-on-a-server-not-the-laptop) when configured.
+   the [remote runtime](#optional-remote-runtime-build--run-on-a-server-not-the-phone) when configured.
    TS type-checking is done live by the editor; esbuild strips types for execution.
 3. The bundled JS/CSS is inlined into a self-contained HTML string rendered in a sandboxed `<iframe>`
    (`allow-scripts`, no `same-origin` → the preview cannot touch the app).
@@ -194,6 +211,10 @@ server only; the browser never sees them.
    `unhandledrejection` back to the IDE via `postMessage`.
 
 Build errors (missing files, syntax errors, bad imports) are shown as red entries in the console.
+
+5. Programs (Python/Go) POST `{ files, entry, stdin }` to `/run` and render `{ stdout, stderr, exitCode }`
+   in the Output panel. Execution never happens on-device. Without a runtime the UI shows a
+   "needs runtime" hint. Limits: 8s timeout, 256KB output cap, stdin capped at 64KB.
 
 ## AI: bring your own key, or self-host the agent
 
@@ -214,7 +235,7 @@ Everything else in the IDE works without any key — only the AI panel needs one
 provider's tab shows an amber dot and a key prompt.
 
 **2. Self-host the agent (the AI edits your files).** This runs the [opencode](https://opencode.ai)
-agent on a server so it can read/write the project with real tools, while the student's device only
+agent on a server so it can read/write the project with real tools, while the phone or Chromebook only
 renders the browser UI. Run all three server-side pieces on the same machine:
 
 ```bash
@@ -256,9 +277,10 @@ token set when you do).
   (or `npm run build` when a `package.json` with a build script / Vite is present); for heavy apps
   prefer linking the pushed GitHub repo inside Vercel instead. OAuth uses a popup — allow popups for
   the site.
-- **AI** works two ways: bring your own key (OpenRouter/Anthropic/OpenAI/Gemini, stored in this
+- **AI** is optional and works two ways: bring your own key (OpenRouter/Anthropic/OpenAI/Gemini, stored in this
   browser, billed by that provider) or sign in to use the zut cloud proxy. The self-hosted agent
-  option runs opencode on a server.
+  option runs opencode on a server. Coding, running, and deploying all work with no AI.
+- **Programs** (Python/Go) need `VITE_RUNTIME_URL`; without it they show a hint instead of running. `/run` is single-tenant with timeout + output caps — do not expose it multi-tenant without a sandbox.
 - Importing some dynamic pages may fail if the site blocks cross-origin fetches or requires JS
   rendering. CodePen, raw GitHub, and plain HTML/CSS/JS pages work best.
 
@@ -267,29 +289,33 @@ token set when you do).
 ```
 src/
   App.tsx                # routing, run loop, autosave, cloud sync, feature wiring
-  lib/runner.ts          # esbuild bundling + srcdoc + console harness
-  lib/runtime.ts         # client for the optional remote bundling service
+  lib/runner.ts          # esbuild bundling + srcdoc + console harness (web)
+  lib/projectKind.ts     # web vs python vs go detection + entry lookup
+  lib/runtime.ts         # client for remote /build + /run (weak devices offload)
   lib/ai.ts              # BYOK chat providers (OpenRouter, Anthropic, OpenAI, Gemini)
   lib/opencode.ts        # opencode agent + disk-sync bridge client
   lib/backend.ts         # Supabase + localStorage persistence
   lib/supabase.ts        # client init / config check
-  lib/templates.ts       # starting templates
+  lib/templates.ts       # starting templates (web, React, Vue, Python, Go)
   lib/download.ts        # ZIP export
   lib/deploy.ts          # Netlify one-click deploy
   lib/hosting.ts         # Edge Function client (OAuth, GitHub push, Vercel, Claude)
   lib/importer.ts        # import project from URL (HTML/CodePen/GitHub)
-  lib/formatter.ts       # Prettier formatting
+  lib/formatter.ts       # Prettier formatting (web files; py/go run as-is)
   store/workspace.tsx    # files / console / project state
   components/
     CodeEditor.tsx       # Monaco wrapper (language per extension)
     FileExplorer.tsx     # add / upload / drop / rename / delete files
-    Preview.tsx          # sandboxed iframe + status + viewport toggle
+    RunOutput.tsx        # unified output: iframe preview (web) or terminal (py/go)
+    Preview.tsx          # sandboxed iframe + status + viewport toggle (web only)
     ConsolePanel.tsx     # console + error streaming
-    Toolbar.tsx          # run / autosave / save / share / zip / deploy / AI
+    Toolbar.tsx          # run / autosave / save / share / zip / deploy / AI (optional)
     Login.tsx, ProjectList.tsx, ShareDialog.tsx
     DeployDialog.tsx     # Publish hub: GitHub push, Vercel, Netlify
     AiPanel.tsx          # AI chat: BYOK providers + optional self-hosted agent
-runtime/server.mjs       # self-hostable bundling service (native esbuild)
+runtime/server.mjs       # self-hostable compute service (/build + /run, native esbuild + python3/go)
+cloud/server.mjs         # zut-cloud: builds + runs + headless agent turns
+scripts/file-bridge.mjs  # syncs the project to disk for the opencode agent
 scripts/file-bridge.mjs  # syncs the project to disk for the opencode agent
 supabase/schema.sql      # tables + RLS + share RPCs + OAuth connections
 supabase/functions/

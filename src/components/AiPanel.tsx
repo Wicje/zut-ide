@@ -397,6 +397,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
         acc = n > 0 ? `${r.reply}\n\n_(applied ${n} file change${n === 1 ? '' : 's'} to your project)_` : r.reply
         setDraft(acc)
         setUsage((u) => (u == null ? u : u + 1))
+        if (n > 0) dispatch({ type: 'MARK_AI_TOUCHED', paths: [...Object.keys(r.updated), ...Object.keys(r.created)] })
       } else {
         let sessionId = opencodeSessionId
         if (!sessionId) {
@@ -439,6 +440,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
               for (const [p, c] of Object.entries(changes.updated)) dispatch({ type: 'SET_FILE', path: p, content: c })
               for (const [p, c] of Object.entries(changes.created)) dispatch({ type: 'ADD_FILE', path: p, content: c })
               for (const p of changes.deleted) dispatch({ type: 'DELETE_FILE', path: p })
+              dispatch({ type: 'MARK_AI_TOUCHED', paths: [...Object.keys(changes.updated), ...Object.keys(changes.created)] })
               const n = changes.deleted.length + Object.keys(changes.updated).length + Object.keys(changes.created).length
               acc += `\n\n_(applied ${n} file change${n === 1 ? '' : 's'} to your project)_`
               setDraft(acc)
@@ -469,6 +471,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
 
   function applyProposal(p: ProposedEdit) {
     dispatch(p.exists ? { type: 'SET_FILE', path: p.path, content: p.content } : { type: 'ADD_FILE', path: p.path, content: p.content })
+    dispatch({ type: 'MARK_AI_TOUCHED', paths: [p.path] })
     dispatch({ type: 'SET_ACTIVE', path: p.path })
   }
 
@@ -626,16 +629,27 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
           )}
 
           {backend === 'zut-cloud' && (
-            <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
-              <span className="text-[11px] text-muted-foreground">Free plan</span>
-              <span className="font-mono text-[11px] text-foreground">
-                {signedIn ? (usage == null ? 'sign in to load meter' : `${usage} / 50 turns used`) : 'sign-in required'}
-              </span>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
+                <span className="text-[11px] text-muted-foreground">Free plan</span>
+                <span className="font-mono text-[11px] text-foreground">
+                  {signedIn ? (usage == null ? 'sign in to load meter' : `${usage} / 50 turns used`) : 'sign-in required'}
+                </span>
+              </div>
+              {signedIn && usage != null && usage >= 45 && usage < 50 && (
+                <p className="px-1 text-[11px] text-amber-400">
+                  Almost at your cap — add your own OpenRouter key (OpenRouter tab) for unlimited direct chat.
+                </p>
+              )}
             </div>
           )}
 
           {directProvider && (
             <div className="flex flex-col gap-2">
+              <p className="px-1 text-[11px] leading-4 text-muted-foreground">
+                Your project files are sent to {BACKENDS.find((b) => b.id === directProvider)?.label} with each
+                message so it can answer about your code.
+              </p>
               <div className="flex items-center gap-2">
                 <label className="text-[11px] font-medium text-muted-foreground">Model</label>
                 <select

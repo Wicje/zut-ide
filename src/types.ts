@@ -41,3 +41,11 @@ export interface EditorSelection {
   startLine: number
   endLine: number
 }
+
+export interface ProgramResult {
+  stdout: string
+  stderr: string
+  exitCode: number | null
+  durationMs: number
+  truncated?: boolean
+}

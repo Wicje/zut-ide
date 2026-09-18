@@ -1,4 +1,14 @@
-# Ship zut-cloud on your OneNetwork VPS
+# Ship zut-cloud on your OneNetwork VPS (or Render for a few days)
+
+You handle the VPS clicking, this repo handles everything else.
+Target: `https://cloud.onenetwork.ng/dashboard` → one Ubuntu VPS → one `docker compose up`.
+
+Short-term alternative: Render.com Web Service from `cloud/Dockerfile` (no Caddy —
+Render terminates TLS). Use Starter 2GB for days, then suspend. Free 512MB will
+OOM on esbuild + opencode. Set `CORS_ORIGIN` to your frontend, health check
+`/health`, and use its URL as `VITE_RUNTIME_URL` / `VITE_CLOUD_URL`.
+`PORT` already respects Render's injected `$PORT`. Disk is ephemeral unless you
+pay for a Disk — fine for days because the browser FileMap is source of truth.
 
 You handle the VPS clicking, this repo handles everything else.
 Target: `https://cloud.onenetwork.ng/dashboard` → one Ubuntu VPS → one `docker compose up`.
@@ -43,7 +53,8 @@ Values:
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` — same values already in your frontend `.env`.
 - `CLOUD_HOST=cloud.yourdomain.com`
 - `ACME_EMAIL=you@yourdomain.com`
-- `CORS_ORIGIN=https://<your-frontend-host>` (your Pages/Vercel URL, `*` only for testing)
+- `CORS_ORIGIN=https://<your-frontend-host>` (your Pages/Vercel URL — REQUIRED, not
+  optional: the `*` default lets any website on the internet spend your agent quota)
 
 ```bash
 cd cloud && docker compose up -d --build

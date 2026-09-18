@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkspace } from './store/workspace'
-import {
-  CONSOLE_SOURCE,
-  bundleProject,
-  buildSrcdoc,
-  collectReferences,
-  formatBuildErrors,
-  initRunner,
-} from './lib/runner'
-import { bundleProjectRemote, canUseRemote, runtimeEnabled } from './lib/runtime'
+import { CONSOLE_SOURCE, collectReferences } from './lib/runner'
+import { runtimeEnabled } from './lib/runtime'
+import { useRunLoop } from './hooks/useRunLoop'
+import { useShortcuts } from './hooks/useShortcuts'
 import { supabaseOrNull } from './lib/supabase'
 import {
   createProject,
@@ -35,7 +30,7 @@ import {
 import Toolbar from './components/Toolbar'
 import FileExplorer from './components/FileExplorer'
 import CodeEditor from './components/CodeEditor'
-import Preview from './components/Preview'
+import RunOutput from './components/RunOutput'
 import ConsolePanel from './components/ConsolePanel'
 import Login from './components/Login'
 import ProjectList from './components/ProjectList'
@@ -47,7 +42,8 @@ import AiPanel from './components/AiPanel'
 import StatusBar from './components/StatusBar'
 import { AlertTriangle, Braces, MonitorPlay, FolderOpen, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { EditorSelection, FileMap, RunStatus } from './types'
+import type { EditorSelection, FileMap } from './types'
+import { detectProjectKind } from './lib/projectKind'
 
 function parseHash(): string | null {
   const m = window.location.hash.match(/^#\/p\/([\w-]+)/)
@@ -84,22 +80,10 @@ function useMediaQuery(query: string): boolean {
   return matches
 }
 
-function resolveErrorFile(file: string | undefined, files: FileMap): string | undefined {
-  if (!file || file === '<stdin>') return undefined
-  const cleaned = file.replace(/^[a-zA-Z][\w-]*:\/*/, '').replace(/^\.?\/+/, '')
-  const candidates = [cleaned, cleaned.split('/').pop() ?? '']
-  for (const candidate of candidates) {
-    if (candidate && candidate in files) return candidate
-  }
-  return undefined
-}
-
 export default function App() {
   const { state, dispatch, addConsole, clearConsole, loadFiles } = useWorkspace()
   const [user, setUser] = useState<{ email?: string | null } | null | undefined>(undefined)
   const [autoplay, setAutoplay] = useState(true)
-  const [srcDoc, setSrcDoc] = useState('')
-  const [runKey, setRunKey] = useState(0)
   const [showLogin, setShowLogin] = useState(false)
   const [showProjects, setShowProjects] = useState(false)
   const [showShare, setShowShare] = useState(false)
@@ -109,14 +93,7 @@ export default function App() {
   const [showAi, setShowAi] = useState(false)
   const [projects, setProjects] = useState<StoredRow[]>([])
   const [shareLink, setShareLink] = useState<string | null>(null)
-  const [status, setStatus] = useState<RunStatus>('idle')
-  const [buildMs, setBuildMs] = useState<number | null>(null)
   const [hasLocalDraft, setHasLocalDraft] = useState(false)
-  const wasmPromise = useRef<Promise<void> | null>(null)
-  const ensureWasm = useCallback(() => {
-    if (!wasmPromise.current) wasmPromise.current = initRunner()
-    return wasmPromise.current
-  }, [])
   const isMobile = useMediaQuery('(max-width: 860px)')
   const [mobileView, setMobileView] = useState<'code' | 'result' | 'files'>('code')
   const fileStripRef = useRef<HTMLDivElement>(null)
@@ -140,60 +117,17 @@ export default function App() {
   const conflictWarned = useRef(false)
   const recoveredRef = useRef(false)
   const firstRunRef = useRef(true)
-  const entriesRef = useRef(state.consoleEntries)
-  entriesRef.current = state.consoleEntries
 
-  const run = useCallback(
-    async (files?: FileMap) => {
-      const target = files ?? state.files
-      const t0 = performance.now()
-      setStatus('running')
-      // Autoplay fires ~900ms after every edit/new-file, which would instantly
-      // erase fresh receipts ("Created …", "Added …"). Preserve a recent
-      // info message across the wipe so actions stay visibly acknowledged.
-      const recentInfo = [...entriesRef.current]
-        .reverse()
-        .find((e) => e.level === 'info' && Date.now() - e.timestamp < 3000)
-      clearConsole()
-      if (recentInfo) addConsole('info', recentInfo.message)
-      try {
-        let bundle
-        if (canUseRemote(target)) {
-          try {
-            bundle = await bundleProjectRemote(target)
-          } catch (e) {
-            if ((e as Error).message.startsWith('BUILD_FAILED:')) throw e
-            addConsole('warn', 'Remote runtime unavailable — building in the browser instead.')
-            await ensureWasm()
-            bundle = await bundleProject(target)
-          }
-        } else {
-          await ensureWasm()
-          bundle = await bundleProject(target)
-        }
-        setSrcDoc(buildSrcdoc(target['index.html'], bundle))
-        setRunKey((k) => k + 1)
-        setStatus('done')
-        setBuildMs(Math.round(performance.now() - t0))
-      } catch (e) {
-        setSrcDoc('')
-        setBuildMs(Math.round(performance.now() - t0))
-        for (const err of formatBuildErrors(e)) {
-          const file = resolveErrorFile(err.location?.file, target)
-          const loc = err.location
-            ? ` (line ${err.location.line}${err.location.column ? `:${err.location.column}` : ''})`
-            : ''
-          addConsole(
-            'error',
-            file ? `Build error: ${err.message}` : `Build error${loc}: ${err.message}`,
-            { file, line: err.location?.line, column: err.location?.column },
-          )
-        }
-        setStatus('error')
-      }
-    },
-    [state.files, addConsole, clearConsole, ensureWasm],
-  )
+  // Build-and-preview loop lives in the hook; App keeps wiring only.
+  // Works without AI: plain code + Run. Web runs in the iframe preview,
+  // Python/Go run on the remote runtime (see RunOutput).
+  const { srcDoc, setSrcDoc, runKey, status, buildMs, program, run } = useRunLoop({
+    files: state.files,
+    consoleEntries: state.consoleEntries,
+    addConsole,
+    clearConsole,
+  })
+  const projectKind = useMemo(() => detectProjectKind(state.files), [state.files])
 
   const openLocation = useCallback(
     (file: string, line?: number, column?: number) => {
@@ -285,15 +219,17 @@ export default function App() {
 
   // Rebuild only when the build inputs change (index.html + referenced
   // files) — editing notes.txt or data.json no longer rebundles.
-  // runRef always points at the latest run() so the timer never builds stale files.
+  // Programs (Python/Go) run manually so every keystroke doesn't bill the
+  // remote runtime. runRef always points at the latest run().
   const buildSig = useMemo(() => buildSignature(state.files), [state.files])
   useEffect(() => {
     if (!autoplay) return
     if (Object.keys(state.files).length === 0) return
+    if (projectKind !== 'web') return
     const t = setTimeout(() => void runRef.current(), 900)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildSig, autoplay])
+  }, [buildSig, autoplay, projectKind])
 
   useEffect(() => {
     if (state.isSharedView || !state.hydrated) return
@@ -385,23 +321,12 @@ export default function App() {
     addConsole('info', `Created "${name}" with ${Object.keys(files).length} files. Press Run to preview.`)
   }
 
-  // IDE shortcuts: Ctrl/Cmd+Enter = Run, Ctrl/Cmd+S = Save.
-  const saveRef = useRef(save)
-  saveRef.current = save
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const mod = e.ctrlKey || e.metaKey
-      if (mod && e.key === 'Enter') {
-        e.preventDefault()
-        void runRef.current()
-      } else if (mod && (e.key === 's' || e.key === 'S')) {
-        e.preventDefault()
-        void saveRef.current()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  // IDE shortcuts (listener lives in the hook; handlers stay fresh via ref).
+  useShortcuts({
+    onRun: () => void runRef.current(),
+    onSave: () => void save(),
+    onToggleAi: () => setShowAi((v) => !v),
+  })
 
   async function openProject(id: string) {
     if (id.startsWith('local-')) { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); conflictWarned.current = false; lastLocalWrite.current = 0; firstRunRef.current = true; return }
@@ -469,6 +394,10 @@ export default function App() {
     setFormatting(true)
     try {
       const ext = state.activeFile.split('.').pop() ?? ''
+      if (['py', 'go'].includes(ext)) {
+        addConsole('info', 'Formatting Python/Go is not built in yet — your code runs as-is.')
+        return
+      }
       if (!['html', 'htm', 'css', 'scss', 'less', 'js', 'jsx', 'mjs', 'ts', 'tsx', 'json'].includes(ext)) {
         addConsole('info', 'Formatting not supported for this file type.')
         return
@@ -595,7 +524,15 @@ export default function App() {
             )}
             {mobileView === 'result' && (
               <div className="flex h-full flex-col">
-                <Preview srcDoc={srcDoc} runKey={runKey} status={status} onRun={() => run()} />
+                <RunOutput
+                  kind={projectKind}
+                  srcDoc={srcDoc}
+                  runKey={runKey}
+                  status={status}
+                  program={program}
+                  onRun={() => void run()}
+                  onRunProgram={(stdin) => void run(undefined, stdin)}
+                />
                 <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} collapsible onOpenLocation={openLocation} />
               </div>
             )}
@@ -659,14 +596,17 @@ export default function App() {
             )}
           </main>
           <section className="flex min-h-0 min-w-0 flex-col bg-background">
-            <Preview
+            <RunOutput
+              kind={projectKind}
               srcDoc={srcDoc}
               runKey={runKey}
               status={status}
+              program={program}
               viewport={viewport}
               onViewportChange={setViewport}
               showViewportControls={!state.isSharedView}
-              onRun={() => run()}
+              onRun={() => void run()}
+              onRunProgram={(stdin) => void run(undefined, stdin)}
             />
             <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable onOpenLocation={openLocation} />
           </section>
@@ -684,6 +624,7 @@ export default function App() {
           activeFile={state.activeFile}
           errorCount={state.consoleEntries.filter((e) => e.level === 'error').length}
           cloudBuild={runtimeEnabled()}
+          aiTouched={state.aiTouched}
         />
       )}
 

@@ -8,15 +8,19 @@
 
 - **Name:** zut, always lowercase. Mark: `~zut` — emerald `~` + neutral wordmark,
   mono, bold, tight tracking (`Toolbar.tsx`).
-- **Positioning:** "Code with AI, from any device." A cloud IDE for phones and
-  Chromebooks, not a desktop replacement.
+- **Positioning:** "Code from any device." A cloud-assisted IDE for phones and
+  sub-2GB Chromebooks/gadgets, not a desktop replacement. AI is optional —
+  plain code + Run is the default path.
 - **Personality:** quiet workshop, not neon arcade. The UI recedes; the user's
   code and preview own the pixels.
 
 ## Palette (dark-first)
 
 App boots `.dark`. Light tokens exist in `index.css` but there is no toggle —
-do not design light-only states.
+dark is brand intent (workshop-at-night, OLED phones, projector-safe
+contrast), not a placeholder. Prefer boring utilities on
+positioning-critical elements; Tailwind v4 exotic syntax (`w-(--…)`,
+`origin-(…)`) is decoration-only — it once broke menu widths.
 
 | Token | Value | Use |
 |---|---|---|
@@ -92,15 +96,22 @@ violet = AI. Do not add new accent hues without updating this table.
   click jumps to file+line and switches to Code view on mobile.
 - **Preview:** header reads `Preview` + viewport chip (`375/768/Full`) +
   status pill (`Not run yet / Building… / Running / Build failed`).
+  Non-web projects use the same slot: `RunOutput.tsx` shows `Output` + language
+  chip (`Python/Go`) + `exit N · Nms`, with stdout/stderr and an stdin box.
+  One component, mobile and desktop — no separate mobile output.
 - **AI:** violet spark; backend tabs show key-missing amber dots and
   server-status dots. Cloud agent edits apply with a counted receipt
-  ("applied N file changes").
+  ("applied N file changes"). AI never blocks coding: Run/Save/Format/Deploy
+  work with no key.
+- **Project kind:** `index.html` = web, else `main.py` = Python, `main.go` = Go
+  (`src/lib/projectKind.ts`). Kind decides the Output slot, never the chrome.
 
 ## Voice
 
 - Friendly + plain: "Click Run to see your page here.", "No output yet."
 - Errors say what + where: `Build error (line x:y)` with a clickable jump.
-- Infra words (`VITE_*`, callback URLs, meter logs) never surface to students.
+- Programs without a runtime say what to do: "Python/Go need the remote runtime (VITE_RUNTIME_URL)."
+- Infra words (`VITE_*`, callback URLs, meter logs) never surface beyond that one hint.
 
 ## Non-goals
 

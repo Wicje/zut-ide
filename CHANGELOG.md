@@ -6,6 +6,12 @@ moved to a version section on release.
 ## [Unreleased]
 
 ### Added
+- Polyglot programs: Python (`main.py`) + Go (`main.go`) starters, `detectProjectKind` entry routing, unified `RunOutput` (iframe for web, terminal + stdin for programs) on mobile and desktop.
+- Remote execution: `POST /run` on `runtime/server.mjs` + `cloud/server.mjs` (`python3` / `go run`, 8s timeout, 256KB output cap, stdin support). Programs need `VITE_RUNTIME_URL`.
+- Render-ready cloud image: `python3` + `golang-go` in `cloud/Dockerfile`, `$PORT`-compatible, `/health` reports `runners`.
+- Docs repositioned: phones + <2GB gadgets (not students/classroom), AI-optional, web vs program execution contracts.
+
+### Added
 - zut-cloud: single VPS backend (remote builds + headless agent turns) with
   Supabase-JWT auth, per-user workspaces, quotas, and Docker/Caddy deploy kit.
 - Status bar (desktop): run state, build time, project + save location,

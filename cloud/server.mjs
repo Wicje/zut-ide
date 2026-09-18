@@ -1,11 +1,13 @@
-// zut-cloud — single shippable backend for "Cursor on the cloud".
+// zut-cloud — single shippable backend for weak devices.
 //
-// One Node process (zero npm deps beyond esbuild) that gives weak devices
-// (phones, Chromebooks) a full agent + fast builds:
+// One Node process that gives phones and <2GB Chromebooks fast builds,
+// program execution (Python/Go), and full agent turns without local compute:
 //
-//   GET  /health                    -> { ok, service, version, agent }
+//   GET  /health                    -> { ok, service, version, agent, runners }
 //   POST /build  { files }          -> { js, css, referenced } | { errors }
+//   POST /run    { files, entry, stdin } -> { stdout, stderr, exitCode, durationMs }
 //   POST /agent/turn  (auth)        -> { reply, updated, created, deleted }
+// AI is optional: /build and /run work with no key and no sign-in.
 //
 // Auth: Supabase JWT in `Authorization: Bearer <jwt>`.
 // Verified server-side via SUPABASE_URL + SUPABASE_ANON_KEY
@@ -44,7 +46,7 @@ import { spawn } from 'node:child_process'
 import { build } from 'esbuild'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
-const VERSION = '0.2.0'
+const VERSION = '0.3.0'
 const PORT = Number(process.env.PORT ?? process.env.ZUT_CLOUD_PORT ?? 8787)
 const HOST = process.env.HOST ?? '127.0.0.1'
 const DATA_ROOT = path.resolve(process.env.DATA_ROOT ?? './cloud-data')
@@ -58,6 +60,8 @@ const AGENT_TIMEOUT = Number(process.env.ZUT_AGENT_TIMEOUT_MS ?? 120_000)
 const AGENT_CONCURRENCY = Math.max(1, Number(process.env.ZUT_AGENT_CONCURRENCY ?? 2))
 const WORKSPACE_MAX_BYTES = Math.max(1, Number(process.env.ZUT_WORKSPACE_MAX_MB ?? 50)) * 1024 * 1024
 const MAX_BODY = Number(process.env.ZUT_MAX_BODY ?? 8 * 1024 * 1024)
+const RUN_TIMEOUT_MS = Number(process.env.ZUT_RUN_TIMEOUT_MS ?? 8000)
+const RUN_MAX_OUTPUT = Number(process.env.ZUT_RUN_MAX_OUTPUT ?? 256 * 1024)
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
 const MONTHLY_CAP = Number(process.env.ZUT_MONTHLY_AGENT_CAP ?? 50)
 
@@ -345,6 +349,64 @@ async function bundleProject(files) {
   }
 }
 
+// ---- program execution (Python/Go): isolated temp dir, timeout + output caps.
+// No container yet — same single-tenant posture as the agent. The browser
+// FileMap is source of truth; nothing persists except rate/usage counters.
+async function runProgram(files, entry, stdin = '') {
+  const rel = safePath(entry)
+  if (!rel) return { error: `Unsafe entry path: ${entry}`, status: 400 }
+  const kind = rel.endsWith('.py') ? 'python' : rel.endsWith('.go') ? 'go' : null
+  if (!kind) return { error: 'Only .py and .go entries are supported (main.py / main.go).', status: 400 }
+  if (!files || typeof files !== 'object') return { error: 'Request must include a `files` object.', status: 400 }
+  if (!(rel in files)) return { error: `Entry file "${rel}" not found.`, status: 400 }
+  for (const p of Object.keys(files)) if (!safePath(p)) return { error: `Unsafe path: ${p}`, status: 400 }
+
+  const dir = path.join(os.tmpdir(), `zut-run-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  try {
+    for (const [name, content] of Object.entries(files)) {
+      if (name === 'index.html') continue
+      const full = path.join(dir, safePath(name))
+      await fs.mkdir(path.dirname(full), { recursive: true })
+      await fs.writeFile(full, String(content ?? ''), 'utf8')
+    }
+    const cmd = kind === 'python' ? 'python3' : 'go'
+    const args = kind === 'python' ? [rel] : ['run', rel]
+    const started = Date.now()
+    return await new Promise((resolve) => {
+      const child = spawn(cmd, args, { cwd: dir, timeout: RUN_TIMEOUT_MS })
+      let stdout = ''
+      let stderr = ''
+      let truncated = false
+      const push = (buf, isErr) => {
+        let s = buf.toString('utf8')
+        const room = RUN_MAX_OUTPUT - (stdout.length + stderr.length)
+        if (room <= 0) { truncated = true; return }
+        if (s.length > room) { s = s.slice(0, room); truncated = true }
+        if (isErr) stderr += s
+        else stdout += s
+      }
+      child.stdout?.on('data', (d) => push(d, false))
+      child.stderr?.on('data', (d) => push(d, true))
+      child.on('error', (e) =>
+        resolve({ stdout, stderr: stderr + `\n[${cmd} not available: ${e.message}]`, exitCode: 127, truncated, durationMs: Date.now() - started }),
+      )
+      const kill = setTimeout(() => { try { child.kill('SIGKILL') } catch {} }, RUN_TIMEOUT_MS + 1000)
+      if (stdin) { try { child.stdin?.write(String(stdin).slice(0, 64 * 1024)); child.stdin?.end() } catch {} }
+      else { try { child.stdin?.end() } catch {} }
+      child.on('close', (code, signal) => {
+        clearTimeout(kill)
+        if (signal === 'SIGTERM' || signal === 'SIGKILL') {
+          resolve({ stdout, stderr: stderr + `\n[timeout after ${RUN_TIMEOUT_MS}ms]`, exitCode: 124, truncated: true, durationMs: Date.now() - started })
+        } else {
+          resolve({ stdout, stderr, exitCode: code ?? 1, truncated, durationMs: Date.now() - started })
+        }
+      })
+    })
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+}
+
 // ---- agent turn: write files, run opencode headless, diff back ----
 function envForModel(model, llmKey) {
   const env = { ...process.env }
@@ -395,7 +457,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { cors(res); res.writeHead(204); res.end(); return }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    send(res, 200, { ok: true, service: 'zut-cloud', version: VERSION, agent: true, auth: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) })
+    send(res, 200, { ok: true, service: 'zut-cloud', version: VERSION, agent: true, runners: ['web', 'python', 'go'], auth: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) })
     return
   }
 
@@ -405,6 +467,17 @@ const server = http.createServer(async (req, res) => {
       const body = JSON.parse((await readBody(req)) || '{}')
       send(res, 200, await bundleProject(body.files))
     } catch (e) { send(res, 400, { error: e?.message ?? 'Build failed' }) }
+    return
+  }
+
+  if (req.method === 'POST' && url.pathname === '/run') {
+    if (!rateOk(`run:${ip}`, Number(process.env.ZUT_RATE_RUN_MIN ?? 20))) { send(res, 429, { error: 'Too many runs. Slow down.' }); return }
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}')
+      const result = await runProgram(body.files, body.entry, body.stdin ?? '')
+      if (result.error) { send(res, result.status ?? 400, { error: result.error }); return }
+      send(res, 200, result)
+    } catch (e) { send(res, 400, { error: e?.message ?? 'Run failed' }) }
     return
   }
 
