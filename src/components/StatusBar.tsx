@@ -4,7 +4,9 @@ import type { RunStatus } from '../types'
 
 interface StatusBarProps {
   status: RunStatus
+  buildMs?: number | null
   saved: boolean
+  savedTo: 'cloud' | 'device'
   projectName: string
   fileCount: number
   activeFile: string
@@ -16,7 +18,9 @@ interface StatusBarProps {
 /** VS Code-style status bar: the single glanceable row that says "this is an IDE". */
 export default function StatusBar({
   status,
+  buildMs,
   saved,
+  savedTo,
   projectName,
   fileCount,
   activeFile,
@@ -45,15 +49,20 @@ export default function StatusBar({
           <span className="size-1.5 rounded-full bg-muted-foreground/60" />
         )}
         {status === 'idle' ? 'Idle' : status === 'running' ? 'Building' : status === 'done' ? 'Running' : 'Build failed'}
+        {buildMs != null && (
+          <span className="font-mono font-normal text-muted-foreground">
+            {buildMs < 1000 ? `${buildMs}ms` : `${(buildMs / 1000).toFixed(1)}s`}
+          </span>
+        )}
       </span>
 
       <span className="h-3 w-px bg-border/70" aria-hidden />
 
       {/* Project */}
-      <span className="flex min-w-0 items-center gap-1.5">
+      <span className="flex min-w-0 items-center gap-1.5" title={savedTo === 'cloud' ? 'Saved to your cloud account' : 'Saved on this device only — sign in for cloud save'}>
         <span className={cn('size-1.5 shrink-0 rounded-full', saved ? 'bg-emerald-400/70' : 'bg-amber-400')} />
         <span className="truncate font-medium text-foreground/80">{projectName}</span>
-        <span className="hidden sm:inline">{saved ? 'saved' : 'unsaved'}</span>
+        <span className="hidden sm:inline">{saved ? `saved · ${savedTo}` : 'unsaved'}</span>
       </span>
 
       <span className="hidden items-center gap-1 md:flex">

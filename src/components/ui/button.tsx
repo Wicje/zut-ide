@@ -40,16 +40,19 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  asChild = false,
-  ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
+function ButtonBase(
+  {
+    className,
+    variant = "default",
+    size = "default",
+    asChild = false,
+    ...props
+  }: React.ComponentProps<"button"> &
+    VariantProps<typeof buttonVariants> & {
+      asChild?: boolean
+    },
+  ref: React.ForwardedRef<HTMLButtonElement>,
+) {
   const Comp = asChild ? Slot.Root : "button"
 
   return (
@@ -58,9 +61,19 @@ function Button({
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
+      ref={ref}
       {...props}
     />
   )
 }
+
+// forwardRef (not React 19 ref-as-prop): the app runs React 18, where refs
+// on plain function components are dropped. Radix `asChild` triggers
+// (dropdown menus) attach positioning refs here — without forwarding, menus
+// never anchor and render stuck off-screen.
+const Button = React.forwardRef<HTMLButtonElement, React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+  }>(ButtonBase)
 
 export { Button, buttonVariants }

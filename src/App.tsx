@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkspace } from './store/workspace'
 import {
   CONSOLE_SOURCE,
   bundleProject,
   buildSrcdoc,
+  collectReferences,
   formatBuildErrors,
   initRunner,
 } from './lib/runner'
@@ -27,9 +28,8 @@ import { formatCode } from './lib/formatter'
 import { importFromUrl } from './lib/importer'
 import {
   listenForExternalWorkspaceChange,
-  maybeHeartbeatBackup,
-  recordHeartbeatBackup,
   recoverActiveWorkspace,
+  saveWorkspaceCheckpoint,
   saveWorkspaceSnapshot,
 } from './lib/persistence'
 import Toolbar from './components/Toolbar'
@@ -52,6 +52,24 @@ import type { EditorSelection, FileMap, RunStatus } from './types'
 function parseHash(): string | null {
   const m = window.location.hash.match(/^#\/p\/([\w-]+)/)
   return m ? m[1] : null
+}
+
+function hashStr(s: string): string {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+/** Hash of exactly what the preview build consumes: index.html + referenced files. */
+function buildSignature(files: FileMap): string {
+  const html = files['index.html'] ?? ''
+  let refs: string[] = []
+  try {
+    refs = collectReferences(html)
+  } catch {
+    refs = []
+  }
+  return ['index.html', ...refs].map((f) => `${f}#${hashStr(files[f] ?? '')}`).join('|')
 }
 
 function useMediaQuery(query: string): boolean {
@@ -92,6 +110,7 @@ export default function App() {
   const [projects, setProjects] = useState<StoredRow[]>([])
   const [shareLink, setShareLink] = useState<string | null>(null)
   const [status, setStatus] = useState<RunStatus>('idle')
+  const [buildMs, setBuildMs] = useState<number | null>(null)
   const [hasLocalDraft, setHasLocalDraft] = useState(false)
   const wasmPromise = useRef<Promise<void> | null>(null)
   const ensureWasm = useCallback(() => {
@@ -127,6 +146,7 @@ export default function App() {
   const run = useCallback(
     async (files?: FileMap) => {
       const target = files ?? state.files
+      const t0 = performance.now()
       setStatus('running')
       // Autoplay fires ~900ms after every edit/new-file, which would instantly
       // erase fresh receipts ("Created …", "Added …"). Preserve a recent
@@ -154,8 +174,10 @@ export default function App() {
         setSrcDoc(buildSrcdoc(target['index.html'], bundle))
         setRunKey((k) => k + 1)
         setStatus('done')
+        setBuildMs(Math.round(performance.now() - t0))
       } catch (e) {
         setSrcDoc('')
+        setBuildMs(Math.round(performance.now() - t0))
         for (const err of formatBuildErrors(e)) {
           const file = resolveErrorFile(err.location?.file, target)
           const loc = err.location
@@ -182,6 +204,10 @@ export default function App() {
     },
     [dispatch, state.files],
   )
+
+  // Latest-callback refs so timers/shortcuts never invoke stale closures.
+  const runRef = useRef(run)
+  runRef.current = run
 
   useEffect(() => {
     const supabase = supabaseOrNull()
@@ -257,12 +283,17 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [addConsole, loadFiles])
 
+  // Rebuild only when the build inputs change (index.html + referenced
+  // files) — editing notes.txt or data.json no longer rebundles.
+  // runRef always points at the latest run() so the timer never builds stale files.
+  const buildSig = useMemo(() => buildSignature(state.files), [state.files])
   useEffect(() => {
     if (!autoplay) return
     if (Object.keys(state.files).length === 0) return
-    const t = setTimeout(() => run(state.files), 900)
+    const t = setTimeout(() => void runRef.current(), 900)
     return () => clearTimeout(t)
-  }, [state.files, autoplay, run])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildSig, autoplay])
 
   useEffect(() => {
     if (state.isSharedView || !state.hydrated) return
@@ -276,11 +307,6 @@ export default function App() {
     if (now - lastSnapshotAt.current > 30_000 && Object.keys(state.files).length > 0) {
       lastSnapshotAt.current = now
       void saveWorkspaceSnapshot(state.projectId, state.projectName, state.files)
-    }
-    if (maybeHeartbeatBackup(state.projectName)) {
-      void downloadProjectZip(state.projectName || 'project', state.files).then(() => {
-        recordHeartbeatBackup(state.projectName || 'project')
-      })
     }
   }, [state.files, state.projectName, state.isSharedView])
 
@@ -344,6 +370,11 @@ export default function App() {
   }
 
   function newProject(files: FileMap, name: string) {
+    // Pre-wipe checkpoint: the outgoing workspace is recoverable from History.
+    if (Object.keys(state.files).length > 0) {
+      void saveWorkspaceCheckpoint(state.projectId, state.projectName, state.files)
+      addConsole('info', `Checkpointed "${state.projectName}" — History can restore it.`)
+    }
     setShareLink(null); setSrcDoc('')
     if (parseHash()) history.replaceState(null, '', window.location.pathname)
     dispatch({ type: 'SET_PROJECT_ID', id: null })
@@ -355,8 +386,6 @@ export default function App() {
   }
 
   // IDE shortcuts: Ctrl/Cmd+Enter = Run, Ctrl/Cmd+S = Save.
-  const runRef = useRef(run)
-  runRef.current = run
   const saveRef = useRef(save)
   saveRef.current = save
   useEffect(() => {
@@ -393,10 +422,23 @@ export default function App() {
   function buildShareLink(token: string) { return `${window.location.origin}${window.location.pathname}#/p/${token}` }
 
   async function share() {
-    if (!user || !state.projectId) return
+    if (state.isSharedView || state.readOnly) return
+    if (!user) {
+      addConsole('info', 'Sign in to share a read-only link to this project.')
+      return
+    }
     try {
+      // No dead end: a first-time share saves to the cloud automatically.
+      let id = state.projectId
+      if (!id) {
+        id = await createProject(state.projectName, state.files)
+        dispatch({ type: 'SET_PROJECT_ID', id })
+        dispatch({ type: 'SET_SAVED', saved: true })
+        refreshProjects()
+        addConsole('info', 'Saved to cloud.')
+      }
       if (shareLink) { setShowShare(true); return }
-      const token = await setProjectShared(state.projectId, true)
+      const token = await setProjectShared(id, true)
       if (token) { setShareLink(buildShareLink(token)); setShowShare(true); refreshProjects() }
     } catch (e) { addConsole('error', `Could not share: ${(e as { message?: string }).message}`) }
   }
@@ -433,6 +475,9 @@ export default function App() {
   }
 
   function restoreSnapshot(name: string, files: FileMap) {
+    if (Object.keys(state.files).length > 0) {
+      void saveWorkspaceCheckpoint(state.projectId, state.projectName, state.files)
+    }
     setSrcDoc('')
     conflictWarned.current = false
     lastLocalWrite.current = 0
@@ -619,6 +664,8 @@ export default function App() {
       {!isMobile && (
         <StatusBar
           status={status}
+          buildMs={buildMs}
+          savedTo={user && state.projectId && !state.isSharedView ? 'cloud' : 'device'}
           saved={state.saved}
           projectName={state.projectName}
           fileCount={Object.keys(state.files).length}

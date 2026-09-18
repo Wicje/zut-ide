@@ -131,8 +131,8 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
 
   const hasMudbase = mudbaseEnabled()
   const canCloud = hostingEnabled() && signedIn
-  const showTabs = hasMudbase || canCloud
-  const defaultTab = nodeProject && canCloud ? 'node' : hasMudbase ? 'mudbase' : 'github'
+  const hasAdvanced = hasMudbase || canCloud
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const isConnected = (p: string) => connections.some((c) => c.provider === p)
   const login = (p: string) => connections.find((c) => c.provider === p)?.login ?? null
@@ -279,43 +279,48 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
         <DialogHeader>
           <DialogTitle>Publish project</DialogTitle>
           <DialogDescription>
-            {!hasMudbase && !hostingEnabled()
-              ? 'Publishing needs configuration — see README.md (GitHub/Vercel/AI need Supabase; the serverless tab needs VITE_MUDBASE_API_KEY + VITE_MUDBASE_PROJECT_ID).'
-              : !signedIn && !hasMudbase
-                ? 'Sign in (top-right) to connect GitHub / Vercel and use the AI assistant.'
-                : `Deploy or push "${state.projectName}" to a hosting provider.`}
+            One-click live URL, no account needed. GitHub, Vercel and serverless
+            targets live under Advanced and need sign-in / configuration.
           </DialogDescription>
         </DialogHeader>
 
-        {showTabs && (
-          <Tabs defaultValue={defaultTab} className="flex min-h-0 flex-1 flex-col">
-            <TabsList className="w-full justify-start">
-              {hasMudbase && (
-                <TabsTrigger value="mudbase">
-                  <Server className="mr-1.5 size-3.5" /> Serverless
-                </TabsTrigger>
-              )}
-              {canCloud && nodeProject && (
-                <TabsTrigger value="node">
-                  <Stethoscope className="mr-1.5 size-3.5" /> Check
-                </TabsTrigger>
-              )}
-              {canCloud && (
-                <TabsTrigger value="github">
-                  <GitBranch className="mr-1.5 size-3.5" /> GitHub
-                </TabsTrigger>
-              )}
-              {canCloud && (
-                <TabsTrigger value="vercel">
-                  <Triangle className="mr-1.5 size-3.5" /> Vercel
-                </TabsTrigger>
-              )}
-              {canCloud && (
-                <TabsTrigger value="netlify">
-                  <Cloud className="mr-1.5 size-3.5" /> Netlify
-                </TabsTrigger>
-              )}
-            </TabsList>
+        <Tabs defaultValue="netlify" className="flex min-h-0 flex-1 flex-col">
+          <TabsList className="w-full justify-start">
+            <TabsTrigger value="netlify">
+              <Cloud className="mr-1.5 size-3.5" /> Netlify
+            </TabsTrigger>
+            {showAdvanced && hasMudbase && (
+              <TabsTrigger value="mudbase">
+                <Server className="mr-1.5 size-3.5" /> Serverless
+              </TabsTrigger>
+            )}
+            {showAdvanced && canCloud && nodeProject && (
+              <TabsTrigger value="node">
+                <Stethoscope className="mr-1.5 size-3.5" /> Check
+              </TabsTrigger>
+            )}
+            {showAdvanced && canCloud && (
+              <TabsTrigger value="github">
+                <GitBranch className="mr-1.5 size-3.5" /> GitHub
+              </TabsTrigger>
+            )}
+            {showAdvanced && canCloud && (
+              <TabsTrigger value="vercel">
+                <Triangle className="mr-1.5 size-3.5" /> Vercel
+              </TabsTrigger>
+            )}
+          </TabsList>
+
+            {hasAdvanced && (
+              <div className="px-1 pt-1">
+                <button
+                  className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                  onClick={() => setShowAdvanced((s) => !s)}
+                >
+                  {showAdvanced ? 'Hide advanced targets' : 'Advanced: GitHub · Vercel · Serverless'}
+                </button>
+              </div>
+            )}
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               {hasMudbase && (
@@ -556,7 +561,6 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
               </TabsContent>
             </div>
           </Tabs>
-        )}
       </DialogContent>
     </Dialog>
   )

@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.local
+cloud/cloud.env
 .DS_Store
 *.log
 supabase/.temp/

@@ -38,6 +38,7 @@ jobs:
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
           echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+          echo "VITE_CLOUD_URL=${{ secrets.VITE_CLOUD_URL }}" >> .env
           VITE_BASE=/${{ github.event.repository.name }}/ npm run build
 
       - name: Upload artifact

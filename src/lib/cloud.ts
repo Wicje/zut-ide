@@ -80,3 +80,27 @@ export async function cloudHealth(): Promise<boolean> {
     return false
   }
 }
+
+/** Free-plan agent turns used this calendar month (server enforces the cap;
+ *  this is display-only so the limit never surprises). Null when unknown. */
+export async function getAgentUsageThisMonth(): Promise<number | null> {
+  if (!isSupabaseConfigured()) return null
+  try {
+    const supabase = getSupabase()
+    const { data } = await supabase.auth.getSession()
+    const uid = data.session?.user?.id
+    if (!uid) return null
+    const start = new Date()
+    start.setDate(1)
+    start.setHours(0, 0, 0, 0)
+    const { count, error } = await supabase
+      .from('usage_meter')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', uid)
+      .gte('ts', start.toISOString())
+    if (error) return null
+    return count ?? 0
+  } catch {
+    return null
+  }
+}

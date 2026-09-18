@@ -29,7 +29,7 @@ import {
   computeProjectChanges,
   type OpencodeProvider,
 } from '../lib/opencode'
-import { cloudAgentTurn, cloudEnabled } from '../lib/cloud'
+import { cloudAgentTurn, cloudEnabled, getAgentUsageThisMonth } from '../lib/cloud'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -297,6 +297,14 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
   const [models, setModels] = useState<Record<DirectProvider, string>>({ ...DEFAULT_MODEL })
   const [keyInput, setKeyInput] = useState('')
   const [keyTick, setKeyTick] = useState(0)
+  const [usage, setUsage] = useState<number | null>(null)
+
+  // Free-plan meter for the cloud agent (display-only; the server enforces).
+  useEffect(() => {
+    if (backend === 'zut-cloud' && signedIn) {
+      getAgentUsageThisMonth().then(setUsage).catch(() => setUsage(null))
+    }
+  }, [backend, signedIn])
 
   // Check opencode availability on mount
   useEffect(() => {
@@ -388,6 +396,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
         const n = r.deleted.length + Object.keys(r.updated).length + Object.keys(r.created).length
         acc = n > 0 ? `${r.reply}\n\n_(applied ${n} file change${n === 1 ? '' : 's'} to your project)_` : r.reply
         setDraft(acc)
+        setUsage((u) => (u == null ? u : u + 1))
       } else {
         let sessionId = opencodeSessionId
         if (!sessionId) {
@@ -614,6 +623,15 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
               File sync unavailable — the agent can chat but can't edit files. Run{' '}
               <code className="rounded bg-muted px-1 font-mono">npm run dev:bridge</code>.
             </p>
+          )}
+
+          {backend === 'zut-cloud' && (
+            <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
+              <span className="text-[11px] text-muted-foreground">Free plan</span>
+              <span className="font-mono text-[11px] text-foreground">
+                {signedIn ? (usage == null ? 'sign in to load meter' : `${usage} / 50 turns used`) : 'sign-in required'}
+              </span>
+            </div>
           )}
 
           {directProvider && (

@@ -71,9 +71,20 @@ violet = AI. Do not add new accent hues without updating this table.
 
 - **Run:** solid emerald, always visible, `Ctrl+Enter`. Preview empty state
   offers the same Run — there is exactly one primary action.
+- **New:** one click = blank canvas (minimal HTML + CSS + JS). No template
+  maze — devs add files via explorer +. Starters/playgrounds/frameworks live
+  behind the chevron, each with a one-line description. Guarded by confirm
+  only when unsaved changes exist.
 - **Save:** ghost, `Ctrl+S`. Dirty = amber dot + "unsaved" in titlebar *and*
   status bar. Never silent destructive actions: New/Import/Restore announce
   to the console (`Created "x" with N files.`).
+- **Save model:** one home per sign-in state — device (logged out) or cloud
+  (logged in + project). Status bar names it (`saved · cloud/device`). No
+  surprise downloads: ZIP only on explicit click; History snapshots are the
+  safety net, with a pre-wipe checkpoint before every New/Import/Restore.
+- **Deploy dialog:** Netlify one-click is the whole default view. GitHub,
+  Vercel, Serverless and Check live behind an Advanced toggle that only
+  appears when configured.
 - **Menus:** pointer cursor, icons muted, destructive items red. File-type
   rows: badge + name + rename/delete always visible on touch
   (`md:` hover-reveal only with a mouse), rows keyboard-focusable.

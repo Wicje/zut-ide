@@ -60,9 +60,16 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
   }
 
   function addFile(kind: (typeof FILE_KINDS)[number]) {
-    const path = uniqueName(kind.file)
+    const raw = window.prompt('File name:', kind.file)
+    if (raw === null) return // cancelled — stay on the current file
+    const name = raw.trim() || kind.file
+    if (name.includes('/') || name === '' || name === '.' || name === '..') {
+      window.alert('Use a plain file name like "about.html" (no folders yet).')
+      return
+    }
+    const path = uniqueName(name)
     dispatch({ type: 'ADD_FILE', path, content: kind.content })
-    addConsole('info', `Added ${path}.`)
+    addConsole('info', path === name ? `Added ${path}.` : `Added ${path} (named to avoid a clash).`)
   }
 
   function confirmDelete(path: string) {

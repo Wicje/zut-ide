@@ -62,12 +62,34 @@ interface ToolbarProps {
   shareLink: string | null
 }
 
-const NEW_PROJECTS = [
-  { label: 'Empty project', name: 'my-project', files: () => emptyProject() },
-  { label: 'JavaScript playground', name: 'js-playground', files: () => javascriptStarter() },
-  { label: 'TypeScript playground', name: 'ts-playground', files: () => typescriptStarter() },
-  { label: 'React + Router + TanStack', name: 'react-app', files: () => reactStarter() },
-  { label: 'Vue', name: 'vue-app', files: () => vueStarter() },
+const STARTERS = [
+  {
+    label: 'JavaScript playground',
+    desc: 'Single script.js, console-first',
+    name: 'js-playground',
+    files: () => javascriptStarter(),
+  },
+  {
+    label: 'TypeScript playground',
+    desc: 'Typed script.ts with checking',
+    name: 'ts-playground',
+    files: () => typescriptStarter(),
+  },
+] as const
+
+const FRAMEWORKS = [
+  {
+    label: 'React + Router + TanStack',
+    desc: 'App shell, live preview',
+    name: 'react-app',
+    files: () => reactStarter(),
+  },
+  {
+    label: 'Vue',
+    desc: 'Single-file components',
+    name: 'vue-app',
+    files: () => vueStarter(),
+  },
 ] as const
 
 export default function Toolbar(props: ToolbarProps) {
@@ -77,6 +99,16 @@ export default function Toolbar(props: ToolbarProps) {
   useEffect(() => setNameInput(state.projectName), [state.projectName])
 
   const editable = !state.isSharedView && !state.readOnly
+
+  // Blank-first: one click = minimal index.html + CSS + JS canvas.
+  // Devs add whatever files they need via the explorer +. Starters live
+  // behind the chevron for those who want a head start.
+  function newBlank() {
+    if (!state.saved && Object.keys(state.files).length > 0) {
+      if (!window.confirm('Start a new blank project? Unsaved changes will be lost.')) return
+    }
+    props.onNewProject(emptyProject(), 'my-project')
+  }
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b bg-background/80 px-2 backdrop-blur md:gap-2 md:px-3">
@@ -121,28 +153,61 @@ export default function Toolbar(props: ToolbarProps) {
       <div className="flex shrink-0 items-center gap-1 md:gap-1.5">
         {editable && (
           <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Plus className="mr-1 size-4" /> New
-                  <ChevronDown className="ml-1 size-3.5 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-60">
-                <DropdownMenuLabel>New project</DropdownMenuLabel>
-                {NEW_PROJECTS.map((p) => (
-                  <DropdownMenuItem key={p.label} onSelect={() => props.onNewProject(p.files(), p.name)}>
-                    <FilePlus2 className="mr-2 size-4 text-muted-foreground" />
-                    {p.label}
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-r-none pr-1.5"
+                onClick={newBlank}
+                title="New blank project (minimal HTML + CSS + JS)"
+              >
+                <Plus className="mr-1 size-4" /> New
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-l-none px-1"
+                    title="Start from a starter instead"
+                    aria-label="More project starters"
+                  >
+                    <ChevronDown className="size-3.5 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuLabel>Starters (optional)</DropdownMenuLabel>
+                  {STARTERS.map((p) => (
+                    <DropdownMenuItem key={p.label} onSelect={() => props.onNewProject(p.files(), p.name)}>
+                      <FilePlus2 className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                      <span className="flex min-w-0 flex-col">
+                        <span>{p.label}</span>
+                        <span className="truncate text-[11px] text-muted-foreground">{p.desc}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Frameworks</DropdownMenuLabel>
+                  {FRAMEWORKS.map((p) => (
+                    <DropdownMenuItem key={p.label} onSelect={() => props.onNewProject(p.files(), p.name)}>
+                      <FilePlus2 className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                      <span className="flex min-w-0 flex-col">
+                        <span>{p.label}</span>
+                        <span className="truncate text-[11px] text-muted-foreground">{p.desc}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={props.onImport}>
+                    <Globe className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                    <span className="flex min-w-0 flex-col">
+                      <span>Import from URL…</span>
+                      <span className="truncate text-[11px] text-muted-foreground">HTML page, CodePen, GitHub raw</span>
+                    </span>
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={props.onImport}>
-                  <Globe className="mr-2 size-4 text-muted-foreground" />
-                  Import from URL…
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -200,7 +265,8 @@ export default function Toolbar(props: ToolbarProps) {
               variant="ghost"
               size="sm"
               onClick={props.onShare}
-              disabled={!props.shareLink && !state.projectId}
+              disabled={!props.user}
+              title={props.user ? 'Share a read-only link (saves to cloud first)' : 'Sign in to share'}
             >
               <Share2 className="size-4 md:mr-1.5" />
               <span className="hidden md:inline">Share</span>
