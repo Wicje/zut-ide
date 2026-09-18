@@ -23,10 +23,13 @@
 //   PORT / HOST                  (default 8787 / 127.0.0.1)
 //   DATA_ROOT                    (default ./cloud-data)
 //   SUPABASE_URL / SUPABASE_ANON_KEY   (required for /agent/*)
+//   SUPABASE_SERVICE_ROLE_KEY    (optional: writes usage_meter rows server-side)
 //   OPENCODE_BIN                 (default "opencode" in PATH)
 //   ZUT_AGENT_MODEL              (default "openrouter/google/gemini-2.5-flash")
 //   ZUT_AGENT_AUTO               ("1" passes --auto so files edit w/o prompt)
 //   ZUT_AGENT_TIMEOUT_MS         (default 120000)
+//   ZUT_AGENT_CONCURRENCY        (default 2 concurrent agent turns; rest queue)
+//   ZUT_WORKSPACE_MAX_MB         (default 50MB per user project on disk)
 //   ZUT_MAX_BODY                 (default 8MB)
 //   ZUT_RATE_BUILD_MIN           (default 30 req/min/IP)
 //   ZUT_RATE_AGENT_MIN           (default 10 req/min/user)
@@ -39,6 +42,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { spawn } from 'node:child_process'
 import { build } from 'esbuild'
+import { createRemoteJWKSet, jwtVerify } from 'jose'
 
 const VERSION = '0.2.0'
 const PORT = Number(process.env.PORT ?? process.env.ZUT_CLOUD_PORT ?? 8787)
@@ -46,10 +50,13 @@ const HOST = process.env.HOST ?? '127.0.0.1'
 const DATA_ROOT = path.resolve(process.env.DATA_ROOT ?? './cloud-data')
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').replace(/\/+$/, '')
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? ''
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
 const OPENCODE_BIN = process.env.OPENCODE_BIN ?? 'opencode'
 const DEFAULT_MODEL = process.env.ZUT_AGENT_MODEL ?? 'openrouter/google/gemini-2.5-flash'
 const AGENT_AUTO = (process.env.ZUT_AGENT_AUTO ?? '1') === '1'
 const AGENT_TIMEOUT = Number(process.env.ZUT_AGENT_TIMEOUT_MS ?? 120_000)
+const AGENT_CONCURRENCY = Math.max(1, Number(process.env.ZUT_AGENT_CONCURRENCY ?? 2))
+const WORKSPACE_MAX_BYTES = Math.max(1, Number(process.env.ZUT_WORKSPACE_MAX_MB ?? 50)) * 1024 * 1024
 const MAX_BODY = Number(process.env.ZUT_MAX_BODY ?? 8 * 1024 * 1024)
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
 const MONTHLY_CAP = Number(process.env.ZUT_MONTHLY_AGENT_CAP ?? 50)
@@ -92,7 +99,22 @@ function rateOk(key, perMin) {
   return true
 }
 
-// ---- auth via Supabase (no JWT crypto needed) ----
+// ---- auth: local JWKS verify first (no network, survives Supabase blips),
+// then the hosted /auth/v1/user check as fallback (covers legacy HS256
+// projects with no JWKS endpoint). Either way the uid is cached 60s. ----
+let jwksSet = null
+function getJwks() {
+  if (!SUPABASE_URL) return null
+  if (!jwksSet) {
+    try {
+      jwksSet = createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`))
+    } catch {
+      return null
+    }
+  }
+  return jwksSet
+}
+
 const authCache = new Map() // token -> { uid, exp }
 async function verifyUser(req) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw Object.assign(new Error('Server missing SUPABASE_URL / SUPABASE_ANON_KEY.'), { status: 503 })
@@ -102,6 +124,20 @@ async function verifyUser(req) {
   const token = m[1]
   const cached = authCache.get(token)
   if (cached && cached.exp > Date.now()) return cached.uid
+  // 1. Local signature check — only Supabase holds the private key.
+  try {
+    const set = getJwks()
+    if (set) {
+      const { payload } = await jwtVerify(token, set)
+      if (typeof payload?.sub === 'string' && payload.sub && payload.exp * 1000 > Date.now()) {
+        authCache.set(token, { uid: payload.sub, exp: Date.now() + 60_000 })
+        return payload.sub
+      }
+    }
+  } catch {
+    /* fall through to the hosted check */
+  }
+  // 2. Hosted check.
   const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
   })
@@ -130,6 +166,73 @@ async function bumpAgentCount(uid) {
   } catch { /* non-fatal */ }
 }
 
+/** Durable server-side usage row (service role bypasses RLS; users read their
+ *  own rows). Best-effort — the local counter above remains the live gate. */
+async function recordUsage(uid, model, ms, inputBytes) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/usage_meter`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ owner_id: uid, model, ms, input_bytes: inputBytes }),
+      signal: AbortSignal.timeout(5000),
+    })
+  } catch { /* metering must never fail the turn */ }
+}
+
+// ---- agent concurrency gate: N run at once, rest queue (bounded) ----
+let activeAgents = 0
+const agentQueue = [] // FIFO of () => void
+const MAX_QUEUE = 10
+async function acquireAgentSlot() {
+  if (activeAgents < AGENT_CONCURRENCY) { activeAgents++; return 0 }
+  if (agentQueue.length >= MAX_QUEUE) {
+    throw Object.assign(new Error('Agent is busy — try again in a minute.'), { status: 429 })
+  }
+  const queuedAt = Date.now()
+  await new Promise((resolve, reject) => {
+    const entry = { fire: null, timer: null }
+    entry.timer = setTimeout(() => {
+      const i = agentQueue.indexOf(entry)
+      if (i >= 0) agentQueue.splice(i, 1)
+      reject(Object.assign(new Error('Agent queue timed out — try again.'), { status: 429 }))
+    }, 90_000)
+    entry.fire = () => { clearTimeout(entry.timer); resolve() }
+    agentQueue.push(entry)
+  })
+  activeAgents++
+  return Date.now() - queuedAt
+}
+function releaseAgentSlot() {
+  activeAgents = Math.max(0, activeAgents - 1)
+  const next = agentQueue.shift()
+  if (next) next.fire()
+}
+
+/** Byte size of a workspace, following no symlinks (they are never read). */
+async function dirSizeBytes(dir) {
+  let total = 0
+  async function walk(d) {
+    let entries = []
+    try { entries = await fs.readdir(d, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      if (e.isSymbolicLink()) continue
+      const full = path.join(d, e.name)
+      if (e.isDirectory()) await walk(full)
+      else if (e.isFile()) {
+        try { total += (await fs.stat(full)).size } catch { /* ignore */ }
+      }
+    }
+  }
+  await walk(dir)
+  return total
+}
+
 // ---- workspace isolation ----
 function safeSeg(s, fallback = 'default') {
   const v = String(s ?? fallback)
@@ -146,9 +249,10 @@ async function readTree(dir) {
   async function walk(d) {
     let entries = []
     try { entries = await fs.readdir(d, { withFileTypes: true }) } catch { return }
-    for (const e of entries) {
-      if (e.name === '.git' || e.name === 'node_modules' || e.name === '.opencode') continue
-      const full = path.join(d, e.name)
+  for (const e of entries) {
+    if (e.name === '.git' || e.name === 'node_modules' || e.name === '.opencode') continue
+    if (e.isSymbolicLink()) continue // never follow agent-created symlinks
+    const full = path.join(d, e.name)
       const rel = path.relative(dir, full).replace(/\\/g, '/')
       if (e.isDirectory()) await walk(full)
       else if (e.isFile()) {
@@ -322,20 +426,38 @@ const server = http.createServer(async (req, res) => {
     for (const p of Object.keys(files)) if (!safePath(p)) { send(res, 400, { error: `Unsafe path: ${p}` }); return }
 
     const dir = path.join(DATA_ROOT, uid, pid)
+    const turnStarted = Date.now()
     try {
       await fs.mkdir(dir, { recursive: true })
       const before = await readTree(dir)
-      // Write incoming FileMap (delete files missing from client? No — only write/overwrite to avoid data loss)
+      // Write incoming FileMap (only write/overwrite to avoid data loss).
+      let inputBytes = 0
       for (const [p, content] of Object.entries(files)) {
         const t = safePath(p); if (!t) continue
         const full = path.join(dir, t)
         await fs.mkdir(path.dirname(full), { recursive: true })
         await fs.writeFile(full, String(content), 'utf8')
+        inputBytes += Buffer.byteLength(String(content))
       }
-      const chosen = typeof model === 'string' && model.includes('/') ? model : DEFAULT_MODEL
-      const llmKey = req.headers['x-llm-key']?.toString() ?? ''
-      const system = `You are zut, a coding assistant in a browser IDE. The project files are on disk in front of you. Use file tools to MAKE the requested change directly, then briefly summarize. Keep replies short for phone screens.`
-      const r = await runOpencode(dir, `${system}\n\nUser request: ${prompt}`, chosen, llmKey)
+      if ((await dirSizeBytes(dir)) > WORKSPACE_MAX_BYTES) {
+        send(res, 413, { error: `Workspace exceeds the ${Math.round(WORKSPACE_MAX_BYTES / 1024 / 1024)}MB limit — delete files and retry.` })
+        return
+      }
+      // Concurrency gate: bounded parallel agents, bounded queue.
+      let queuedMs = 0
+      try {
+        queuedMs = await acquireAgentSlot()
+      } catch (e) { send(res, e.status ?? 429, { error: e.message }); return }
+      let r
+      try {
+        const chosen = typeof model === 'string' && model.includes('/') ? model : DEFAULT_MODEL
+        const llmKey = req.headers['x-llm-key']?.toString() ?? ''
+        const system = `You are zut, a coding assistant in a browser IDE. The project files are on disk in front of you. Use file tools to MAKE the requested change directly, then briefly summarize. Keep replies short for phone screens.`
+        r = await runOpencode(dir, `${system}\n\nUser request: ${prompt}`, chosen, llmKey)
+        var chosenModel = chosen
+      } finally {
+        releaseAgentSlot()
+      }
       if (!r.ok) { send(res, 502, { error: r.error }); return }
       const after = await readTree(dir)
       const updated = {}, created = {}
@@ -347,9 +469,10 @@ const server = http.createServer(async (req, res) => {
       }
       for (const p of Object.keys(files)) if (!(p in after)) deleted.push(p)
       await bumpAgentCount(uid)
-      console.log(`[zut-cloud] agent ok uid=${uid.slice(0, 8)} pid=${pid} +${Object.keys(created).length} ~${Object.keys(updated).length} -${deleted.length}`)
+      void recordUsage(uid, chosenModel, Date.now() - turnStarted, inputBytes)
+      console.log(`[zut-cloud] agent ok uid=${uid.slice(0, 8)} pid=${pid} +${Object.keys(created).length} ~${Object.keys(updated).length} -${deleted.length} queued=${queuedMs}ms took=${Date.now() - turnStarted}ms`)
       send(res, 200, { reply: r.reply, updated, created, deleted })
-    } catch (e) { send(res, 500, { error: e?.message ?? 'Agent turn failed' }) }
+    } catch (e) { send(res, e.status ?? 500, { error: e?.message ?? 'Agent turn failed' }) }
     return
   }
 

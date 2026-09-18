@@ -57,6 +57,7 @@ interface ToolbarProps {
   onHistory: () => void
   onOpenAi: () => void
   onImport: () => void
+  onRemix?: () => void
   formatting: boolean
   isMobile: boolean
   shareLink: string | null
@@ -118,9 +119,23 @@ export default function Toolbar(props: ToolbarProps) {
           <span className="text-emerald-400">~</span>zut
         </span>
         {state.isSharedView ? (
-          <Badge variant="outline" className="shrink-0 gap-1.5">
-            <Globe className="size-3" /> shared view · read-only
-          </Badge>
+          <>
+            <Badge variant="outline" className="shrink-0 gap-1.5">
+              <Globe className="size-3" /> shared view · read-only
+            </Badge>
+            {props.onRemix && (
+              <Button
+                size="sm"
+                className="shrink-0 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                onClick={props.onRemix}
+                title="Make your own editable copy of this project"
+              >
+                <Plus className="size-3.5" />
+                <span className="hidden sm:inline">Remix in zut</span>
+                <span className="sm:hidden">Remix</span>
+              </Button>
+            )}
+          </>
         ) : (
           <>
             <Input

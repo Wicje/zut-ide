@@ -419,7 +419,18 @@ export default function App() {
     }
   }
 
-  function buildShareLink(token: string) { return `${window.location.origin}${window.location.pathname}#/p/${token}` }
+  function buildShareLink(token: string) { return `${window.location.origin}${window.location.pathname}?ref=share#/p/${token}` }
+
+  function remixShared() {
+    if (!state.isSharedView) return
+    history.replaceState(null, '', window.location.pathname)
+    conflictWarned.current = false
+    lastLocalWrite.current = 0
+    firstRunRef.current = true
+    const name = state.projectName.endsWith(' (remix)') ? state.projectName : `${state.projectName} (remix)`
+    loadFiles({ ...state.files }, name)
+    addConsole('info', 'Remixed into your own editable copy. Press Run to preview.')
+  }
 
   async function share() {
     if (state.isSharedView || state.readOnly) return
@@ -513,6 +524,7 @@ export default function App() {
         onLogin={() => setShowLogin(true)}
         onLogout={logout}
         onNewProject={newProject}
+        onRemix={remixShared}
         shareLink={canShare ? shareLink : null}
         onFormat={formatActive}
         onDeploy={handleDeploy}

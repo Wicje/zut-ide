@@ -3,6 +3,12 @@ services:
     build: ..
     image: zut-cloud:latest
     restart: unless-stopped
+    # Hard box for an agent that runs model-driven shell: bounded memory,
+    # no extra privileges, no privilege escalation.
+    mem_limit: 3g
+    mem_reservation: 1g
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - ./cloud.env
     environment:

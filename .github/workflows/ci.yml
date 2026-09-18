@@ -31,6 +31,17 @@ jobs:
         run: |
           node --check runtime/server.mjs
           node --check scripts/file-bridge.mjs
+          node --check cloud/server.mjs
+
+      - name: UI component contract (one cn, forwarded refs)
+        run: |
+          if grep -rn 'from "cn"' src/; then
+            echo "ERROR: import { cn } from '@/lib/utils' — never from the cn package."
+            exit 1
+          fi
+          for f in src/components/ui/button.tsx src/components/ui/input.tsx src/components/ui/badge.tsx src/components/ui/textarea.tsx; do
+            grep -q forwardRef "$f" || { echo "ERROR: $f lost its forwardRef (React 18 drops plain-function refs; Radix triggers break)."; exit 1; }
+          done
 
       - name: Production build
         run: npm run build

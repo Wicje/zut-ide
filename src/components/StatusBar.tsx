@@ -12,7 +12,6 @@ interface StatusBarProps {
   activeFile: string
   errorCount: number
   cloudBuild: boolean
-  onOpenConsole?: () => void
 }
 
 /** VS Code-style status bar: the single glanceable row that says "this is an IDE". */
@@ -26,7 +25,6 @@ export default function StatusBar({
   activeFile,
   errorCount,
   cloudBuild,
-  onOpenConsole,
 }: StatusBarProps) {
   return (
     <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-border/60 bg-muted/30 px-3 text-[11px] text-muted-foreground select-none">
@@ -78,14 +76,10 @@ export default function StatusBar({
       <span className="ml-auto flex items-center gap-3">
         {/* Console errors */}
         {errorCount > 0 ? (
-          <button
-            className="flex items-center gap-1 text-red-400 hover:text-red-300"
-            onClick={onOpenConsole}
-            title="Show errors in console"
-          >
+          <span className="flex items-center gap-1 text-red-400" title="Fix the errors shown in the console">
             <TriangleAlert className="size-3" />
             <span className="font-mono">{errorCount} error{errorCount === 1 ? '' : 's'}</span>
-          </button>
+          </span>
         ) : (
           <span className="hidden items-center gap-1 sm:flex">
             <CircleCheck className="size-3 text-muted-foreground/60" />

@@ -1,8 +1,9 @@
-# zut — a student web IDE for HTML / CSS / JavaScript / TypeScript
+# zut — full AI coding on a Chromebook or phone. Nothing to install.
 
-A browser-based IDE for teaching web development. Students edit files in a VS Code–style editor
-(Monaco), hit Run, and see the result in a live preview with a real console that captures
-`console.log`, warnings, runtime errors and build errors.
+A browser IDE + cloud agent for HTML / CSS / JavaScript / TypeScript. Students edit files,
+hit Run, and see the result in a live preview — on hardware that could never run
+a local toolchain. Heavy work (builds, AI file edits) runs on zut-cloud; the
+device just renders the UI.
 
 - **Editor**: Monaco (VS Code's editor) with IntelliSense and red-squiggle type errors for JS/TS.
 - **Multiple files**: `index.html`, `style.css`, `script.js`, `script.ts`, JSON, text — anything.
@@ -59,6 +60,13 @@ The app runs fine with no configuration — try it before touching Supabase.
 ```bash
 npm run build && npm run preview
 ```
+
+## Keyboard shortcuts
+
+| Keys | Action |
+| --- | --- |
+| `Ctrl/⌘ + Enter` | Run preview |
+| `Ctrl/⌘ + S` | Save (device, or cloud when signed in) |
 
 ## Optional: remote runtime (build on a server, not the laptop)
 
