@@ -23,6 +23,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { cellsConfig, cellsConfigured, createCellsDriver } from './cells.mjs'
 
 const PORT = Number(process.env.PORT ?? process.env.ZUT_BROKER_PORT ?? 8787)
 const HOST = process.env.HOST ?? '127.0.0.1'
@@ -211,6 +212,32 @@ async function runProgram(files, entry, stdin = '') {
 
 const termTokens = new Map() // token -> { uid, workspaceId, exp }
 
+// Live Cells driver (null unless CELLS_API_KEY is set; all API shapes in cells.mjs).
+const CELLS = cellsConfig()
+let cellsDriver = null
+function driver() {
+  if (!cellsDriver) cellsDriver = createCellsDriver(CELLS)
+  return cellsDriver
+}
+/** Persisted hash state so resyncs upload only diffs (survives restarts). */
+function hashStoreFor(uid, workspaceId) {
+  const file = path.join(DATA_ROOT, 'sync', String(uid), String(workspaceId), 'hashes.json')
+  return {
+    load: async () => {
+      try { return (JSON.parse(await fs.readFile(file, 'utf8'))).hashes ?? {} } catch { return {} }
+    },
+    save: async (_sid, hashes) => {
+      await fs.mkdir(path.dirname(file), { recursive: true })
+      await fs.writeFile(file, JSON.stringify({ hashes }))
+    },
+  }
+}
+function commandForEntry(entry) {
+  if (entry.endsWith('.py')) return `python3 ${entry}`
+  if (entry.endsWith('.go')) return `go run ${entry}`
+  return null
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return }
@@ -291,13 +318,35 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/broker/terminal-token') {
       const body = await readJson(req)
+      const workspaceId = safeSeg(body.workspaceId ?? 'default') ?? 'default'
+      if (cellsConfigured()) {
+        try {
+          const d = driver()
+          const { sessionId } = await d.ensureSession({ externalId: `${uid}:${workspaceId}` })
+          const t = await d.terminalToken({ sessionId })
+          send(res, 200, { token: t.token, expiresInSec: t.expiresInSec, gatewayUrl: t.gatewayUrl ?? undefined }); return
+        } catch (e) {
+          send(res, e.status ?? 502, { error: e.message }); return
+        }
+      }
       const token = crypto.randomBytes(24).toString('hex')
-      termTokens.set(token, { uid, workspaceId: String(body.workspaceId ?? 'default'), exp: Date.now() + 60_000 })
+      termTokens.set(token, { uid, workspaceId, exp: Date.now() + 60_000 })
       send(res, 200, { token, expiresInSec: 60 }); return
     }
     if (req.method === 'GET' && url.pathname === '/api/broker/preview') {
-      // Demo: no remote dev server yet — browser keeps srcDoc preview.
-      // With Cells: start service, wait for port, expose, return { url, access }.
+      const workspaceId = safeSeg(url.searchParams.get('workspaceId') ?? 'default') ?? 'default'
+      const port = Number(url.searchParams.get('port') ?? 3000)
+      if (cellsConfigured()) {
+        try {
+          const d = driver()
+          const { sessionId } = await d.ensureSession({ externalId: `${uid}:${workspaceId}` })
+          const p = await d.preview({ sessionId, port })
+          send(res, 200, p); return
+        } catch {
+          // No dev server yet — browser falls back to srcDoc preview.
+          send(res, 200, { url: null, access: 'private-token' }); return
+        }
+      }
       send(res, 200, { url: null, access: 'private-token' }); return
     }
     if (req.method === 'POST' && url.pathname === '/api/broker/run') {
@@ -311,11 +360,24 @@ const server = http.createServer(async (req, res) => {
           if (!cleanRelPath(p) && p !== 'index.html') { send(res, 400, { error: `Unsafe path: ${p}` }); return }
         }
       }
-      // Cells path lands here: create/resume named cell (externalId = workspaceId),
-      // hash-diff sync ≤200 files, exec entry with stdin + timeout, record runs row.
-      if (CELLS_CONFIGURED) {
-        send(res, 501, { error: 'Cells adapter not wired in this demo build — unset CELLS_API_KEY to use local runs.' })
-        return
+      if (cellsConfigured()) {
+        // Live Cell: resume named session (externalId = uid:workspace, so a
+        // double-click cannot create two), hash-diff sync, exec, record usage.
+        const entry = String(body.entry ?? '')
+        const command = commandForEntry(entry)
+        if (!command) { send(res, 400, { error: 'Only .py and .go entries are supported (main.py / main.go).' }); return }
+        try {
+          const d = driver()
+          const { sessionId, reused } = await d.ensureSession({ externalId: `${uid}:${workspaceId}` })
+          const sync = await d.syncFiles({ sessionId, files: body.files ?? {}, hashStore: hashStoreFor(uid, workspaceId) })
+          const result = await d.exec({ sessionId, command, stdin: body.stdin ?? '' })
+          bumpDaily(uid)
+          console.log(`[zut-broker] run ok uid=${String(uid).slice(0, 8)} cell=${String(sessionId).slice(0, 8)} reused=${reused} sync=+${sync.uploaded} entry=${entry} exit=${result.exitCode} ${result.durationMs}ms`)
+          send(res, 200, result); return
+        } catch (e) {
+          const status = typeof e?.status === 'number' && e.status >= 400 && e.status < 600 ? e.status : 502
+          send(res, status, { error: e?.message ?? 'Cell run failed' }); return
+        }
       }
       const result = await runProgram(body.files ?? {}, body.entry, body.stdin ?? '')
       if (result.error) { send(res, result.status ?? 400, { error: result.error }); return }
