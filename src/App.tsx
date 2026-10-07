@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkspace } from './store/workspace'
 import { CONSOLE_SOURCE, collectReferences } from './lib/runner'
 import { runtimeEnabled } from './lib/runtime'
@@ -35,12 +35,13 @@ import CodeEditor from './components/CodeEditor'
 import RunOutput from './components/RunOutput'
 import ConsolePanel from './components/ConsolePanel'
 import Login from './components/Login'
-import ProjectList from './components/ProjectList'
 import ShareDialog from './components/ShareDialog'
 import ImportDialog from './components/ImportDialog'
-import DeployDialog from './components/DeployDialog'
-import HistoryDialog from './components/HistoryDialog'
-import AiPanel from './components/AiPanel'
+// Heavy panels split out of the initial phone load (Monaco + editor first).
+const ProjectList = lazy(() => import('./components/ProjectList'))
+const DeployDialog = lazy(() => import('./components/DeployDialog'))
+const HistoryDialog = lazy(() => import('./components/HistoryDialog'))
+const AiPanel = lazy(() => import('./components/AiPanel'))
 import StatusBar from './components/StatusBar'
 import { AlertTriangle, Braces, MonitorPlay, FolderOpen, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -672,42 +673,50 @@ export default function App() {
 
       {showLogin && <Login onClose={() => setShowLogin(false)} onSignedIn={() => { setShowLogin(false); refreshProjects() }} />}
       {showProjects && (
-        <ProjectList
-          projects={projects}
-          hasLocalDraft={hasLocalDraft}
-          onOpen={openProject}
-          onOpenLocal={() => { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); conflictWarned.current = false; lastLocalWrite.current = 0; firstRunRef.current = true; setShowProjects(false) }}
-          onDelete={removeProject}
-          onClose={() => setShowProjects(false)}
-        />
+        <Suspense fallback={null}>
+          <ProjectList
+            projects={projects}
+            hasLocalDraft={hasLocalDraft}
+            onOpen={openProject}
+            onOpenLocal={() => { const d = loadLocalWorkspace(); if (d) loadFiles(d.files, d.name); conflictWarned.current = false; lastLocalWrite.current = 0; firstRunRef.current = true; setShowProjects(false) }}
+            onDelete={removeProject}
+            onClose={() => setShowProjects(false)}
+          />
+        </Suspense>
       )}
       {showShare && shareLink && state.projectId && (
         <ShareDialog link={shareLink} onClose={() => setShowShare(false)} onStopSharing={stopSharing} />
       )}
       {showImport && <ImportDialog onClose={() => setShowImport(false)} onImport={handleImport} />}
       {showDeploy && (
-        <DeployDialog
-          signedIn={Boolean(user)}
-          onClose={() => setShowDeploy(false)}
-          onLog={(level, message) => addConsole(level, message)}
-        />
+        <Suspense fallback={null}>
+          <DeployDialog
+            signedIn={Boolean(user)}
+            onClose={() => setShowDeploy(false)}
+            onLog={(level, message) => addConsole(level, message)}
+          />
+        </Suspense>
       )}
       {showHistory && (
-        <HistoryDialog
-          projectId={state.projectId}
-          projectName={state.projectName}
-          files={state.files}
-          onRestore={restoreSnapshot}
-          onClose={() => setShowHistory(false)}
-        />
+        <Suspense fallback={null}>
+          <HistoryDialog
+            projectId={state.projectId}
+            projectName={state.projectName}
+            files={state.files}
+            onRestore={restoreSnapshot}
+            onClose={() => setShowHistory(false)}
+          />
+        </Suspense>
       )}
       {showAi && (
-        <AiPanel
-          signedIn={Boolean(user)}
-          onSignIn={() => setShowLogin(true)}
-          onClose={() => setShowAi(false)}
-          selection={aiSelection}
-        />
+        <Suspense fallback={null}>
+          <AiPanel
+            signedIn={Boolean(user)}
+            onSignIn={() => setShowLogin(true)}
+            onClose={() => setShowAi(false)}
+            selection={aiSelection}
+          />
+        </Suspense>
       )}
     </div>
   )

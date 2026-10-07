@@ -41,6 +41,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import ConfirmDialog from './ConfirmDialog'
 
 interface MudbasePanelProps {
   files: FileMap
@@ -160,6 +161,7 @@ export default function MudbasePanel({ files, projectName, onLog }: MudbasePanel
   const [logs, setLogs] = useState<MudbaseExecutionLog[] | null>(null)
   const [logsBusy, setLogsBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [pendingDeleteFn, setPendingDeleteFn] = useState<MudbaseFunction | null>(null)
 
   const candidates = useMemo(
     () =>
@@ -258,8 +260,10 @@ export default function MudbasePanel({ files, projectName, onLog }: MudbasePanel
     }
   }
 
-  async function handleDelete(fn: MudbaseFunction) {
-    if (!window.confirm(`Delete the serverless function "${fn.name}"?`)) return
+  async function handleDelete() {
+    const fn = pendingDeleteFn
+    if (!fn) return
+    setPendingDeleteFn(null)
     setActionBusy(`delete-${fn._id}`)
     try {
       await deleteMudbaseFunction(fn._id)
@@ -372,6 +376,15 @@ export default function MudbasePanel({ files, projectName, onLog }: MudbasePanel
 
   return (
     <div className="grid gap-4">
+      <ConfirmDialog
+        open={pendingDeleteFn !== null}
+        title={pendingDeleteFn ? `Delete "${pendingDeleteFn.name}"?` : 'Delete function?'}
+        description="The live endpoint stops serving this function immediately."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setPendingDeleteFn(null)}
+      />
       <div className="flex items-center gap-2">
         <Server className="size-4 text-muted-foreground" />
         <span className="text-sm font-semibold">Mudbase serverless API</span>
@@ -546,7 +559,7 @@ export default function MudbasePanel({ files, projectName, onLog }: MudbasePanel
                     title="Delete"
                     className="text-muted-foreground hover:text-red-400"
                     disabled={running}
-                    onClick={() => handleDelete(fn)}
+                    onClick={() => setPendingDeleteFn(fn)}
                   >
                     {running && actionBusy === `delete-${fn._id}` ? (
                       <Loader2 className="size-3.5 animate-spin" />

@@ -48,8 +48,12 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
   const [dragOver, setDragOver] = useState(false)
   const [creating, setCreating] = useState<{ content: string; name: string } | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState<{ old: string; name: string; error: string | null } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createInputRef = useRef<HTMLInputElement>(null)
+  const renameInputRef = useRef<HTMLInputElement>(null)
+  const deleteTimer = useRef<number | null>(null)
 
   // Radix returns focus to the + trigger when its menu closes, stealing the
   // input's autofocus. Re-claim focus after the menu finishes closing.
@@ -58,6 +62,19 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
     const t = setTimeout(() => createInputRef.current?.focus(), 60)
     return () => clearTimeout(t)
   }, [creating])
+
+  useEffect(() => {
+    if (!renaming) return
+    const t = setTimeout(() => {
+      renameInputRef.current?.focus()
+      renameInputRef.current?.select()
+    }, 30)
+    return () => clearTimeout(t)
+  }, [renaming])
+
+  useEffect(() => () => {
+    if (deleteTimer.current) window.clearTimeout(deleteTimer.current)
+  }, [])
 
   const files = Object.keys(state.files).sort()
 
@@ -99,16 +116,53 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
     setCreateError(null)
   }
 
+  // Two-tap delete: first tap arms (3s window), second tap deletes.
+  // No blocking dialog; always visible on touch, keyboard-focusable.
   function confirmDelete(path: string) {
     if (Object.keys(state.files).length <= 1) return
-    if (window.confirm(`Delete ${path}?`)) dispatch({ type: 'DELETE_FILE', path })
+    if (pendingDelete === path) {
+      if (deleteTimer.current) window.clearTimeout(deleteTimer.current)
+      deleteTimer.current = null
+      setPendingDelete(null)
+      dispatch({ type: 'DELETE_FILE', path })
+      addConsole('info', `Deleted ${path}.`)
+      return
+    }
+    if (deleteTimer.current) window.clearTimeout(deleteTimer.current)
+    setPendingDelete(path)
+    deleteTimer.current = window.setTimeout(() => {
+      setPendingDelete(null)
+      deleteTimer.current = null
+    }, 3000)
   }
 
   function startRename(path: string) {
-    const next = window.prompt('Rename file:', path)
-    if (!next || next === path || next.includes('/')) return
-    if (next in state.files) return window.alert('A file with that name already exists.')
-    dispatch({ type: 'RENAME_FILE', oldPath: path, newPath: next })
+    if (deleteTimer.current) window.clearTimeout(deleteTimer.current)
+    setPendingDelete(null)
+    setRenaming({ old: path, name: path, error: null })
+  }
+
+  function commitRename() {
+    if (!renaming) return
+    const next = renaming.name.trim()
+    if (!next) {
+      setRenaming({ ...renaming, error: 'Give the file a name.' })
+      return
+    }
+    if (next.includes('/')) {
+      setRenaming({ ...renaming, error: 'Plain file names only — no folders yet.' })
+      return
+    }
+    if (next === renaming.old) {
+      setRenaming(null)
+      return
+    }
+    if (next in state.files) {
+      setRenaming({ ...renaming, error: 'A file with that name already exists.' })
+      return
+    }
+    dispatch({ type: 'RENAME_FILE', oldPath: renaming.old, newPath: next })
+    setRenaming(null)
   }
 
   async function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -245,6 +299,8 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
           {files.map((file) => {
             const active = state.activeFile === file
             const color = COLORS[languageBadge(file)] ?? '#9da5b1'
+            const isRenaming = renaming?.old === file
+            const deleteArmed = pendingDelete === file
             return (
               <li
                 key={file}
@@ -256,8 +312,9 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
                   'group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60 text-foreground/90',
                 )}
-                onClick={() => dispatch({ type: 'SET_ACTIVE', path: file })}
+                onClick={() => { if (!isRenaming) dispatch({ type: 'SET_ACTIVE', path: file }) }}
                 onKeyDown={(e) => {
+                  if (isRenaming) return
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     dispatch({ type: 'SET_ACTIVE', path: file })
@@ -274,14 +331,33 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
                 <span className="w-8 shrink-0 font-mono text-[10px] font-semibold" style={{ color }}>
                   {languageBadge(file)}
                 </span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{file}</span>
+                {isRenaming && renaming ? (
+                  <span className="min-w-0 flex-1" onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      ref={renameInputRef}
+                      value={renaming.name}
+                      onChange={(e) => setRenaming({ ...renaming, name: e.target.value, error: null })}
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        if (e.key === 'Enter') commitRename()
+                        else if (e.key === 'Escape') setRenaming(null)
+                      }}
+                      onBlur={commitRename}
+                      className="h-7 font-mono text-[13px]"
+                      aria-label={`Rename ${file} — Enter to save, Esc to cancel`}
+                    />
+                    {renaming.error && <span className="block pt-0.5 text-[11px] text-red-400">{renaming.error}</span>}
+                  </span>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{file}</span>
+                )}
                 {!active && state.aiTouched[file] != null && (
                   <span
                     className="size-1.5 shrink-0 rounded-full bg-violet-400"
                     title="Changed by AI — open to review"
                   />
                 )}
-                {!readOnly && (
+                {!readOnly && !isRenaming && (
                   <span className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-within:opacity-100">
                     <button
                       className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -292,14 +368,21 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
                       <Pencil className="size-3.5" />
                     </button>
                     <button
-                      className="rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                      title={`Delete ${file}`}
-                      aria-label={`Delete ${file}`}
+                      className={cn(
+                        'rounded p-1 hover:bg-destructive/20 hover:text-destructive',
+                        deleteArmed ? 'text-destructive' : 'text-muted-foreground',
+                      )}
+                      title={deleteArmed ? `Tap again to delete ${file}` : `Delete ${file}`}
+                      aria-label={deleteArmed ? `Confirm delete ${file}` : `Delete ${file}`}
                       onClick={(e) => { e.stopPropagation(); confirmDelete(file) }}
+                      onBlur={() => { if (pendingDelete === file) setPendingDelete(null) }}
                     >
                       <Trash2 className="size-3.5" />
                     </button>
                   </span>
+                )}
+                {!readOnly && deleteArmed && !isRenaming && (
+                  <span className="shrink-0 font-mono text-[10px] text-destructive">sure?</span>
                 )}
               </li>
             )

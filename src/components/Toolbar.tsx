@@ -41,6 +41,7 @@ import {
   Paintbrush,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import ConfirmDialog from './ConfirmDialog'
 
 interface ToolbarProps {
   user: { email?: string | null } | null | undefined
@@ -113,6 +114,7 @@ const PROGRAMS = [
 export default function Toolbar(props: ToolbarProps) {
   const { state, dispatch } = useWorkspace()
   const [nameInput, setNameInput] = useState(state.projectName)
+  const [confirmBlank, setConfirmBlank] = useState(false)
 
   useEffect(() => setNameInput(state.projectName), [state.projectName])
 
@@ -123,12 +125,23 @@ export default function Toolbar(props: ToolbarProps) {
   // behind the chevron for those who want a head start.
   function newBlank() {
     if (!state.saved && Object.keys(state.files).length > 0) {
-      if (!window.confirm('Start a new blank project? Unsaved changes will be lost.')) return
+      setConfirmBlank(true)
+      return
     }
     props.onNewProject(emptyProject(), 'my-project')
   }
 
   return (
+    <>
+    <ConfirmDialog
+      open={confirmBlank}
+      title="Start a new blank project?"
+      description="Unsaved changes are checkpointed to History first, then replaced."
+      confirmLabel="Start blank"
+      destructive
+      onConfirm={() => { setConfirmBlank(false); props.onNewProject(emptyProject(), 'my-project') }}
+      onCancel={() => setConfirmBlank(false)}
+    />
     <header className="flex h-12 shrink-0 items-center gap-1 border-b bg-background/80 px-2 backdrop-blur md:gap-2 md:px-3">
       {/* Left: logo + project name */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -353,5 +366,6 @@ export default function Toolbar(props: ToolbarProps) {
         )}
       </div>
     </header>
+    </>
   )
 }
