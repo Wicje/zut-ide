@@ -377,7 +377,7 @@ export default function App() {
     }
   }
 
-  function buildShareLink(token: string) { return `${window.location.origin}${window.location.pathname}?ref=share#/p/${token}` }
+  function buildShareLink(token: string) { return `${window.location.origin}${window.location.pathname}#/p/${token}` }
 
   function remixShared() {
     if (!state.isSharedView) return

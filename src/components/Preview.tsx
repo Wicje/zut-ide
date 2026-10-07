@@ -134,7 +134,7 @@ export default function Preview({
               key={runKey}
               title="preview"
               src={previewUrl}
-              sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
+              sandbox="allow-scripts allow-forms allow-modals allow-popups"
               className="h-full w-full border-0 bg-white"
               style={viewport !== 'auto' ? { maxWidth: '100%' } : undefined}
             />
