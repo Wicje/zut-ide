@@ -7,10 +7,14 @@
 ## Brand
 
 - **Name:** zut, always lowercase. Mark: `~zut` — emerald `~` + neutral wordmark,
-  mono, bold, tight tracking (`Toolbar.tsx`).
+  mono, bold, tight tracking (`Toolbar.tsx`). Single public name: zut.
+  Folder/repo names (`chisom_ide`, `zut-ide`) never appear in UI.
 - **Positioning:** "Code from any device." A cloud-assisted IDE for phones and
   sub-2GB Chromebooks/gadgets, not a desktop replacement. AI is optional —
   plain code + Run is the default path.
+- **Backend is invisible:** built on Mudbase, but UI says Run / Terminal / Preview.
+  Never expose Cells, Small-hours, externalId, session ids, or quota internals.
+  Trust line: "Your code lives in your private project. Editing is free — only runs use run time."
 - **Personality:** quiet workshop, not neon arcade. The UI recedes; the user's
   code and preview own the pixels.
 
@@ -95,10 +99,15 @@ violet = AI. Do not add new accent hues without updating this table.
 - **Console:** level = dot + label + message; file refs dotted-underline,
   click jumps to file+line and switches to Code view on mobile.
 - **Preview:** header reads `Preview` + viewport chip (`375/768/Full`) +
-  status pill (`Not run yet / Building… / Running / Build failed`).
+  status pill (`Not run yet / Waking… / Installing… / Starting… / Running / Build failed`) +
+  access badge (`private` default, `public link` only when shared) + Cancel while running.
+  Local web = `srcDoc` iframe; remote dev server = `previewUrl` iframe. Same chrome.
   Non-web projects use the same slot: `RunOutput.tsx` shows `Output` + language
   chip (`Python/Go`) + `exit N · Nms`, with stdout/stderr and an stdin box.
+  First run warns: "First run can take up to ~20s while the computer wakes."
   One component, mobile and desktop — no separate mobile output.
+- **Write-back is explicit:** runs/agents never silently overwrite source.
+  Changed files show a diff + Accept. Receipts are counted ("applied N file changes").
 - **AI:** violet spark; backend tabs show key-missing amber dots and
   server-status dots. Cloud agent edits apply with a counted receipt
   ("applied N file changes"). AI never blocks coding: Run/Save/Format/Deploy
@@ -110,8 +119,9 @@ violet = AI. Do not add new accent hues without updating this table.
 
 - Friendly + plain: "Click Run to see your page here.", "No output yet."
 - Errors say what + where: `Build error (line x:y)` with a clickable jump.
-- Programs without a runtime say what to do: "Python/Go need the remote runtime (VITE_RUNTIME_URL)."
-- Infra words (`VITE_*`, callback URLs, meter logs) never surface beyond that one hint.
+- Programs without a runner say what to do: "Python/Go need the remote runner (set VITE_RUNTIME_URL to your broker)."
+- Quota says plain words: "Run time used up for today — try again tomorrow or ask for a higher quota." Never `402`, `Small-hours`, `allowance`.
+- Infra words (`VITE_*`, Cells, externalId, session ids, callback URLs, meter logs) never surface in UI.
 
 ## Non-goals
 

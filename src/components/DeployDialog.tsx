@@ -14,7 +14,11 @@ import {
 } from '../lib/hosting'
 import { checkNodeProject, findNodeEntry } from '../lib/runner'
 import { mudbaseEnabled } from '../lib/mudbase'
+import { brokerEnabled } from '../lib/broker'
+import { getUserToken } from '../lib/auth'
 import MudbasePanel from './MudbasePanel'
+import TerminalPanel from './TerminalPanel'
+import UsagePanel from './UsagePanel'
 import type { ConsoleLevel } from '../types'
 import {
   Dialog,
@@ -86,6 +90,29 @@ function ConnBadge({ label, off }: { label: string; off?: boolean }) {
       <span className={cn('size-1.5 rounded-full', off ? 'bg-muted-foreground' : 'bg-emerald-400')} />
       {label}
     </Badge>
+  )
+}
+
+function RunnerPanel({ onLog }: { onLog: (level: ConsoleLevel, message: string) => void }) {
+  const { state } = useWorkspace()
+  const [userToken, setUserToken] = useState<string | null>(null)
+  useEffect(() => {
+    void getUserToken().then(setUserToken)
+  }, [])
+  const workspaceId = state.projectId ?? 'local'
+  if (!brokerEnabled()) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Set VITE_RUNTIME_URL to your broker to enable remote runs, terminal, and usage metering. Without it the app
+        stays a pure browser tool.
+      </p>
+    )
+  }
+  return (
+    <div className="grid gap-4">
+      <TerminalPanel workspaceId={workspaceId} userToken={userToken} onLog={onLog} />
+      <UsagePanel />
+    </div>
   )
 }
 
@@ -289,6 +316,9 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
             <TabsTrigger value="netlify">
               <Cloud className="mr-1.5 size-3.5" /> Netlify
             </TabsTrigger>
+            <TabsTrigger value="runner">
+              <PlugZap className="mr-1.5 size-3.5" /> Runner
+            </TabsTrigger>
             {showAdvanced && hasMudbase && (
               <TabsTrigger value="mudbase">
                 <Server className="mr-1.5 size-3.5" /> Serverless
@@ -323,6 +353,9 @@ export default function DeployDialog({ onClose, onLog, signedIn }: DeployDialogP
             )}
 
             <div className="min-h-0 flex-1 overflow-y-auto">
+              <TabsContent value="runner" className="grid gap-4">
+                <RunnerPanel onLog={onLog} />
+              </TabsContent>
               {hasMudbase && (
                 <TabsContent value="mudbase">
                   <MudbasePanel files={state.files} projectName={state.projectName} onLog={onLog} />

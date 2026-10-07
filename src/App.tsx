@@ -5,6 +5,8 @@ import { runtimeEnabled } from './lib/runtime'
 import { useRunLoop } from './hooks/useRunLoop'
 import { useShortcuts } from './hooks/useShortcuts'
 import { supabaseOrNull } from './lib/supabase'
+import { brokerEnabled, brokerPreview } from './lib/broker'
+import { getUserToken } from './lib/auth'
 import {
   createProject,
   deleteProject,
@@ -104,6 +106,8 @@ export default function App() {
     el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [isMobile, state.activeFile])
   const [viewport, setViewport] = useState<'auto' | number>('auto')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewAccess, setPreviewAccess] = useState<'private-token' | 'public' | null>(null)
   const [formatting, setFormatting] = useState(false)
   const [reveal, setReveal] = useState<{ token: number; line?: number; column?: number } | null>(null)
   const [aiSelection, setAiSelection] = useState<EditorSelection | null>(null)
@@ -121,13 +125,42 @@ export default function App() {
   // Build-and-preview loop lives in the hook; App keeps wiring only.
   // Works without AI: plain code + Run. Web runs in the iframe preview,
   // Python/Go run on the remote runtime (see RunOutput).
-  const { srcDoc, setSrcDoc, runKey, status, buildMs, program, run } = useRunLoop({
+  const { srcDoc, setSrcDoc, runKey, status, stage, buildMs, program, run, cancel } = useRunLoop({
     files: state.files,
     consoleEntries: state.consoleEntries,
     addConsole,
     clearConsole,
   })
   const projectKind = useMemo(() => detectProjectKind(state.files), [state.files])
+
+  // Remote preview URL (Cells expose) when the broker has a live dev server.
+  // Null = keep local srcDoc preview. Failures are silent by design.
+  useEffect(() => {
+    if (!brokerEnabled() || !state.projectId || projectKind !== 'web') {
+      setPreviewUrl(null)
+      setPreviewAccess(null)
+      return
+    }
+    let cancelled = false
+    void getUserToken().then((token) => {
+      if (cancelled || !token || !state.projectId) return
+      return brokerPreview(state.projectId, token)
+        .then((p) => {
+          if (cancelled) return
+          setPreviewUrl(p.url ?? null)
+          setPreviewAccess(p.access ?? null)
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPreviewUrl(null)
+            setPreviewAccess(null)
+          }
+        })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [state.projectId, projectKind])
 
   const openLocation = useCallback(
     (file: string, line?: number, column?: number) => {
@@ -529,9 +562,13 @@ export default function App() {
                   srcDoc={srcDoc}
                   runKey={runKey}
                   status={status}
+                  stage={stage}
                   program={program}
+                  previewUrl={previewUrl}
+                  previewAccess={previewAccess}
                   onRun={() => void run()}
                   onRunProgram={(stdin) => void run(undefined, stdin)}
+                  onCancel={cancel}
                 />
                 <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} collapsible onOpenLocation={openLocation} />
               </div>
@@ -601,12 +638,16 @@ export default function App() {
               srcDoc={srcDoc}
               runKey={runKey}
               status={status}
+              stage={stage}
               program={program}
+              previewUrl={previewUrl}
+              previewAccess={previewAccess}
               viewport={viewport}
               onViewportChange={setViewport}
               showViewportControls={!state.isSharedView}
               onRun={() => void run()}
               onRunProgram={(stdin) => void run(undefined, stdin)}
+              onCancel={cancel}
             />
             <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable onOpenLocation={openLocation} />
           </section>
@@ -616,6 +657,7 @@ export default function App() {
       {!isMobile && (
         <StatusBar
           status={status}
+          stage={stage}
           buildMs={buildMs}
           savedTo={user && state.projectId && !state.isSharedView ? 'cloud' : 'device'}
           saved={state.saved}

@@ -4,21 +4,33 @@ import { Textarea } from '@/components/ui/textarea'
 import { Play, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Preview from './Preview'
-import type { ProgramResult, RunStatus } from '../types'
+import type { ProgramResult, RunStage, RunStatus } from '../types'
 import type { ProjectKind } from '../lib/projectKind'
 import { KIND_LABEL } from '../lib/projectKind'
+
+export const STAGE_LABEL: Record<RunStage, string> = {
+  waking: 'Waking remote computer…',
+  installing: 'Installing…',
+  starting: 'Starting…',
+  running: 'Running…',
+  ready: 'Ready',
+}
 
 interface RunOutputProps {
   kind: ProjectKind
   srcDoc: string
   runKey: number
   status: RunStatus
+  stage?: RunStage | null
   program: ProgramResult | null
+  previewUrl?: string | null
+  previewAccess?: 'private-token' | 'public' | null
   viewport?: 'auto' | number
   onViewportChange?: (v: 'auto' | number) => void
   showViewportControls?: boolean
   onRun: () => void
   onRunProgram: (stdin: string) => void
+  onCancel?: () => void
 }
 
 /** Unified output for web + programs. Same component on mobile and desktop:
@@ -31,12 +43,16 @@ export default function RunOutput({
   srcDoc,
   runKey,
   status,
+  stage,
   program,
+  previewUrl,
+  previewAccess,
   viewport,
   onViewportChange,
   showViewportControls,
   onRun,
   onRunProgram,
+  onCancel,
 }: RunOutputProps) {
   const [stdin, setStdin] = useState('')
 
@@ -46,10 +62,14 @@ export default function RunOutput({
         srcDoc={srcDoc}
         runKey={runKey}
         status={status}
+        stage={stage}
+        previewUrl={previewUrl}
+        previewAccess={previewAccess}
         viewport={viewport}
         onViewportChange={onViewportChange}
         showViewportControls={showViewportControls}
         onRun={onRun}
+        onCancel={onCancel}
       />
     )
   }
@@ -77,13 +97,22 @@ export default function RunOutput({
           )}
         >
           {status === 'running'
-            ? 'Running…'
+            ? (stage ? STAGE_LABEL[stage] : 'Running…')
             : program
               ? `exit ${program.exitCode ?? '?'} · ${program.durationMs}ms`
               : status === 'error'
                 ? 'Failed'
                 : 'Not run yet'}
         </span>
+        {status === 'running' && onCancel && (
+          <button
+            onClick={onCancel}
+            className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            title="Stop this run (no further run time will be used)"
+          >
+            Cancel
+          </button>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto bg-black/40 p-3 font-mono text-[12px] leading-5">
@@ -104,7 +133,12 @@ export default function RunOutput({
           </div>
         )}
         {status === 'running' && !hasOutput && (
-          <p className="text-amber-400">Running on the remote runtime…</p>
+          <div className="grid gap-2">
+            <p className="text-amber-400">{stage ? STAGE_LABEL[stage] : 'Starting remote computer…'}</p>
+            <p className="text-xs text-muted-foreground">
+              First run can take up to ~20s while the computer wakes. Editing stays free — only runs use run time.
+            </p>
+          </div>
         )}
         {program?.stdout && (
           <pre className="whitespace-pre-wrap break-all text-[#e6edf3]">{program.stdout.slice(0, 64000)}</pre>

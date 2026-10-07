@@ -22,6 +22,28 @@ export interface Project {
 
 export type RunStatus = 'idle' | 'running' | 'done' | 'error'
 
+/** User-facing run stage. Never expose infra words (Cells, Small-hours,
+ *  externalId, session id) — only these stage labels reach the UI. */
+export type RunStage = 'waking' | 'installing' | 'starting' | 'running' | 'ready'
+
+export interface RunProgress {
+  stage: RunStage | null
+  cancellable: boolean
+  startedAt: number | null
+}
+
+/** Pilot cost trail. One row per run; broker persists the same shape to BaaS. */
+export interface UsageRecord {
+  workspaceId: string
+  command: string
+  status: 'success' | 'failed' | 'cancelled' | 'quota'
+  exitCode: number | null
+  durationMs: number
+  /** Estimated Small-hours (server bills exact; client estimates for display). */
+  smallHours: number
+  at: number
+}
+
 export interface StoredProjectRow {
   id: string
   name: string
