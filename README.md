@@ -1,9 +1,12 @@
 # zut — full coding on a Chromebook or phone. Nothing to install.
 
-A browser IDE + optional cloud backend for people on phones, Chromebooks, and
+A browser IDE + optional run broker for people on phones, Chromebooks, and
 other gadgets with &lt;2GB RAM. Edit files, hit Run, see the result — on hardware
-that could never run a local toolchain. Heavy work (builds, program runs, AI
-file edits) runs on zut-cloud; the device just renders the UI.
+that could never run a local toolchain. Heavy work (program runs, terminal,
+preview, AI file edits) runs on your private computer via the broker;
+the device just renders the UI.
+
+Your code lives in your private project. Editing is free — only runs use run time.
 
 AI is optional: plain code + Run works with no key, no sign-in, no server.
 When you want it, bring your own key or use the cloud agent.

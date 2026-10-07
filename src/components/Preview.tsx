@@ -2,16 +2,20 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Smartphone, Tablet, Monitor, Loader2, CircleAlert, CircleCheck, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { RunStatus } from '../types'
+import type { RunStage, RunStatus } from '../types'
 
 interface PreviewProps {
   srcDoc: string
   runKey: number
   status: RunStatus
+  stage?: RunStage | null
+  previewUrl?: string | null
+  previewAccess?: 'private-token' | 'public' | null
   viewport?: 'auto' | number
   onViewportChange?: (v: 'auto' | number) => void
   showViewportControls?: boolean
   onRun?: () => void
+  onCancel?: () => void
 }
 
 const STATUS_LABEL: Record<RunStatus, string> = {
@@ -38,11 +42,25 @@ export default function Preview({
   srcDoc,
   runKey,
   status,
+  stage,
+  previewUrl,
+  previewAccess,
   viewport = 'auto',
   onViewportChange,
   showViewportControls,
   onRun,
+  onCancel,
 }: PreviewProps) {
+  const stageLabel =
+    status === 'running' && stage
+      ? stage === 'waking'
+        ? 'Waking…'
+        : stage === 'installing'
+          ? 'Installing…'
+          : stage === 'starting'
+            ? 'Starting…'
+            : 'Running…'
+      : null
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-muted/30 px-3">
@@ -77,21 +95,51 @@ export default function Preview({
               })}
             </div>
           )}
-          <Badge variant="outline" className={cn('gap-1.5 font-normal', STATUS_STYLE[status].badge)}>
-            {status === 'running' ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : status === 'error' ? (
-              <CircleAlert className="size-3" />
-            ) : status === 'done' ? (
-              <CircleCheck className="size-3" />
-            ) : null}
-            {STATUS_LABEL[status]}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            {previewUrl && (
+              <Badge variant="outline" className="font-mono text-[10px] font-normal text-muted-foreground" title={previewAccess === 'public' ? 'Anyone with the link can open this preview' : 'Private preview — needs your sign-in'}>
+                {previewAccess === 'public' ? 'public link' : 'private'}
+              </Badge>
+            )}
+            <Badge variant="outline" className={cn('gap-1.5 font-normal', STATUS_STYLE[status].badge)}>
+              {status === 'running' ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : status === 'error' ? (
+                <CircleAlert className="size-3" />
+              ) : status === 'done' ? (
+                <CircleCheck className="size-3" />
+              ) : null}
+              {stageLabel ?? STATUS_LABEL[status]}
+            </Badge>
+            {status === 'running' && onCancel && (
+              <button
+                onClick={onCancel}
+                className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                title="Stop this run"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 p-0">
-        {srcDoc ? (
+        {previewUrl ? (
+          <div
+            className="h-full"
+            style={viewport !== 'auto' ? { maxWidth: viewport, margin: '0 auto' } : undefined}
+          >
+            <iframe
+              key={runKey}
+              title="preview"
+              src={previewUrl}
+              sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
+              className="h-full w-full border-0 bg-white"
+              style={viewport !== 'auto' ? { maxWidth: '100%' } : undefined}
+            />
+          </div>
+        ) : srcDoc ? (
           <div
             className="h-full"
             style={viewport !== 'auto' ? { maxWidth: viewport, margin: '0 auto' } : undefined}

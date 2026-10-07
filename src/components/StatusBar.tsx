@@ -1,9 +1,12 @@
 import { CircleAlert, CircleCheck, Loader2, Cloud, HardDrive, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { RunStatus } from '../types'
+import { LIMITS } from '../lib/limits'
+import { runsToday } from '../lib/usage'
+import type { RunStage, RunStatus } from '../types'
 
 interface StatusBarProps {
   status: RunStatus
+  stage?: RunStage | null
   buildMs?: number | null
   saved: boolean
   savedTo: 'cloud' | 'device'
@@ -26,6 +29,7 @@ function ago(ts: number): string {
 /** VS Code-style status bar: the single glanceable row that says "this is an IDE". */
 export default function StatusBar({
   status,
+  stage,
   buildMs,
   saved,
   savedTo,
@@ -37,6 +41,12 @@ export default function StatusBar({
   aiTouched,
 }: StatusBarProps) {
   const aiLatest = Object.entries(aiTouched).sort((a, b) => b[1] - a[1])[0]
+  let today = 0
+  try {
+    today = runsToday().length
+  } catch {
+    today = 0
+  }
   return (
     <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-border/60 bg-muted/30 px-3 text-[11px] text-muted-foreground select-none">
       {/* Left: run state */}
@@ -57,7 +67,13 @@ export default function StatusBar({
         ) : (
           <span className="size-1.5 rounded-full bg-muted-foreground/60" />
         )}
-        {status === 'idle' ? 'Idle' : status === 'running' ? 'Building' : status === 'done' ? 'Running' : 'Build failed'}
+        {status === 'idle'
+          ? 'Idle'
+          : status === 'running'
+            ? (stage === 'waking' ? 'Waking' : stage === 'installing' ? 'Installing' : stage === 'starting' ? 'Starting' : 'Building')
+            : status === 'done'
+              ? 'Running'
+              : 'Build failed'}
         {buildMs != null && (
           <span className="font-mono font-normal text-muted-foreground">
             {buildMs < 1000 ? `${buildMs}ms` : `${(buildMs / 1000).toFixed(1)}s`}
@@ -113,10 +129,16 @@ export default function StatusBar({
         {/* Build location */}
         <span
           className="flex items-center gap-1"
-          title={cloudBuild ? 'Building on zut-cloud (fast on weak devices)' : 'Building in this browser'}
+          title={
+            cloudBuild
+              ? `Remote runner via broker (fast on weak devices). ${today}/${LIMITS.dailyRunCap} runs today. Only runs use run time.`
+              : 'Building in this browser (free)'
+          }
         >
           {cloudBuild ? <Cloud className="size-3 text-emerald-400/80" /> : <HardDrive className="size-3" />}
-          <span className="hidden sm:inline">{cloudBuild ? 'cloud build' : 'local build'}</span>
+          <span className="hidden sm:inline">
+            {cloudBuild ? `remote runner · ${today}/${LIMITS.dailyRunCap}` : 'local build'}
+          </span>
         </span>
       </span>
     </footer>
