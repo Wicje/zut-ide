@@ -39,16 +39,27 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? ''
 const CELLS_CONFIGURED = Boolean(process.env.CELLS_API_KEY)
 const VERSION = '0.1.0'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
+// CORS allowlist: '*' for local demo only. In production set CORS_ORIGIN to
+// your exact frontend host(s), comma-separated — otherwise any website can
+// spend your users' quotas with their own tokens.
+const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
+const CORS_ALLOW = new Set(CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean))
+
+function corsFor(req) {
+  const origin = req.headers.origin
+  const allow = CORS_ORIGIN === '*' || (origin && CORS_ALLOW.has(origin)) ? (origin ?? '*') : 'null'
+  return {
+    'Access-Control-Allow-Origin': allow,
+    Vary: 'Origin',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  }
 }
 
-function send(res, status, body) {
+function send(res, req, status, body) {
   const payload = JSON.stringify(body)
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(payload), ...CORS })
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(payload), ...corsFor(req) })
   res.end(payload)
 }
 
@@ -240,10 +251,10 @@ function commandForEntry(entry) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
-  if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return }
+  if (req.method === 'OPTIONS') { res.writeHead(204, corsFor(req)); res.end(); return }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    send(res, 200, { ok: true, service: 'zut-broker', version: VERSION, cells: CELLS_CONFIGURED, runners: ['python', 'go'], auth: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) || DEV_ALLOW_ANON })
+    send(res, req, 200, { ok: true, service: 'zut-broker', version: VERSION, cells: CELLS_CONFIGURED, runners: ['python', 'go'], auth: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) || DEV_ALLOW_ANON })
     return
   }
 
@@ -251,8 +262,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname.startsWith('/api/baas/shared/')) {
     const token = decodeURIComponent(url.pathname.split('/').pop() ?? '')
     const row = await findShared(token)
-    if (!row) { send(res, 404, { error: 'Project not found' }); return }
-    send(res, 200, { name: row.name, files: row.files })
+    if (!row) { send(res, req, 404, { error: 'Project not found' }); return }
+    send(res, req, 200, { name: row.name, files: row.files })
     return
   }
 
@@ -260,61 +271,61 @@ const server = http.createServer(async (req, res) => {
   const needsAuth = url.pathname.startsWith('/api/broker/') || url.pathname.startsWith('/api/baas/')
   let uid = null
   if (needsAuth) {
-    try { uid = await verifyUser(req) } catch (e) { send(res, e.status ?? 401, { error: e.message }); return }
+    try { uid = await verifyUser(req) } catch (e) { send(res, req, e.status ?? 401, { error: e.message }); return }
   }
 
   try {
     // ---- BaaS: projects ----
     if (req.method === 'GET' && url.pathname === '/api/baas/projects') {
-      send(res, 200, await listProjects(uid)); return
+      send(res, req, 200, await listProjects(uid)); return
     }
     if (req.method === 'POST' && url.pathname === '/api/baas/projects') {
       const body = await readJson(req)
       const id = crypto.randomUUID()
       const row = { id, name: String(body.name ?? 'untitled'), files: body.files ?? {}, share_token: null, updated_at: new Date().toISOString(), owner_id: uid }
       await writeProject(uid, row)
-      send(res, 200, { id }); return
+      send(res, req, 200, { id }); return
     }
     const pm = url.pathname.match(/^\/api\/baas\/projects\/([^/]+)$/)
     if (pm) {
       const id = decodeURIComponent(pm[1])
-      if (!safeSeg(id, null) && !/^[0-9a-f-]{36}$/.test(id)) { send(res, 400, { error: 'Invalid project id.' }); return }
+      if (!safeSeg(id, null) && !/^[0-9a-f-]{36}$/.test(id)) { send(res, req, 400, { error: 'Invalid project id.' }); return }
       if (req.method === 'GET') {
         const row = await readProject(uid, id)
-        if (!row) { send(res, 404, { error: 'Project not found' }); return }
-        send(res, 200, row); return
+        if (!row) { send(res, req, 404, { error: 'Project not found' }); return }
+        send(res, req, 200, row); return
       }
       if (req.method === 'PUT') {
         const body = await readJson(req)
         const prev = (await readProject(uid, id)) ?? { id, owner_id: uid, share_token: null }
         const row = { ...prev, name: String(body.name ?? prev.name ?? 'untitled'), files: body.files ?? prev.files ?? {}, updated_at: new Date().toISOString(), owner_id: uid }
         await writeProject(uid, row)
-        send(res, 200, { ok: true }); return
+        send(res, req, 200, { ok: true }); return
       }
       if (req.method === 'DELETE') {
         try { await fs.rm(projFile(uid, id), { force: true }) } catch {}
-        send(res, 200, { ok: true }); return
+        send(res, req, 200, { ok: true }); return
       }
     }
     if (req.method === 'POST' && url.pathname === '/api/baas/share') {
       const body = await readJson(req)
       const row = await readProject(uid, body.id)
-      if (!row) { send(res, 404, { error: 'Project not found' }); return }
+      if (!row) { send(res, req, 404, { error: 'Project not found' }); return }
       if (!body.shared) {
         await writeProject(uid, { ...row, share_token: null })
-        send(res, 200, { token: null }); return
+        send(res, req, 200, { token: null }); return
       }
       const token = crypto.randomUUID()
       await writeProject(uid, { ...row, share_token: token })
-      send(res, 200, { token }); return
+      send(res, req, 200, { token }); return
     }
 
     // ---- broker ----
     if (req.method === 'POST' && url.pathname === '/api/broker/open') {
-      send(res, 200, { state: 'ready', stage: 'ready', cells: CELLS_CONFIGURED }); return
+      send(res, req, 200, { state: 'ready', stage: 'ready', cells: CELLS_CONFIGURED }); return
     }
     if (req.method === 'POST' && url.pathname === '/api/broker/stop') {
-      send(res, 200, { ok: true }); return
+      send(res, req, 200, { ok: true }); return
     }
     if (req.method === 'POST' && url.pathname === '/api/broker/terminal-token') {
       const body = await readJson(req)
@@ -324,14 +335,14 @@ const server = http.createServer(async (req, res) => {
           const d = driver()
           const { sessionId } = await d.ensureSession({ externalId: `${uid}:${workspaceId}` })
           const t = await d.terminalToken({ sessionId })
-          send(res, 200, { token: t.token, expiresInSec: t.expiresInSec, gatewayUrl: t.gatewayUrl ?? undefined }); return
+          send(res, req, 200, { token: t.token, expiresInSec: t.expiresInSec, gatewayUrl: t.gatewayUrl ?? undefined }); return
         } catch (e) {
-          send(res, e.status ?? 502, { error: e.message }); return
+          send(res, req, e.status ?? 502, { error: e.message }); return
         }
       }
       const token = crypto.randomBytes(24).toString('hex')
       termTokens.set(token, { uid, workspaceId, exp: Date.now() + 60_000 })
-      send(res, 200, { token, expiresInSec: 60 }); return
+      send(res, req, 200, { token, expiresInSec: 60 }); return
     }
     if (req.method === 'GET' && url.pathname === '/api/broker/preview') {
       const workspaceId = safeSeg(url.searchParams.get('workspaceId') ?? 'default') ?? 'default'
@@ -341,23 +352,23 @@ const server = http.createServer(async (req, res) => {
           const d = driver()
           const { sessionId } = await d.ensureSession({ externalId: `${uid}:${workspaceId}` })
           const p = await d.preview({ sessionId, port })
-          send(res, 200, p); return
+          send(res, req, 200, p); return
         } catch {
           // No dev server yet — browser falls back to srcDoc preview.
-          send(res, 200, { url: null, access: 'private-token' }); return
+          send(res, req, 200, { url: null, access: 'private-token' }); return
         }
       }
-      send(res, 200, { url: null, access: 'private-token' }); return
+      send(res, req, 200, { url: null, access: 'private-token' }); return
     }
     if (req.method === 'POST' && url.pathname === '/api/broker/run') {
-      if (!rateOk(`run:${uid}`, RATE_RUN_MIN)) { send(res, 429, { error: 'Too many runs. Slow down.' }); return }
-      if (dailyCount(uid) >= DAILY_RUN_CAP) { send(res, 402, { error: 'Run time used up for today — try again tomorrow or ask for a higher quota.' }); return }
+      if (!rateOk(`run:${uid}`, RATE_RUN_MIN)) { send(res, req, 429, { error: 'Too many runs. Slow down.' }); return }
+      if (dailyCount(uid) >= DAILY_RUN_CAP) { send(res, req, 402, { error: 'Run time used up for today — try again tomorrow or ask for a higher quota.' }); return }
       const body = await readJson(req)
       const workspaceId = safeSeg(body.workspaceId ?? 'default') ?? 'default'
       void workspaceId
       if (body.files && typeof body.files === 'object') {
         for (const p of Object.keys(body.files)) {
-          if (!cleanRelPath(p) && p !== 'index.html') { send(res, 400, { error: `Unsafe path: ${p}` }); return }
+          if (!cleanRelPath(p) && p !== 'index.html') { send(res, req, 400, { error: `Unsafe path: ${p}` }); return }
         }
       }
       if (cellsConfigured()) {
@@ -365,7 +376,7 @@ const server = http.createServer(async (req, res) => {
         // double-click cannot create two), hash-diff sync, exec, record usage.
         const entry = String(body.entry ?? '')
         const command = commandForEntry(entry)
-        if (!command) { send(res, 400, { error: 'Only .py and .go entries are supported (main.py / main.go).' }); return }
+        if (!command) { send(res, req, 400, { error: 'Only .py and .go entries are supported (main.py / main.go).' }); return }
         try {
           const d = driver()
           const { sessionId, reused } = await d.ensureSession({ externalId: `${uid}:${workspaceId}` })
@@ -373,22 +384,22 @@ const server = http.createServer(async (req, res) => {
           const result = await d.exec({ sessionId, command, stdin: body.stdin ?? '' })
           bumpDaily(uid)
           console.log(`[zut-broker] run ok uid=${String(uid).slice(0, 8)} cell=${String(sessionId).slice(0, 8)} reused=${reused} sync=+${sync.uploaded} entry=${entry} exit=${result.exitCode} ${result.durationMs}ms`)
-          send(res, 200, result); return
+          send(res, req, 200, result); return
         } catch (e) {
           const status = typeof e?.status === 'number' && e.status >= 400 && e.status < 600 ? e.status : 502
-          send(res, status, { error: e?.message ?? 'Cell run failed' }); return
+          send(res, req, status, { error: e?.message ?? 'Cell run failed' }); return
         }
       }
       const result = await runProgram(body.files ?? {}, body.entry, body.stdin ?? '')
-      if (result.error) { send(res, result.status ?? 400, { error: result.error }); return }
+      if (result.error) { send(res, req, result.status ?? 400, { error: result.error }); return }
       bumpDaily(uid)
       console.log(`[zut-broker] run ok uid=${String(uid).slice(0, 8)} entry=${body.entry} exit=${result.exitCode} ${result.durationMs}ms`)
-      send(res, 200, result); return
+      send(res, req, 200, result); return
     }
 
-    send(res, 404, { error: 'Not found' })
+    send(res, req, 404, { error: 'Not found' })
   } catch (e) {
-    send(res, e.status ?? 500, { error: e?.message ?? 'Broker failed' })
+    send(res, req, e.status ?? 500, { error: e?.message ?? 'Broker failed' })
   }
 })
 

@@ -43,6 +43,32 @@ curl -s -X POST localhost:8787/api/broker/run \
 # → {"stdout":"hello from broker\n","stderr":"","exitCode":0,...}
 ```
 
+## Deploy
+
+Frontend (static, free): build with your backend URLs, upload `dist/`
+to Cloudflare Pages / Vercel / Netlify, set the custom domain as `CORS_ORIGIN`
+below. Users then Install it from the browser menu (PWA).
+
+```bash
+VITE_SUPABASE_URL=https://YOUR_REF.supabase.co \
+VITE_SUPABASE_ANON_KEY=eyJ... \
+VITE_RUNTIME_URL=https://broker.yourdomain.com \
+npm run build
+```
+
+Broker — option A, Render (days, no VPS): Web Service from `broker/Dockerfile`,
+health check `/health`, Starter 2GB (free 512MB will OOM on go builds).
+Set env: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CORS_ORIGIN` (your exact
+frontend host — REQUIRED, not optional: the `*` default is local-demo only),
+plus `CELLS_API_KEY` when going live. Disk is ephemeral unless you pay for
+one — fine while BaaS is the source of truth.
+
+Broker — option B, VPS (proper): same shape as `cloud/DEPLOY.md` —
+Ubuntu 24.04, Docker, `docker build -f broker/Dockerfile -t zut-broker .`,
+run with `--env-file broker.env -v zut-broker-data:/data -p 127.0.0.1:8787:8787`
+behind Caddy with auto-TLS. Copy `cloud/cloud.env.example` keys plus the
+`CELLS_*` / `ZUT_DAILY_RUN_CAP` rows into `broker.env` (never commit it).
+
 ## Going live (first real Cell)
 
 1. Set `CELLS_API_KEY` (+ `SUPABASE_URL/ANON_KEY`, unset dev-anon).
