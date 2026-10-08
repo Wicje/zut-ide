@@ -283,7 +283,7 @@ token set when you do).
 - **AI** is optional and works two ways: bring your own key (OpenRouter/Anthropic/OpenAI/Gemini, stored in this
   browser, billed by that provider) or sign in to use the zut cloud proxy. The self-hosted agent
   option runs opencode on a server. Coding, running, and deploying all work with no AI.
-- **Programs** (Python/Go) need `VITE_RUNTIME_URL`; without it they show a hint instead of running. `/run` is single-tenant with timeout + output caps — do not expose it multi-tenant without a sandbox.
+- **Programs** (Python/Go) run through the broker (`VITE_RUNTIME_URL` → `npm run broker`); without it they show a hint instead of running. Staged status (`Waking…/Starting…`) + Cancel, 60s browser wait cap, plain-words quota (`402` → "run time used up"). Service keys stay on the broker; the browser sends only the user token. See `broker/README.md` for env + smoke test.
 - Importing some dynamic pages may fail if the site blocks cross-origin fetches or requires JS
   rendering. CodePen, raw GitHub, and plain HTML/CSS/JS pages work best.
 
@@ -292,12 +292,17 @@ token set when you do).
 ```
 src/
   App.tsx                # routing, run loop, autosave, cloud sync, feature wiring
+  hooks/useRunLoop.ts    # staged runs (waking/installing/starting), cancel, quota, usage
   lib/runner.ts          # esbuild bundling + srcdoc + console harness (web)
   lib/projectKind.ts     # web vs python vs go detection + entry lookup
-  lib/runtime.ts         # client for remote /build + /run (weak devices offload)
+  lib/runtime.ts         # legacy client for remote /build + /run
+  lib/broker.ts          # thin broker client (open/run/stop/terminal-token/preview)
+  lib/auth.ts            # user token (Supabase session, else local) — never service keys
+  lib/limits.ts          # single caps source (daily runs, sessions, file/output caps)
+  lib/usage.ts           # pilot cost trail (runs, Small-hours est, quota)
   lib/ai.ts              # BYOK chat providers (OpenRouter, Anthropic, OpenAI, Gemini)
   lib/opencode.ts        # opencode agent + disk-sync bridge client
-  lib/backend.ts         # Supabase + localStorage persistence
+  lib/backend.ts         # swappable persistence (broker BaaS → Supabase → local)
   lib/supabase.ts        # client init / config check
   lib/templates.ts       # starting templates (web, React, Vue, Python, Go)
   lib/download.ts        # ZIP export
@@ -308,17 +313,25 @@ src/
   store/workspace.tsx    # files / console / project state
   components/
     CodeEditor.tsx       # Monaco wrapper (language per extension)
-    FileExplorer.tsx     # add / upload / drop / rename / delete files
-    RunOutput.tsx        # unified output: iframe preview (web) or terminal (py/go)
-    Preview.tsx          # sandboxed iframe + status + viewport toggle (web only)
+    FileExplorer.tsx     # add / upload / drop / inline rename / two-tap delete
+    RunOutput.tsx        # unified output: staged status + Cancel (web + py/go)
+    Preview.tsx          # sandboxed iframe (local srcDoc or remote URL) + access badge
     ConsolePanel.tsx     # console + error streaming
+    ConfirmDialog.tsx    # in-app confirm (no window.confirm/prompt anywhere)
+    TerminalPanel.tsx    # 60s terminal token lifecycle (xterm attaches here)
+    UsagePanel.tsx       # pilot cost dashboard (runs, Small-hours, quota)
     Toolbar.tsx          # run / autosave / save / share / zip / deploy / AI (optional)
     Login.tsx, ProjectList.tsx, ShareDialog.tsx
-    DeployDialog.tsx     # Publish hub: GitHub push, Vercel, Netlify
+    DeployDialog.tsx     # Publish hub: Netlify, Runner (terminal+usage), + advanced
     AiPanel.tsx          # AI chat: BYOK providers + optional self-hosted agent
+  types.ts               # FileMap, RunStatus/RunStage, UsageRecord
+broker/
+  server.mjs             # thin broker (npm run broker): BaaS routes + run/terminal/preview
+  cells.mjs              # ONLY file that speaks Cells (env-driven, VERIFY markers)
+  lib.mjs                # pure guards (segments, paths, hash diff, batching)
+  README.md              # env table, curl smoke, go-live checklist
 runtime/server.mjs       # self-hostable compute service (/build + /run, native esbuild + python3/go)
 cloud/server.mjs         # zut-cloud: builds + runs + headless agent turns
-scripts/file-bridge.mjs  # syncs the project to disk for the opencode agent
 scripts/file-bridge.mjs  # syncs the project to disk for the opencode agent
 supabase/schema.sql      # tables + RLS + share RPCs + OAuth connections
 supabase/functions/

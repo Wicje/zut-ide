@@ -128,4 +128,7 @@ violet = AI. Do not add new accent hues without updating this table.
 - No new toolbar buttons without a home in mobile (every desktop action must
   degrade: hide with reason, or live in the dock/dialogs).
 - No color-only signalling (dots + labels), no hover-only controls on touch,
-  no `window.confirm/prompt` for new flows (legacy debt, do not extend).
+  no `window.confirm/prompt/alert` anywhere — destructive flows use
+  `ConfirmDialog.tsx`, explorer delete is two-tap, rename is inline.
+- No new eager imports for behind-a-click panels — `AiPanel`, `DeployDialog`,
+  `HistoryDialog`, `ProjectList` stay `React.lazy` so phones load editor first.
