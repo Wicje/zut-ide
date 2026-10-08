@@ -57,21 +57,32 @@ violet = AI. Do not add new accent hues without updating this table.
 ## Layout grammar (VS Code-like)
 
 ```
-┌──────────────────────────────────────────────┐
-│ titlebar: ~zut · name · saved · New… Run Save │
-│ amber banner (only when cloud unconfigured)  │
-├──────────┬───────────────────┬───────────────┤
-│ explorer │ editor            │ preview       │
-│ 248px    │ minmax flexible   │ 42% + console │
-├──────────┴───────────────────┴───────────────┤
-│ status: run-state · project · files · errors │
-└──────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│ titlebar: ~zut · name · saved · New… Run Save               │
+│ amber banner (only when cloud unconfigured)               │
+├──────────┬───────────────────┬────────────────────────────┤
+│ sidebar  │ composer          │ editor tabs + code / diff  │
+│ 264px    │ 340–400px         │ minmax flexible            │
+│ explorer │ AI chat, inline   │ tab: file · +A -D · Review │
+│ review   │ (drawer on mobile)│ code, then preview+console │
+│ identity │                   │                            │
+├──────────┴───────────────────┴────────────────────────────┤
+│ status: run-state · project · files · errors              │
+└───────────────────────────────────────────────────────────┘
 ```
 
-- Desktop grid: explorer / editor / preview+console. Columns are fixed today;
-  do not widen chrome at the editor's expense.
+- Desktop grid: sidebar / composer / editor+output. Composer collapses via
+  the AI button (`Ctrl+K`); do not widen chrome at the editor's expense.
+- Sidebar: Explorer (files), Review (AI-touched files, violet dot, click to
+  open), identity footer (account · runs today). No separate sessions list —
+  History owns versions.
+- Editor header: file tab + `+A -D` badge vs last snapshot + Review toggle.
+  Review shows a read-only side-by-side diff (snapshot left, current right);
+  edits happen in Code mode. Dark stays — structure follows the reference,
+  palette does not.
 - Mobile (`≤860px`): single pane + 4-tab dock (Code / Result / Files / AI),
-  file strip on top, `env(safe-area-inset-bottom)` respected.
+  file strip on top, `env(safe-area-inset-bottom)` respected. Composer and
+  review are drawer/overlay only on mobile.
 - Status bar (desktop only): run state · project+saved · file count · active
   file · error count (clickable) · build location (cloud/local).
 

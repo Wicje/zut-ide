@@ -113,6 +113,8 @@ interface AiPanelProps {
   onSignIn: () => void
   onClose: () => void
   selection?: EditorSelection | null
+  /** Render as a full-height inline pane (3-pane layout) instead of a drawer. */
+  inline?: boolean
 }
 
 const MAX_FILE_CHARS = 4000
@@ -272,7 +274,7 @@ function ProposalCard({
   )
 }
 
-export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPanelProps) {
+export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline }: AiPanelProps) {
   const { state, dispatch } = useWorkspace()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -512,15 +514,12 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
 
   const [open, setOpen] = useState(true)
 
-  return (
-    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) onClose() }}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md" showCloseButton={false}>
-        <SheetTitle className="sr-only">zut AI</SheetTitle>
-
+  const innerContent = (
+    <>
         {/* Header */}
         <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-3">
           <span className="flex items-center gap-2 text-sm font-semibold">
-            <Sparkles className="size-4 text-violet-400" /> zut AI
+            <Sparkles className="size-4 text-violet-400" /> {inline ? 'Composer' : 'zut AI'}
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -824,6 +823,18 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection }: AiPa
             </div>
           </>
         )}
+    </>
+  )
+
+  if (inline) {
+    return <div className="flex h-full min-h-0 flex-col bg-background">{innerContent}</div>
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) onClose() }}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md" showCloseButton={false}>
+        <SheetTitle className="sr-only">zut AI</SheetTitle>
+        {innerContent}
       </SheetContent>
     </Sheet>
   )

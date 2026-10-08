@@ -7,6 +7,10 @@ import { useShortcuts } from './hooks/useShortcuts'
 import { supabaseOrNull } from './lib/supabase'
 import { brokerEnabled, brokerPreview } from './lib/broker'
 import { getUserToken } from './lib/auth'
+import { diffLines, diffStat } from './lib/aiEdits'
+import { listWorkspaceSnapshots } from './lib/persistence'
+import { pilotStats } from './lib/usage'
+import { LIMITS } from './lib/limits'
 import {
   createProject,
   deleteProject,
@@ -42,6 +46,7 @@ const ProjectList = lazy(() => import('./components/ProjectList'))
 const DeployDialog = lazy(() => import('./components/DeployDialog'))
 const HistoryDialog = lazy(() => import('./components/HistoryDialog'))
 const AiPanel = lazy(() => import('./components/AiPanel'))
+const DiffViewer = lazy(() => import('./components/DiffViewer'))
 import StatusBar from './components/StatusBar'
 import { AlertTriangle, Braces, MonitorPlay, FolderOpen, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -93,7 +98,9 @@ export default function App() {
   const [showImport, setShowImport] = useState(false)
   const [showDeploy, setShowDeploy] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [showAi, setShowAi] = useState(false)
+  // Desktop boots with the composer pane open (3-pane layout); mobile keeps
+  // the AI behind the dock button.
+  const [showAi, setShowAi] = useState(() => typeof window !== 'undefined' && !window.matchMedia('(max-width: 860px)').matches)
   const [projects, setProjects] = useState<StoredRow[]>([])
   const [shareLink, setShareLink] = useState<string | null>(null)
   const [hasLocalDraft, setHasLocalDraft] = useState(false)
@@ -112,6 +119,9 @@ export default function App() {
   const [formatting, setFormatting] = useState(false)
   const [reveal, setReveal] = useState<{ token: number; line?: number; column?: number } | null>(null)
   const [aiSelection, setAiSelection] = useState<EditorSelection | null>(null)
+  // Review mode: diff active file (and totals) against the latest snapshot.
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewBase, setReviewBase] = useState<{ id: string; files: FileMap } | null>(null)
 
   const sortedFiles = Object.keys(state.files).sort()
   const touchStartX = useRef(0)
@@ -133,6 +143,37 @@ export default function App() {
     clearConsole,
   })
   const projectKind = useMemo(() => detectProjectKind(state.files), [state.files])
+
+  // Latest snapshot is the review baseline (refreshed per project).
+  useEffect(() => {
+    let cancelled = false
+    void listWorkspaceSnapshots(state.projectId, state.projectName).then((snaps) => {
+      if (!cancelled) setReviewBase(snaps.length ? { id: snaps[0].id, files: snaps[0].files } : null)
+    })
+    return () => { cancelled = true }
+  }, [state.projectId, state.projectName])
+
+  const reviewStats = useMemo(() => {
+    if (!reviewBase) return null
+    let added = 0
+    let removed = 0
+    let changedFiles = 0
+    for (const f of new Set([...Object.keys(reviewBase.files), ...Object.keys(state.files)])) {
+      const a = reviewBase.files[f] ?? ''
+      const b = state.files[f] ?? ''
+      if (a === b) continue
+      changedFiles++
+      const s = diffStat(diffLines(a, b))
+      added += s.added
+      removed += s.removed
+    }
+    return { added, removed, changedFiles }
+  }, [reviewBase, state.files])
+
+  const aiReviewFiles = useMemo(() => Object.keys(state.aiTouched).filter((f) => f in state.files).sort(), [state.aiTouched, state.files])
+  const todayCount = useMemo(() => {
+    try { return pilotStats().today } catch { return 0 }
+  }, [state.files])
 
   // Remote preview URL (Cells expose) when the broker has a live dev server.
   // Null = keep local srcDoc preview. Failures are silent by design.
@@ -492,7 +533,7 @@ export default function App() {
         onFormat={formatActive}
         onDeploy={handleDeploy}
         onHistory={() => setShowHistory(true)}
-        onOpenAi={() => setShowAi(true)}
+        onOpenAi={() => setShowAi((v) => !v)}
         onImport={() => setShowImport(true)}
         formatting={formatting}
         isMobile={isMobile}
@@ -613,45 +654,135 @@ export default function App() {
           </nav>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[248px_minmax(0,1fr)_minmax(320px,42%)]">
-          <aside className="min-h-0 border-r border-border bg-muted/30">
-            <FileExplorer readOnly={state.isSharedView || state.readOnly} />
-          </aside>
-          <main className="min-w-0 min-h-0 border-r border-border">
-            {state.activeFile ? (
-              <CodeEditor
-                path={state.activeFile}
-                value={state.files[state.activeFile] ?? ''}
-                readOnly={state.isSharedView || state.readOnly}
-                onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
-                reveal={reveal}
-                onSelectionChange={setAiSelection}
-              />
-            ) : (
-              <div className="grid h-full place-content-center text-sm text-muted-foreground">
-                Create a file to get started.
+        <div
+          className="grid min-h-0 flex-1"
+          style={{ gridTemplateColumns: showAi ? '264px minmax(340px,400px) minmax(0,1fr)' : '264px minmax(0,1fr)' }}
+        >
+          {/* Left: explorer + AI review queue + identity */}
+          <aside className="flex min-h-0 flex-col border-r border-border bg-muted/30">
+            <div className="flex h-10 shrink-0 items-center px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Explorer
+            </div>
+            <div className="min-h-0 flex-1">
+              <FileExplorer readOnly={state.isSharedView || state.readOnly} />
+            </div>
+            {aiReviewFiles.length > 0 && (
+              <div className="shrink-0 border-t border-border/60 px-1.5 py-2">
+                <div className="px-1.5 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Review
+                </div>
+                <ul>
+                  {aiReviewFiles.map((f) => (
+                    <li key={f}>
+                      <button
+                        className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left font-mono text-xs text-foreground/90 hover:bg-accent/60"
+                        onClick={() => openLocation(f)}
+                        title="Changed by AI — open to review"
+                      >
+                        <span className="size-1.5 shrink-0 rounded-full bg-violet-400" aria-hidden />
+                        <span className="truncate">{f}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-          </main>
-          <section className="flex min-h-0 min-w-0 flex-col bg-background">
-            <RunOutput
-              kind={projectKind}
-              srcDoc={srcDoc}
-              runKey={runKey}
-              status={status}
-              stage={stage}
-              program={program}
-              previewUrl={previewUrl}
-              previewAccess={previewAccess}
-              viewport={viewport}
-              onViewportChange={setViewport}
-              showViewportControls={!state.isSharedView}
-              onRun={() => void run()}
-              onRunProgram={(stdin) => void run(undefined, stdin)}
-              onCancel={cancel}
-            />
-            <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable onOpenLocation={openLocation} />
-          </section>
+            <div className="flex shrink-0 items-center gap-2 border-t border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+              <span className="truncate">{user?.email ?? 'Local mode'}</span>
+              <span className="ml-auto shrink-0 font-mono" title="Runs used today">
+                {todayCount}/{LIMITS.dailyRunCap}
+              </span>
+            </div>
+          </aside>
+
+          {/* Center: composer */}
+          {showAi && (
+            <section className="flex min-h-0 min-w-0 flex-col border-r border-border">
+              <Suspense fallback={null}>
+                <AiPanel
+                  inline
+                  signedIn={Boolean(user)}
+                  onSignIn={() => setShowLogin(true)}
+                  onClose={() => setShowAi(false)}
+                  selection={aiSelection}
+                />
+              </Suspense>
+            </section>
+          )}
+
+          {/* Right: file tab + code/diff + output */}
+          <div className="flex min-h-0 min-w-0 flex-col bg-background">
+            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/60 bg-muted/30 px-3">
+              <span className="min-w-0 truncate font-mono text-xs text-foreground/90" title={state.activeFile}>
+                {state.activeFile || 'No file open'}
+              </span>
+              {reviewStats && reviewStats.changedFiles > 0 && (
+                <span
+                  className="shrink-0 rounded-full border border-border px-2 py-0.5 font-mono text-[10px]"
+                  title={`${reviewStats.changedFiles} files changed vs last snapshot`}
+                >
+                  <span className="text-emerald-400">+{reviewStats.added}</span>{' '}
+                  <span className="text-red-400">-{reviewStats.removed}</span>
+                </span>
+              )}
+              <span className="ml-auto flex shrink-0 items-center">
+                <button
+                  className={cn(
+                    'rounded-md px-2 py-1 font-mono text-[11px] transition-colors',
+                    reviewing ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  disabled={!reviewBase || !state.activeFile}
+                  title={reviewBase ? 'Diff against last snapshot' : 'No snapshot yet — autosnapshots land every ~30s'}
+                  onClick={() => setReviewing((r) => !r)}
+                >
+                  {reviewing ? 'Code' : 'Review'}
+                </button>
+              </span>
+            </div>
+            <div className="min-h-0 flex-[8] border-b border-border">
+              {reviewing && reviewBase && state.activeFile ? (
+                <Suspense fallback={null}>
+                  <DiffViewer
+                    path={state.activeFile}
+                    original={reviewBase.files[state.activeFile] ?? ''}
+                    modified={state.files[state.activeFile] ?? ''}
+                  />
+                </Suspense>
+              ) : state.activeFile ? (
+                <CodeEditor
+                  path={state.activeFile}
+                  value={state.files[state.activeFile] ?? ''}
+                  readOnly={state.isSharedView || state.readOnly}
+                  onChange={(value) => dispatch({ type: 'SET_FILE', path: state.activeFile, content: value })}
+                  reveal={reveal}
+                  onSelectionChange={setAiSelection}
+                />
+              ) : (
+                <div className="grid h-full place-content-center text-sm text-muted-foreground">
+                  Create a file to get started.
+                </div>
+              )}
+            </div>
+            <div className="flex min-h-[200px] flex-[5] flex-col">
+              <RunOutput
+                kind={projectKind}
+                srcDoc={srcDoc}
+                runKey={runKey}
+                status={status}
+                stage={stage}
+                program={program}
+                previewUrl={previewUrl}
+                previewAccess={previewAccess}
+                viewport={viewport}
+                onViewportChange={setViewport}
+                showViewportControls={!state.isSharedView}
+                onRun={() => void run()}
+                onRunProgram={(stdin) => void run(undefined, stdin)}
+                onCancel={cancel}
+              />
+              <ConsolePanel entries={state.consoleEntries} onClear={clearConsole} resizable onOpenLocation={openLocation} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -708,7 +839,7 @@ export default function App() {
           />
         </Suspense>
       )}
-      {showAi && (
+      {showAi && isMobile && (
         <Suspense fallback={null}>
           <AiPanel
             signedIn={Boolean(user)}
