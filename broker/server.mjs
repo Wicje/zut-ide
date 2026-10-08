@@ -36,6 +36,7 @@ const RATE_RUN_MIN = Number(process.env.ZUT_RATE_RUN_MIN ?? 20)
 const DEV_ALLOW_ANON = (process.env.ZUT_BROKER_DEV_ALLOW_ANON ?? '') === '1'
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').replace(/\/+$/, '')
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? ''
+const MUDBASE_URL = (process.env.MUDBASE_URL ?? 'https://api.mudbase.dev').replace(/\/+$/, '')
 const CELLS_CONFIGURED = Boolean(process.env.CELLS_API_KEY)
 const VERSION = '0.1.0'
 
@@ -83,8 +84,18 @@ async function readJson(req) {
   try { return JSON.parse(raw) } catch { const e = new Error('Request body must be valid JSON.'); e.status = 400; throw e }
 }
 
-// ---- auth: 60s cache, Supabase-hosted verify when configured ----
+// ---- auth: 60s cache. Supabase JWT first, then Mudbase user token
+// (GET /api/auth/session) when MUDBASE_URL is set. Either way the uid is
+// the verified subject — never a browser-supplied id.
 const authCache = new Map()
+async function verifyMudbase(token) {
+  const r = await fetch(`${MUDBASE_URL}/api/auth/session`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!r.ok) return null
+  const j = await r.json().catch(() => null)
+  const user = j?.user ?? j
+  const uid = user?.id ?? user?.email
+  return typeof uid === 'string' && uid ? uid : null
+}
 async function verifyUser(req) {
   const h = req.headers.authorization ?? ''
   const m = h.match(/^Bearer (.+)$/)
@@ -100,12 +111,19 @@ async function verifyUser(req) {
     authCache.set(token, { uid: j.id, exp: Date.now() + 60_000 })
     return j.id
   }
+  if (process.env.MUDBASE_AUTH !== '0') {
+    const uid = await verifyMudbase(token).catch(() => null)
+    if (uid) {
+      authCache.set(token, { uid, exp: Date.now() + 60_000 })
+      return uid
+    }
+  }
   if (DEV_ALLOW_ANON) {
     const uid = 'dev-user'
     authCache.set(token, { uid, exp: Date.now() + 60_000 })
     return uid
   }
-  const e = new Error('Broker auth not configured (set SUPABASE_URL/ANON_KEY or ZUT_BROKER_DEV_ALLOW_ANON=1 for local demo).')
+  const e = new Error('Broker auth not configured (set SUPABASE_URL/ANON_KEY, MUDBASE_URL, or ZUT_BROKER_DEV_ALLOW_ANON=1 for local demo).')
   e.status = 503
   throw e
 }
@@ -254,7 +272,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, corsFor(req)); res.end(); return }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    send(res, req, 200, { ok: true, service: 'zut-broker', version: VERSION, cells: CELLS_CONFIGURED, runners: ['python', 'go'], auth: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) || DEV_ALLOW_ANON })
+    send(res, req, 200, { ok: true, service: 'zut-broker', version: VERSION, cells: CELLS_CONFIGURED, runners: ['python', 'go'], auth: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) || process.env.MUDBASE_AUTH !== '0' || DEV_ALLOW_ANON, mudbase: process.env.MUDBASE_AUTH !== '0' })
     return
   }
 
