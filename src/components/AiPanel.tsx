@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ForwardedRef } from 'react'
 import { useWorkspace } from '../store/workspace'
 import { streamClaude, type ChatMessage } from '../lib/hosting'
 import {
@@ -42,7 +42,14 @@ import {
 import { FileCode2, Loader2, Send, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type Backend = DirectProvider | 'claude' | 'opencode' | 'zut-cloud'
+export type Backend = DirectProvider | 'claude' | 'opencode' | 'zut-cloud'
+
+export interface AiPanelHandle {
+  send: (text: string) => void
+  focus: () => void
+  clear: () => void
+  setBackend: (backend: Backend) => void
+}
 
 const DIRECT_PROVIDERS: DirectProvider[] = ['openrouter', 'anthropic', 'chatgpt', 'gemini']
 
@@ -50,7 +57,7 @@ function isDirect(backend: Backend): backend is DirectProvider {
   return (DIRECT_PROVIDERS as string[]).includes(backend)
 }
 
-const BACKENDS: { id: Backend; label: string }[] = [
+export const BACKENDS: { id: Backend; label: string }[] = [
   { id: 'zut-cloud', label: 'Cloud agent' },
   { id: 'openrouter', label: 'OpenRouter' },
   { id: 'anthropic', label: 'Claude' },
@@ -115,6 +122,17 @@ interface AiPanelProps {
   selection?: EditorSelection | null
   /** Render as a full-height inline pane (3-pane layout) instead of a drawer. */
   inline?: boolean
+  /** Composer session this panel serves (remount per session via key). */
+  sessionKey?: string
+  initialMessages?: ChatMessage[]
+  initialBackend?: Backend
+  onMessagesChange?: (sessionId: string, messages: ChatMessage[]) => void
+  onSessionTitle?: (title: string) => void
+  onBackendChange?: (backend: Backend) => void
+  /** Hide the input row (a parent composer bar sends via ref instead). */
+  hideInput?: boolean
+  /** Hide the title header (a parent pane renders session chrome). */
+  hideHeader?: boolean
 }
 
 const MAX_FILE_CHARS = 4000
@@ -274,9 +292,26 @@ function ProposalCard({
   )
 }
 
-export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline }: AiPanelProps) {
+const AiPanel = forwardRef<AiPanelHandle, AiPanelProps>(function AiPanel(
+  {
+    signedIn,
+    onSignIn,
+    onClose,
+    selection,
+    inline,
+    sessionKey = 'default',
+    initialMessages,
+    initialBackend,
+    onMessagesChange,
+    onSessionTitle,
+    onBackendChange,
+    hideInput,
+    hideHeader,
+  }: AiPanelProps,
+  ref: ForwardedRef<AiPanelHandle>,
+) {
   const { state, dispatch } = useWorkspace()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages ?? [])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
@@ -289,7 +324,36 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Backend selection (default to cloud agent when the VPS is configured)
-  const [backend, setBackend] = useState<Backend>(() => (cloudEnabled() ? 'zut-cloud' : 'openrouter'))
+  const [backend, setBackend] = useState<Backend>(() => initialBackend ?? (cloudEnabled() ? 'zut-cloud' : 'openrouter'))
+  const onMessagesChangeRef = useRef(onMessagesChange)
+  onMessagesChangeRef.current = onMessagesChange
+  const onSessionTitleRef = useRef(onSessionTitle)
+  onSessionTitleRef.current = onSessionTitle
+  const onBackendChangeRef = useRef(onBackendChange)
+  onBackendChangeRef.current = onBackendChange
+
+  // Mirror chat + backend outward so a parent composer owns sessions.
+  useEffect(() => {
+    onMessagesChangeRef.current?.(sessionKey, messages)
+  }, [sessionKey, messages])
+  useEffect(() => {
+    onBackendChangeRef.current?.(backend)
+  }, [backend])
+
+  useImperativeHandle(ref, () => ({
+    send: (text: string) => {
+      void send(text)
+    },
+    focus: () => {
+      inputRef.current?.focus()
+    },
+    clear: () => {
+      reset()
+    },
+    setBackend: (b: Backend) => {
+      switchBackend(b)
+    },
+  }))
   const [opencodeConnected, setOpencodeConnected] = useState<boolean | null>(null)
   const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null)
   const [opencodeSessionId, setOpencodeSessionId] = useState<string | null>(null)
@@ -357,6 +421,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline
 
     const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: trimmed }]
     setMessages(nextMessages)
+    if (messages.length === 0) onSessionTitleRef.current?.(trimmed.slice(0, 48))
     setInput('')
     setError(null)
     setBusy(true)
@@ -516,6 +581,8 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline
 
   const innerContent = (
     <>
+      {!hideHeader && (
+        <>
         {/* Header */}
         <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-3">
           <span className="flex items-center gap-2 text-sm font-semibold">
@@ -540,6 +607,8 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline
             </button>
           </div>
         </div>
+        </>
+      )}
 
         {/* Backend selector */}
         <div className="flex shrink-0 items-center gap-1 px-3 py-2.5">
@@ -800,6 +869,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline
               </div>
             )}
 
+            {!hideInput && (
             <div className="flex shrink-0 items-center gap-2 border-t p-3">
               <form
                 className="flex flex-1 items-center gap-2"
@@ -821,6 +891,7 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline
                 </Button>
               </form>
             </div>
+            )}
           </>
         )}
     </>
@@ -838,4 +909,6 @@ export default function AiPanel({ signedIn, onSignIn, onClose, selection, inline
       </SheetContent>
     </Sheet>
   )
-}
+})
+
+export default AiPanel

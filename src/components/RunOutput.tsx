@@ -115,7 +115,7 @@ export default function RunOutput({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-black/40 p-3 font-mono text-[12px] leading-5">
+      <div className="min-h-0 flex-1 overflow-auto bg-muted/40 p-3 font-mono text-[12px] leading-5">
         {!hasOutput && status !== 'running' && (
           <div className="grid h-full place-content-center gap-3 text-center">
             <p className="text-sm text-muted-foreground">
@@ -134,17 +134,17 @@ export default function RunOutput({
         )}
         {status === 'running' && !hasOutput && (
           <div className="grid gap-2">
-            <p className="text-amber-400">{stage ? STAGE_LABEL[stage] : 'Starting remote computer…'}</p>
+            <p className="text-amber-600">{stage ? STAGE_LABEL[stage] : 'Starting remote computer…'}</p>
             <p className="text-xs text-muted-foreground">
               First run can take up to ~20s while the computer wakes. Editing stays free — only runs use run time.
             </p>
           </div>
         )}
         {program?.stdout && (
-          <pre className="whitespace-pre-wrap break-all text-[#e6edf3]">{program.stdout.slice(0, 64000)}</pre>
+          <pre className="whitespace-pre-wrap break-all text-foreground">{program.stdout.slice(0, 64000)}</pre>
         )}
         {program?.stderr && (
-          <pre className="mt-2 whitespace-pre-wrap break-all text-[#ff7b72]">{program.stderr.slice(0, 64000)}</pre>
+          <pre className="mt-2 whitespace-pre-wrap break-all text-red-600">{program.stderr.slice(0, 64000)}</pre>
         )}
       </div>
 

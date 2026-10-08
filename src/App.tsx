@@ -11,6 +11,9 @@ import { diffLines, diffStat } from './lib/aiEdits'
 import { listWorkspaceSnapshots } from './lib/persistence'
 import { pilotStats } from './lib/usage'
 import { LIMITS } from './lib/limits'
+import { useComposers } from './lib/composers'
+import Sidebar from './components/Sidebar'
+import { detectProjectKind, findProgramEntry } from './lib/projectKind'
 import {
   createProject,
   deleteProject,
@@ -45,13 +48,13 @@ import ImportDialog from './components/ImportDialog'
 const ProjectList = lazy(() => import('./components/ProjectList'))
 const DeployDialog = lazy(() => import('./components/DeployDialog'))
 const HistoryDialog = lazy(() => import('./components/HistoryDialog'))
-const AiPanel = lazy(() => import('./components/AiPanel'))
-const DiffViewer = lazy(() => import('./components/DiffViewer'))
+const ComposerPane = lazy(() => import('./components/ComposerPane'))
+const MultiDiffViewer = lazy(() => import('./components/MultiDiffViewer'))
 import StatusBar from './components/StatusBar'
-import { AlertTriangle, Braces, MonitorPlay, FolderOpen, Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle, Braces, ChevronDown, GitBranch, MonitorPlay, FolderOpen, Play, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { EditorSelection, FileMap } from './types'
-import { detectProjectKind } from './lib/projectKind'
 
 function parseHash(): string | null {
   const m = window.location.hash.match(/^#\/p\/([\w-]+)/)
@@ -119,8 +122,10 @@ export default function App() {
   const [formatting, setFormatting] = useState(false)
   const [reveal, setReveal] = useState<{ token: number; line?: number; column?: number } | null>(null)
   const [aiSelection, setAiSelection] = useState<EditorSelection | null>(null)
-  // Review mode: diff active file (and totals) against the latest snapshot.
-  const [reviewing, setReviewing] = useState(false)
+  // Composer sessions (agents) + right-pane tab.
+  const composers = useComposers()
+  const [rightTab, setRightTab] = useState<'code' | 'changes'>('code')
+  // Latest snapshot is the diff baseline for review + uncommitted counts.
   const [reviewBase, setReviewBase] = useState<{ id: string; files: FileMap } | null>(null)
 
   const sortedFiles = Object.keys(state.files).sort()
@@ -170,10 +175,25 @@ export default function App() {
     return { added, removed, changedFiles }
   }, [reviewBase, state.files])
 
-  const aiReviewFiles = useMemo(() => Object.keys(state.aiTouched).filter((f) => f in state.files).sort(), [state.aiTouched, state.files])
   const todayCount = useMemo(() => {
     try { return pilotStats().today } catch { return 0 }
   }, [state.files])
+
+  const changedFileList = useMemo(() => {
+    if (!reviewBase) return []
+    const out: string[] = []
+    for (const f of new Set([...Object.keys(reviewBase.files), ...Object.keys(state.files)])) {
+      if ((reviewBase.files[f] ?? '') !== (state.files[f] ?? '')) out.push(f)
+      if (out.length >= 50) break
+    }
+    return out.sort()
+  }, [reviewBase, state.files])
+
+  const lastRun = useMemo(() => {
+    if (!program) return null
+    const label = projectKind === 'web' ? 'preview' : `run ${findProgramEntry(state.files, projectKind) ?? projectKind}`
+    return { label, exitCode: program.exitCode, durationMs: program.durationMs }
+  }, [program, projectKind, state.files])
 
   // Remote preview URL (Cells expose) when the broker has a live dev server.
   // Null = keep local srcDoc preview. Failures are silent by design.
@@ -514,8 +534,34 @@ export default function App() {
 
   const canShare = Boolean(user && state.projectId && !state.isSharedView)
 
+  const composerPane = (
+    <Suspense fallback={null}>
+      <ComposerPane
+        key={composers.activeId}
+        composers={composers}
+        signedIn={Boolean(user)}
+        onSignIn={() => setShowLogin(true)}
+        onClose={() => setShowAi(false)}
+        selection={aiSelection}
+        reviewAdded={reviewStats?.added ?? 0}
+        reviewRemoved={reviewStats?.removed ?? 0}
+        changedFiles={changedFileList}
+        lastRun={lastRun}
+        onOpenFile={openLocation}
+        onCommitPush={() => void handleCommitPush()}
+        onLog={(level, message) => addConsole(level, message)}
+      />
+    </Suspense>
+  )
+
+  async function handleCommitPush() {
+    await save()
+    setShowDeploy(true)
+  }
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+      {isMobile && (
       <Toolbar
         user={user}
         autoplay={autoplay}
@@ -538,9 +584,10 @@ export default function App() {
         formatting={formatting}
         isMobile={isMobile}
       />
+      )}
 
       {!supabaseOrNull() && (
-        <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+        <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700">
           <AlertTriangle className="size-3.5 shrink-0" />
           <span className="truncate">
             Cloud not configured — running in local-only mode. Set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in .env
@@ -656,98 +703,114 @@ export default function App() {
       ) : (
         <div
           className="grid min-h-0 flex-1"
-          style={{ gridTemplateColumns: showAi ? '264px minmax(340px,400px) minmax(0,1fr)' : '264px minmax(0,1fr)' }}
+          style={{ gridTemplateColumns: showAi ? '280px minmax(360px,420px) minmax(0,1fr)' : '280px minmax(0,1fr)' }}
         >
-          {/* Left: explorer + AI review queue + identity */}
-          <aside className="flex min-h-0 flex-col border-r border-border bg-muted/30">
-            <div className="flex h-10 shrink-0 items-center px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Explorer
-            </div>
-            <div className="min-h-0 flex-1">
-              <FileExplorer readOnly={state.isSharedView || state.readOnly} />
-            </div>
-            {aiReviewFiles.length > 0 && (
-              <div className="shrink-0 border-t border-border/60 px-1.5 py-2">
-                <div className="px-1.5 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Review
-                </div>
-                <ul>
-                  {aiReviewFiles.map((f) => (
-                    <li key={f}>
-                      <button
-                        className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left font-mono text-xs text-foreground/90 hover:bg-accent/60"
-                        onClick={() => openLocation(f)}
-                        title="Changed by AI — open to review"
-                      >
-                        <span className="size-1.5 shrink-0 rounded-full bg-violet-400" aria-hidden />
-                        <span className="truncate">{f}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div className="flex shrink-0 items-center gap-2 border-t border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
-              <span className="truncate">{user?.email ?? 'Local mode'}</span>
-              <span className="ml-auto shrink-0 font-mono" title="Runs used today">
-                {todayCount}/{LIMITS.dailyRunCap}
-              </span>
-            </div>
+          {/* Left: agents + files + identity */}
+          <aside className="min-h-0 border-r border-border/70 bg-sidebar">
+            <Sidebar
+              sessions={composers.sessions}
+              activeSessionId={composers.activeId}
+              onSelectSession={composers.select}
+              onNewSession={composers.create}
+              onRemoveSession={composers.remove}
+              user={user}
+              todayCount={todayCount}
+              dailyCap={LIMITS.dailyRunCap}
+              actions={{
+                onRun: () => void run(),
+                onFormat: formatActive,
+                onSave: save,
+                onDownload: download,
+                onNewProject: newProject,
+                onImport: () => setShowImport(true),
+                onOpenProjects: openProjects,
+                onOpenHistory: () => setShowHistory(true),
+                onToggleComposer: () => setShowAi((v) => !v),
+                onLogin: () => setShowLogin(true),
+                onLogout: logout,
+              }}
+            />
           </aside>
 
           {/* Center: composer */}
           {showAi && (
-            <section className="flex min-h-0 min-w-0 flex-col border-r border-border">
-              <Suspense fallback={null}>
-                <AiPanel
-                  inline
-                  signedIn={Boolean(user)}
-                  onSignIn={() => setShowLogin(true)}
-                  onClose={() => setShowAi(false)}
-                  selection={aiSelection}
-                />
-              </Suspense>
+            <section className="flex min-h-0 min-w-0 flex-col border-r border-border/70">
+              {composerPane}
             </section>
           )}
 
-          {/* Right: file tab + code/diff + output */}
+          {/* Right: SCM bar + tabs + code/changes + output */}
           <div className="flex min-h-0 min-w-0 flex-col bg-background">
-            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/60 bg-muted/30 px-3">
-              <span className="min-w-0 truncate font-mono text-xs text-foreground/90" title={state.activeFile}>
-                {state.activeFile || 'No file open'}
-              </span>
+            <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border/70 bg-card px-3">
+              <button
+                className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] text-foreground/90 transition-colors hover:bg-muted"
+                onClick={openProjects}
+                title="Projects — switch workspace"
+              >
+                <GitBranch className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate font-medium">{state.projectName}</span>
+                <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+              </button>
               {reviewStats && reviewStats.changedFiles > 0 && (
                 <span
-                  className="shrink-0 rounded-full border border-border px-2 py-0.5 font-mono text-[10px]"
-                  title={`${reviewStats.changedFiles} files changed vs last snapshot`}
+                  className="shrink-0 rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 font-mono text-[11px]"
+                  title={`${reviewStats.changedFiles} files uncommitted vs last snapshot`}
                 >
-                  <span className="text-emerald-400">+{reviewStats.added}</span>{' '}
-                  <span className="text-red-400">-{reviewStats.removed}</span>
+                  <span className="text-emerald-600">+{reviewStats.added}</span>{' '}
+                  <span className="text-red-600">-{reviewStats.removed}</span>
                 </span>
               )}
-              <span className="ml-auto flex shrink-0 items-center">
+              <span className="ml-auto flex shrink-0 items-center gap-1.5">
                 <button
-                  className={cn(
-                    'rounded-md px-2 py-1 font-mono text-[11px] transition-colors',
-                    reviewing ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                  disabled={!reviewBase || !state.activeFile}
-                  title={reviewBase ? 'Diff against last snapshot' : 'No snapshot yet — autosnapshots land every ~30s'}
-                  onClick={() => setReviewing((r) => !r)}
+                  className="grid size-7 place-content-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-500/10"
+                  onClick={() => void run()}
+                  title="Run (Ctrl+Enter)"
+                  aria-label="Run"
                 >
-                  {reviewing ? 'Code' : 'Review'}
+                  <Play className="size-3.5 fill-current" />
                 </button>
+                <Button variant="outline" size="sm" onClick={share} title="Share a read-only review link">
+                  Create PR
+                </Button>
+                <Button size="sm" onClick={() => void handleCommitPush()} title="Save to cloud, then open publish options">
+                  Commit &amp; Push
+                </Button>
               </span>
             </div>
-            <div className="min-h-0 flex-[8] border-b border-border">
-              {reviewing && reviewBase && state.activeFile ? (
-                <Suspense fallback={null}>
-                  <DiffViewer
-                    path={state.activeFile}
-                    original={reviewBase.files[state.activeFile] ?? ''}
-                    modified={state.files[state.activeFile] ?? ''}
-                  />
-                </Suspense>
+            <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/70 bg-card px-2 text-xs">
+              <button
+                className={cn(
+                  'rounded-md px-2.5 py-1 font-mono transition-colors',
+                  rightTab === 'code' ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+                onClick={() => setRightTab('code')}
+              >
+                {state.activeFile || 'No file'}
+              </button>
+              <button
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors',
+                  rightTab === 'changes' ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+                onClick={() => setRightTab('changes')}
+              >
+                Changes
+                {reviewStats && reviewStats.changedFiles > 0 && (
+                  <span className="rounded-full bg-muted px-1.5 font-mono text-[10px]">{reviewStats.changedFiles}</span>
+                )}
+              </button>
+            </div>
+            <div className="min-h-0 flex-[3] border-b border-border/70">
+              {rightTab === 'changes' ? (
+                reviewBase ? (
+                  <Suspense fallback={null}>
+                    <MultiDiffViewer base={reviewBase.files} current={state.files} focusFile={state.activeFile} />
+                  </Suspense>
+                ) : (
+                  <div className="grid h-full place-content-center px-6 text-center text-sm text-muted-foreground">
+                    No snapshot yet — keep editing, autosnapshots land every ~30s.
+                  </div>
+                )
               ) : state.activeFile ? (
                 <CodeEditor
                   path={state.activeFile}
@@ -763,7 +826,7 @@ export default function App() {
                 </div>
               )}
             </div>
-            <div className="flex min-h-[200px] flex-[5] flex-col">
+            <div className="flex min-h-[180px] flex-[2] flex-col">
               <RunOutput
                 kind={projectKind}
                 srcDoc={srcDoc}
@@ -840,14 +903,9 @@ export default function App() {
         </Suspense>
       )}
       {showAi && isMobile && (
-        <Suspense fallback={null}>
-          <AiPanel
-            signedIn={Boolean(user)}
-            onSignIn={() => setShowLogin(true)}
-            onClose={() => setShowAi(false)}
-            selection={aiSelection}
-          />
-        </Suspense>
+        <div className="fixed inset-0 z-50 flex flex-col bg-background">
+          {composerPane}
+        </div>
       )}
     </div>
   )

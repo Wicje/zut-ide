@@ -6,6 +6,10 @@ moved to a version section on release.
 ## [Unreleased]
 
 ### Added
+- Light 3-column shell rebuilt from scratch: sidebar (traffic lights, search, New Agent/Automations/Customize, agent sessions, searchable files, profile), center composer (session feed with request box, file/run chips, in-browser screen recording, summary + follow-up bar with review pill, Commit & Push, backend picker, voice input), right pane (SCM bar with project switcher, uncommitted badge, Run, Create PR review link, Commit & Push; Code/Changes tabs; lazy multi-file diff vs snapshot).
+- Composer sessions (`lib/composers.ts`): multiple named agents, per-session persisted history, auto-titles, backend remembered per agent.
+- AiPanel as embeddable engine (ref send/focus/clear/setBackend, hideable header/input, session persistence hooks).
+- Light-only theme (soft gray shell, white cards, Monaco `vs`, light console/output palettes). No `.dark`, no toggle.
 - Thin broker (`broker/server.mjs`, `npm run broker`): BaaS routes (projects CRUD, share/shared) + `open/run/stop/terminal-token/preview` with user-token auth (60s cache), daily/rate caps, ownership checks. Live Cells path (resume by `externalId`, hash-diff sync ≤200, exec, 60s terminal tokens, preview expose) isolated in `broker/cells.mjs` behind env; local demo runs when no key is set.
 - Staged runs: `waking/installing/starting/running/ready` (`RunStage`), Cancel, 60s browser wait cap, quota → plain words. Wired through `useRunLoop`, `RunOutput`, `Preview` (remote-URL + private/public badge), `StatusBar` (`remote runner · N/50`).
 - Pilot cost trail: `lib/limits.ts` (single caps source), `lib/usage.ts` (offline mirror), `UsagePanel` (runs, Small-hours est, quota) + `Runner` tab in Deploy dialog with `TerminalPanel` (60s token lifecycle).

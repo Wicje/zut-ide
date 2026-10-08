@@ -41,9 +41,11 @@ const ACCEPT_TYPES = '.html,.htm,.css,.scss,.less,.js,.jsx,.ts,.tsx,.mjs,.json,.
 interface FileExplorerProps {
   readOnly: boolean
   onFileUpload?: (files: FileMap) => void
+  /** Substring filter from the sidebar search (matches nothing when absent). */
+  filter?: string
 }
 
-export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerProps) {
+export default function FileExplorer({ readOnly, onFileUpload, filter }: FileExplorerProps) {
   const { state, dispatch, addConsole } = useWorkspace()
   const [dragOver, setDragOver] = useState(false)
   const [creating, setCreating] = useState<{ content: string; name: string } | null>(null)
@@ -76,7 +78,9 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
     if (deleteTimer.current) window.clearTimeout(deleteTimer.current)
   }, [])
 
-  const files = Object.keys(state.files).sort()
+  const allFiles = Object.keys(state.files).sort()
+  const needle = (filter ?? '').trim().toLowerCase()
+  const files = needle ? allFiles.filter((f) => f.toLowerCase().includes(needle)) : allFiles
 
   function uniqueName(base: string): string {
     if (!(base in state.files)) return base
@@ -390,7 +394,7 @@ export default function FileExplorer({ readOnly, onFileUpload }: FileExplorerPro
         </ul>
         {files.length === 0 && (
           <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-            No files yet — add one with the + button.
+            {needle ? 'No files match.' : 'No files yet — add one with the + button.'}
           </div>
         )}
       </ScrollArea>

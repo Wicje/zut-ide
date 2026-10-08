@@ -26,7 +26,7 @@ export default function DiffViewer({ path, original, modified }: DiffViewerProps
       original={original}
       modified={modified}
       language={languageForPath(path)}
-      theme="vs-dark"
+      theme="vs"
       loading={
         <div style={{ display: 'grid', placeContent: 'center', height: '100%', color: '#7d8590', fontFamily: 'monospace' }}>
           Loading diff…

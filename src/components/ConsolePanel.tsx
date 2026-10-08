@@ -10,11 +10,11 @@ const DEFAULT_HEIGHT = 160
 const HEIGHT_KEY = 'zut:console:height'
 
 const LEVEL_COLOR: Record<string, string> = {
-  log: '#e6edf3',
-  info: '#79c0ff',
-  warn: '#f0b429',
-  error: '#ff7b72',
-  debug: '#8b949e',
+  log: '#1f2937',
+  info: '#0369a1',
+  warn: '#b45309',
+  error: '#dc2626',
+  debug: '#6b7280',
 }
 
 const LEVEL_LABEL: Record<string, string> = {

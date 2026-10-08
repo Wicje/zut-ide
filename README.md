@@ -301,6 +301,7 @@ src/
   lib/limits.ts          # single caps source (daily runs, sessions, file/output caps)
   lib/usage.ts           # pilot cost trail (runs, Small-hours est, quota)
   lib/ai.ts              # BYOK chat providers (OpenRouter, Anthropic, OpenAI, Gemini)
+  lib/composers.ts       # agent sessions (list/create/switch, per-session history)
   lib/opencode.ts        # opencode agent + disk-sync bridge client
   lib/backend.ts         # swappable persistence (broker BaaS → Supabase → local)
   lib/supabase.ts        # client init / config check
@@ -313,6 +314,10 @@ src/
   store/workspace.tsx    # files / console / project state
   components/
     CodeEditor.tsx       # Monaco wrapper (language per extension)
+    Sidebar.tsx          # traffic lights, search, New Agent/Automations/Customize, agents, profile
+    ComposerPane.tsx     # agent feed (request, files, recording, summary) + follow-up bar
+    MultiDiffViewer.tsx  # collapsible multi-file diff vs snapshot (lazy per file)
+    RecordCard.tsx       # in-browser screen recording (MediaRecorder, no upload)
     FileExplorer.tsx     # add / upload / drop / inline rename / two-tap delete
     RunOutput.tsx        # unified output: staged status + Cancel (web + py/go)
     Preview.tsx          # sandboxed iframe (local srcDoc or remote URL) + access badge

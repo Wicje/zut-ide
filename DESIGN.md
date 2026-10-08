@@ -6,11 +6,10 @@
 
 ## Brand
 
-- **Name:** zut, always lowercase. Mark: `~zut` — emerald `~` + neutral wordmark,
-  mono, bold, tight tracking (`Toolbar.tsx`). Single public name: zut.
+- **Name:** zut, always lowercase. Single public name: zut.
   Folder/repo names (`chisom_ide`, `zut-ide`) never appear in UI.
-- **Positioning:** "Code from any device." A cloud-assisted IDE for phones and
-  sub-2GB Chromebooks/gadgets, not a desktop replacement. AI is optional —
+- **Positioning:** "Code from any device." An AI-powered code editor for phones
+  and sub-2GB Chromebooks/gadgets, not a desktop replacement. AI is optional —
   plain code + Run is the default path.
 - **Backend is invisible:** built on Mudbase, but UI says Run / Terminal / Preview.
   Never expose Cells, Small-hours, externalId, session ids, or quota internals.
@@ -18,25 +17,26 @@
 - **Personality:** quiet workshop, not neon arcade. The UI recedes; the user's
   code and preview own the pixels.
 
-## Palette (dark-first)
+## Palette (light, refined)
 
-App boots `.dark`. Light tokens exist in `index.css` but there is no toggle —
-dark is brand intent (workshop-at-night, OLED phones, projector-safe
-contrast), not a placeholder. Prefer boring utilities on
+Light-only: no `.dark` class, no toggle. Soft gray app shell, white panels and
+cards, subtle borders, crisp monospace code. Prefer boring utilities on
 positioning-critical elements; Tailwind v4 exotic syntax (`w-(--…)`,
 `origin-(…)`) is decoration-only — it once broke menu widths.
 
 | Token | Value | Use |
 |---|---|---|
-| `background` | `oklch(0.145 0 0)` | app shell, panels |
-| `muted` | panels at `/30`–`/40` opacity | explorer, panel headers, status bar |
-| `border` | `border-border/60` for dividers | never full-contrast lines |
-| `emerald-400/500/600` | **the** accent | Run, success, active file edge, active mobile tab, logo `~` |
-| `red-400 / destructive` | errors only | build failure, error count, delete hover |
-| `amber-400` | warnings + transient | unsaved dot, building state, key-missing dots |
-| `violet-400/500` | AI only | AI buttons, proposal cards |
-| `sky-400` | navigation | clickable file links in console |
-| Console levels | `log #e6edf3 · info #79c0ff · warn #f0b429 · error #ff7b72 · debug #8b949e` | always paired with a dot + text label, never color alone |
+| `background` | `oklch(0.955 0 0)` | app shell |
+| `card` | `oklch(1 0 0)` | panels, composer, editor chrome |
+| `muted` | `oklch(0.93 0 0)` | chips, pills, output wells |
+| `border` | `oklch(0.89 0 0)` for dividers | never full-contrast lines |
+| `emerald-600` | **the** accent | Run, success, added-lines |
+| `red-600 / destructive` | errors only | build failure, removed-lines, delete |
+| `amber-600` | warnings + transient | building state, key-missing dots |
+| `violet-500` | AI only | agent dots, proposal cards, file chips |
+| `sky-600` | navigation | clickable file links in console |
+| Console levels | `log #1f2937 · info #0369a1 · warn #b45309 · error #dc2626 · debug #6b7280` | always paired with a dot + text label, never color alone |
+| Code | Monaco `vs` (light), red/green diff | read-only diffs, light editor |
 
 One accent per meaning. Emerald = go/success, red = broken, amber = wait,
 violet = AI. Do not add new accent hues without updating this table.
@@ -45,7 +45,7 @@ violet = AI. Do not add new accent hues without updating this table.
 
 - **UI:** `Geist Variable` (`--font-sans`). Panel headers: `text-xs font-medium uppercase tracking-wider text-muted-foreground`.
 - **Code/paths:** monospace for file names, counts, status values, console.
-- **Editor:** Monaco `vs-dark`, 14px, minimap off, word wrap on.
+- **Editor:** Monaco `vs` (light), 14px, minimap off, word wrap on. Diffs read-only, side-by-side.
 
 ## Shape & elevation (Linear-quiet)
 
@@ -57,32 +57,42 @@ violet = AI. Do not add new accent hues without updating this table.
 ## Layout grammar (VS Code-like)
 
 ```
-┌───────────────────────────────────────────────────────────┐
-│ titlebar: ~zut · name · saved · New… Run Save               │
-│ amber banner (only when cloud unconfigured)               │
-├──────────┬───────────────────┬────────────────────────────┤
-│ sidebar  │ composer          │ editor tabs + code / diff  │
-│ 264px    │ 340–400px         │ minmax flexible            │
-│ explorer │ AI chat, inline   │ tab: file · +A -D · Review │
-│ review   │ (drawer on mobile)│ code, then preview+console │
-│ identity │                   │                            │
-├──────────┴───────────────────┴────────────────────────────┤
-│ status: run-state · project · files · errors              │
-└───────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ sidebar  │ composer            │ SCM bar: project · +A -D · Run PR Push │
+│ 280px    │ 360–420px          ├────────────────────────────┤
+│ ●●● search│ session ▾ · New   │ tabs: file · Changes (N)   │
+│ +New Agent│ request box       │                            │
+│ Automations│ file/run chips   │ code editor / multi-diff   │
+│ Customize │ recording · summary│                           │
+│ Agents ☉  │ chat              ├────────────────────────────┤
+│ Project ▾ │ follow-up bar:    │ preview + console          │
+│ History   │ +A -D · Push · model · mic                     │
+│ profile   │                   ├────────────────────────────┤
+├───────────┴───────────────────┴────────────────────────────┤
+│ status: run-state · project · files · errors               │
+└────────────────────────────────────────────────────────────┘
 ```
 
-- Desktop grid: sidebar / composer / editor+output. Composer collapses via
-  the AI button (`Ctrl+K`); do not widen chrome at the editor's expense.
-- Sidebar: Explorer (files), Review (AI-touched files, violet dot, click to
-  open), identity footer (account · runs today). No separate sessions list —
-  History owns versions.
-- Editor header: file tab + `+A -D` badge vs last snapshot + Review toggle.
-  Review shows a read-only side-by-side diff (snapshot left, current right);
-  edits happen in Code mode. Dark stays — structure follows the reference,
-  palette does not.
+- Desktop grid: sidebar / composer / editor+output. No top toolbar on desktop
+  (mobile keeps it); SCM bar + sidebar menus own every action. Composer
+  collapses via Customize or `Ctrl+K`; do not widen chrome at the editor's
+  expense.
+- Sidebar: traffic lights (chrome) + search (agents & files) + New Agent /
+  Automations / Customize. Agents group (sessions, active dot, delete),
+  Project files (search-filtered), History row, profile footer (avatar,
+  account, runs today). Labels stay zut-real — never borrow another
+  product's workspace names.
+- Composer: session feed (request box, changed-file + run chips, screen
+  recording, summary) above the chat; follow-up bar with review pill,
+  Commit & Push (save → publish), backend picker, voice input. Recording
+  stays in-browser; nothing uploads.
+- Right: SCM bar (project switcher, uncommitted badge, Run, Create PR =
+  review link, Commit & Push = save + publish), Code / Changes tabs.
+  Changes is a multi-file collapsible diff vs the last snapshot, rendered
+  lazily per file. Edits happen in Code.
 - Mobile (`≤860px`): single pane + 4-tab dock (Code / Result / Files / AI),
-  file strip on top, `env(safe-area-inset-bottom)` respected. Composer and
-  review are drawer/overlay only on mobile.
+  file strip on top, `env(safe-area-inset-bottom)` respected. Composer is a
+  full-screen overlay on mobile.
 - Status bar (desktop only): run state · project+saved · file count · active
   file · error count (clickable) · build location (cloud/local).
 

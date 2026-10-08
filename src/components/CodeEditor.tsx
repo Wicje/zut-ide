@@ -76,7 +76,7 @@ export default function CodeEditor({ path, value, readOnly, onChange, reveal, on
       path={path}
       defaultLanguage={languageForPath(path)}
       value={value}
-      theme="vs-dark"
+      theme="vs"
       loading={
         <div style={{ display: 'grid', placeContent: 'center', height: '100%', color: '#7d8590', fontFamily: 'monospace' }}>
           Loading editor…
