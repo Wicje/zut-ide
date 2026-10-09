@@ -637,63 +637,6 @@ export default function App() {
     return [`unknown command: ${verb}. Try run, status, help.`];
   }
 
-  async function handleCommitPush() {
-    await save();
-    setIsVercelDeployOpen(true);
-  }
-
-  async function handleSharePR(title: string, description: string) {
-    setIsPRModalOpen(false);
-    let shareUrl: string | null = null;
-    if (user && brokerEnabled() && projectId) {
-      try {
-        const token = await setProjectShared(projectId, true);
-        if (token) shareUrl = buildShareLink(token);
-      } catch (e) {
-        showToast(`Share failed: ${(e as Error).message}`);
-      }
-    }
-    const snaps = listSnapshots();
-    const commits = snaps.slice(0, 10).map((s) => ({
-      hash: s.id.slice(-6),
-      message: `Snapshot ${new Date(s.createdAt).toLocaleString()}`,
-      time: timeAgo(s.createdAt),
-    }));
-    const checks: PRCheck[] = runs.slice(0, 10).map((r) => ({
-      name: r.label,
-      status: r.exitCode === 0 ? ('passed' as const) : ('failed' as const),
-      time: `${r.durationMs}ms`,
-    }));
-    const comments: PRComment[] = [
-      ...(description.trim() ? [{ author: user?.name ?? 'you', time: 'just now', body: description.trim() }] : []),
-      ...(shareUrl ? [{ author: 'zut', time: 'just now', body: `Review link: ${shareUrl}` }] : []),
-    ];
-    void commits;
-    void checks;
-    void comments;
-    setPrData({ title: title || `${projectName} review`, description, shareUrl });
-    setIsPRStudioOpen(true);
-  }
-
-  const prCommits: PRCommit[] = useMemo(
-    () =>
-      listSnapshots()
-        .slice(0, 10)
-        .map((s) => ({ hash: s.id.slice(-6), message: `Snapshot ${new Date(s.createdAt).toLocaleString()}`, time: timeAgo(s.createdAt) })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isPRStudioOpen, files],
-  );
-
-  const prChecks: PRCheck[] = useMemo(
-    () =>
-      runs.slice(0, 10).map((r) => ({
-        name: r.label,
-        status: r.exitCode === 0 ? ('passed' as const) : ('failed' as const),
-        time: `${r.durationMs}ms`,
-      })),
-    [runs, isPRStudioOpen],
-  );
-
   async function handleMagicLink(email: string): Promise<string> {
     const sb = getSupabase();
     if (!sb) throw new Error('Sign-in is not configured (VITE_SUPABASE_URL).');
@@ -878,24 +821,9 @@ export default function App() {
     showToast(`Rolled back workspace to snapshot: ${checkpointId}`);
   };
 
-  const handleNewAgentSubmit = (newPrompt: string, newModel: string) => {
-    const newId = `session-${Date.now()}`;
-    const newSession = blankSession(newId, newPrompt.slice(0, 32) || 'New agent', newModel);
-    newSession.prompt = newPrompt;
-    setSessions((prev) => ({ ...prev, [newId]: newSession }));
-    setActiveSessionId(newId);
-    setRightPaneMode('diff');
-    showToast(`Started new agent session: "${newSession.title}"`);
-    void runAgentTurn(newId, newPrompt);
-  };
-
   const handleAskComposerAboutLine = (snippet: string) => {
     setRightPaneMode('diff');
     void runAgentTurn(activeSessionId, `Refactor this code: "${snippet.slice(0, 40)}"`);
-  };
-
-  const handleInlinePrompt = (prompt: string, fileId: string) => {
-    void runAgentTurn(activeSessionId, `In ${fileId}: ${prompt}`);
   };
 
   const handleAutoFixTest = (test: TestCase) => {
@@ -1271,7 +1199,11 @@ export default function App() {
               }}
               onOpenLiveUrl={(url) => window.open(url, '_blank', 'noopener')}
               consoleLines={consoleLines}
-              onInspectElement={() => {}}
+              onInspectElement={({ component, file, line }) => {
+                setRightPaneMode('diff');
+                showToast(`Inspecting ${component} (${file}:${line}) in Composer.`);
+                void runAgentTurn(activeSessionId, `Inspect ${component} in ${file}:${line} and explain it.`);
+              }}
               onSwitchToDiff={() => setRightPaneMode('diff')}
               theme={theme}
             />

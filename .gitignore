@@ -6,3 +6,4 @@ cloud/cloud.env
 .DS_Store
 *.log
 supabase/.temp/
+broker-data/
