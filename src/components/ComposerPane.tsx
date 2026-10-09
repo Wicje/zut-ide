@@ -1,344 +1,643 @@
-import { useMemo, useRef, useState } from 'react'
-import AiPanel, { BACKENDS, type AiPanelHandle, type Backend } from './AiPanel'
-import RecordCard from './RecordCard'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { stripEditBlocks } from '../lib/aiEdits'
-import type { ComposersApi } from '../lib/composers'
-import type { ChatMessage } from '../lib/hosting'
-import type { EditorSelection } from '../types'
-import { ChevronDown, FileCode2, Mic, Play, Plus, TerminalSquare, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
-
-interface RunSummary {
-  label: string
-  exitCode: number | null
-  durationMs: number
-}
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  GitBranch,
+  PanelRightClose,
+  Play,
+  Copy,
+  Check,
+  MoreHorizontal,
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  Mic,
+  Sparkles,
+  Loader2,
+  RotateCcw,
+  FileCode,
+  CheckCircle2,
+  AlertTriangle,
+  AtSign,
+  Shield,
+  Layers,
+  Clock,
+  Brain,
+  Pause,
+  X,
+  XCircle,
+} from 'lucide-react';
+import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext } from '../types';
+import screenRecThumb from '../assets/images/screen_recording_thumb_1791421930526.jpg';
 
 interface ComposerPaneProps {
-  composers: ComposersApi
-  signedIn: boolean
-  onSignIn: () => void
-  onClose: () => void
-  selection: EditorSelection | null
-  reviewAdded: number
-  reviewRemoved: number
-  changedFiles: string[]
-  lastRun: RunSummary | null
-  onOpenFile: (path: string) => void
-  onCommitPush: () => void
-  onLog: (level: 'info' | 'error', message: string) => void
+  session: SessionData;
+  onOpenVideoModal: () => void;
+  onCommitPush: () => void;
+  onReviewClick: () => void;
+  onGenerateEdits: (promptText: string) => void;
+  onRollbackCheckpoint?: (checkpointId: string, stepTitle: string) => void;
+  onOpenRules?: () => void;
+  isGenerating?: boolean;
+  theme?: 'light' | 'dark';
+  /** Real model options (defaults to the built-in list). */
+  models?: string[];
+  onModelChange?: (model: string) => void;
+  /** Real attachable files for @ mentions. */
+  attachableFiles?: Array<{ name: string; tokens: number }>;
 }
 
-interface SpeechRecognizer {
-  continuous: boolean
-  interimResults: boolean
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onend: (() => void) | null
-  onerror: (() => void) | null
-  start: () => void
-  stop: () => void
-}
-
-function recognizerCtor(): (new () => SpeechRecognizer) | null {
-  if (typeof window === 'undefined') return null
-  const w = window as unknown as {
-    SpeechRecognition?: new () => SpeechRecognizer
-    webkitSpeechRecognition?: new () => SpeechRecognizer
-  }
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
-}
-
-function firstUserMessage(messages: ChatMessage[]): ChatMessage | null {
-  return messages.find((m) => m.role === 'user') ?? null
-}
-
-function lastAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'assistant') return messages[i]
-  }
-  return null
-}
-
-// Center column: agent activity feed (request, files, recording, summary)
-// above the chat, with the follow-up bar at the bottom. Everything shown
-// here is derived from real session data — no placeholders.
-export default function ComposerPane({
-  composers,
-  signedIn,
-  onSignIn,
-  onClose,
-  selection,
-  reviewAdded,
-  reviewRemoved,
-  changedFiles,
-  lastRun,
-  onOpenFile,
+export const ComposerPane: React.FC<ComposerPaneProps> = ({
+  session,
+  onOpenVideoModal,
   onCommitPush,
-  onLog,
-}: ComposerPaneProps) {
-  const { sessions, activeId, select, create, remove, retitle, setBackend, syncMessages, messagesFor } = composers
-  const active = sessions.find((s) => s.id === activeId) ?? sessions[0]
-  const messages = messagesFor(active.id)
-  const panelRef = useRef<AiPanelHandle | null>(null)
-  const [input, setInput] = useState('')
-  const [modelOpen, setModelOpen] = useState(false)
-  const [listening, setListening] = useState(false)
-  const recogRef = useRef<SpeechRecognizer | null>(null)
-  const micSupported = recognizerCtor() !== null
+  onReviewClick,
+  onGenerateEdits,
+  onRollbackCheckpoint,
+  onOpenRules,
+  isGenerating = false,
+  theme = 'light',
+  models,
+  onModelChange,
+  attachableFiles,
+}) => {
+  const isDark = theme === 'dark';
+  const modelOptions = models ?? ['Composer 2.5 Fast', 'Claude 3.7 Sonnet', 'GPT-4.5 Preview', 'Claude 3.5 Haiku'];
+  const [copied, setCopied] = useState(false);
+  const [followUpText, setFollowUpText] = useState('');
+  const [selectedModel, setSelectedModel] = useState(session.model || modelOptions[0]);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
 
-  const request = useMemo(() => firstUserMessage(messages), [messages])
-  const summary = useMemo(() => {
-    const m = lastAssistantMessage(messages)
-    if (!m) return null
-    const text = stripEditBlocks(m.content).trim() || m.content.trim()
-    return text || null
-  }, [messages])
-
-  const backendLabel = useMemo(
-    () => BACKENDS.find((b) => b.id === (active.backend as Backend | undefined))?.label ?? 'Cloud agent',
-    [active.backend],
-  )
-
-  function sendFollowUp() {
-    if (!input.trim()) return
-    panelRef.current?.send(input)
-    setInput('')
+  interface VoiceRecognizer {
+    interimResults: boolean;
+    onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+    onend: (() => void) | null;
+    onerror: (() => void) | null;
+    start: () => void;
+    stop: () => void;
   }
 
-  function toggleMic() {
-    const Ctor = recognizerCtor()
-    if (!Ctor) return
-    if (listening) {
-      recogRef.current?.stop()
-      setListening(false)
-      return
+  const voiceRecRef = useRef<VoiceRecognizer | null>(null);
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+
+  // Agentic Loop State
+  const [isExecutionGraphOpen, setIsExecutionGraphOpen] = useState(false);
+
+  // Attached Context Chips (start empty; files attach from the @ menu)
+  const [attachedContexts, setAttachedContexts] = useState<AttachedContext[]>([]);
+  const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (session.model) {
+      setSelectedModel(session.model);
+    } else if (modelOptions[0] && !modelOptions.includes(selectedModel)) {
+      setSelectedModel(modelOptions[0]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id, session.model]);
+
+  function pickModel(model: string) {
+    setSelectedModel(model);
+    setIsModelDropdownOpen(false);
+    onModelChange?.(model);
+  }
+
+  const handleCopySummary = () => {
+    navigator.clipboard?.writeText(session.summary);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendFollowUp = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!followUpText.trim() || isGenerating) return;
+
+    const userText = followUpText.trim();
+    setFollowUpText('');
+    onGenerateEdits(userText);
+  };
+
+  const speechCtor: (new () => VoiceRecognizer) | null =
+    typeof window !== 'undefined'
+      ? (window as unknown as { SpeechRecognition?: new () => VoiceRecognizer; webkitSpeechRecognition?: new () => VoiceRecognizer }).SpeechRecognition ??
+        (window as unknown as { webkitSpeechRecognition?: new () => VoiceRecognizer }).webkitSpeechRecognition ??
+        null
+      : null;
+
+  const toggleVoice = () => {
+    if (isVoiceRecording) {
+      voiceRecRef.current?.stop();
+      setIsVoiceRecording(false);
+      return;
+    }
+    if (!speechCtor) return;
     try {
-      const r = new Ctor()
-      recogRef.current = r
-      r.continuous = false
-      r.interimResults = false
-      r.onresult = (e) => {
-        const t = e.results[0]?.[0]?.transcript ?? ''
-        if (t) setInput((v) => (v ? `${v} ${t}` : t))
-      }
-      r.onend = () => setListening(false)
-      r.onerror = () => setListening(false)
-      r.start()
-      setListening(true)
+      const rec = new speechCtor();
+      voiceRecRef.current = rec;
+      rec.interimResults = false;
+      rec.onresult = (e) => {
+        const t = e.results[0]?.[0]?.transcript ?? '';
+        if (t) setFollowUpText((v) => (v ? `${v} ${t}` : t));
+      };
+      rec.onend = () => setIsVoiceRecording(false);
+      rec.onerror = () => setIsVoiceRecording(false);
+      rec.start();
+      setIsVoiceRecording(true);
     } catch {
-      setListening(false)
+      setIsVoiceRecording(false);
     }
-  }
+  };
+
+  const toggleStepExpand = (stepId: string) => {
+    setExpandedStepId((prev) => (prev === stepId ? null : stepId));
+  };
+
+  const addMentionContext = (name: string, type: 'file' | 'git' | 'doc', tokens?: number) => {
+    setAttachedContexts((prev) => {
+      if (prev.some((c) => c.name === name)) {
+        setIsMentionMenuOpen(false);
+        return prev;
+      }
+      return [...prev, { id: `c-${Date.now()}`, name, type, tokens: tokens ?? 0 }];
+    });
+    setIsMentionMenuOpen(false);
+  };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-card text-card-foreground">
-      {/* Session header */}
-      <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-border/70 px-3">
-        <div className="relative min-w-0 flex-1">
-          <select
-            value={active.id}
-            onChange={(e) => select(e.target.value)}
-            className="w-full appearance-none truncate rounded-md bg-transparent py-1 pl-0 pr-6 text-sm font-semibold outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            aria-label="Active agent"
-            title="Switch agent"
-          >
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-1 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+    <div className="h-full flex flex-col justify-between select-none text-[13px] transition-colors">
+      {/* Top Header */}
+      <div
+        className={`h-10 px-4 border-b flex items-center justify-between ${
+          isDark ? 'border-neutral-800 bg-[#161618]' : 'border-[#e5e5e7] bg-white'
+        }`}
+      >
+        <div className="flex items-center gap-1.5 font-medium text-[13px]">
+          <span className={isDark ? 'text-white' : 'text-neutral-800'}>
+            {session.title}
+          </span>
+          <GitBranch size={13} className="text-neutral-400 rotate-90" />
         </div>
-        <button
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title="New agent"
-          aria-label="New agent"
-          onClick={create}
-        >
-          <Plus className="size-4" />
-        </button>
-        {sessions.length > 1 && (
+
+        <div className="flex items-center gap-1.5">
+          {onOpenRules && (
+            <button
+              onClick={onOpenRules}
+              className="text-neutral-400 hover:text-purple-500 transition-colors p-1 rounded text-[11px] flex items-center gap-1 cursor-pointer"
+              title="Project .cursorrules"
+            >
+              <FileCode size={13} />
+              <span className="hidden sm:inline font-mono">.rules</span>
+            </button>
+          )}
+
           <button
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title={`Delete ${active.title}`}
-            aria-label={`Delete ${active.title}`}
-            onClick={() => remove(active.id)}
+            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-1 rounded cursor-pointer"
+            title="Collapse pane"
           >
-            <X className="size-4" />
+            <PanelRightClose size={14} />
           </button>
+        </div>
+      </div>
+
+      {/* Main Conversation Stream */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3.5">
+        {/* User Prompt Box */}
+        <div
+          className={`border rounded-xl p-3 text-[13px] leading-[1.45] shadow-2xs font-normal ${
+            isDark
+              ? 'bg-[#222227] border-neutral-700 text-neutral-100'
+              : 'bg-[#f8f8fa] border-[#e5e5e8] text-neutral-800'
+          }`}
+        >
+          {session.prompt || <span className="text-neutral-400">New agent — send a prompt below to begin.</span>}
+        </div>
+
+        {/* Live working indicator (only while the agent runs) */}
+        {isGenerating && (
+          <div
+            className={`rounded-xl border px-3 py-2 flex items-center gap-2 text-xs ${
+              isDark ? 'bg-[#1c1c22] border-neutral-700/80' : 'bg-neutral-50/80 border-neutral-200'
+            }`}
+          >
+            <Loader2 size={13} className="text-blue-500 animate-spin shrink-0" />
+            <span className="text-neutral-600 dark:text-neutral-300">Agent working… steps appear below as they complete.</span>
+          </div>
         )}
-        <button
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title="Close composer"
-          aria-label="Close composer"
-          onClick={onClose}
+
+        {/* Autonomous Multi-Phase Execution Graph */}
+        <div
+          className={`rounded-xl border overflow-hidden transition-all ${
+            isDark ? 'bg-[#202025] border-neutral-700' : 'bg-[#fafafc] border-neutral-200'
+          }`}
         >
-          <X className="size-4" />
-        </button>
-      </div>
-
-      {/* Activity feed */}
-      <ScrollArea className="min-h-0 shrink-0" style={{ maxHeight: '46%' }}>
-        <div className="flex flex-col gap-2.5 px-3 py-3">
-          {request ? (
-            <div className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5">
-              <div className="pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Request</div>
-              <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{request.content}</p>
+          <div
+            onClick={() => setIsExecutionGraphOpen(!isExecutionGraphOpen)}
+            className="px-3 py-2 flex items-center justify-between cursor-pointer border-b border-neutral-200/50 dark:border-neutral-700"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-semibold text-xs tracking-tight">Activity</span>
+              <span className="text-[10px] text-neutral-400 font-mono">({session.steps.length} steps)</span>
             </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-[13px] text-muted-foreground">
-              Describe what to build — the agent reads your project and edits files directly.
-            </div>
-          )}
 
-          {(changedFiles.length > 0 || lastRun) && (
-            <div className="flex flex-wrap gap-1.5">
-              {changedFiles.slice(0, 6).map((f) => (
-                <button
-                  key={f}
-                  className="flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-mono text-[11px] text-foreground/80 transition-colors hover:border-violet-400/50 hover:text-foreground"
-                  onClick={() => onOpenFile(f)}
-                  title={`Open ${f}`}
-                >
-                  <FileCode2 className="size-3 shrink-0 text-violet-500" />
-                  <span className="truncate">{f}</span>
-                </button>
+            <div className="flex items-center gap-2 text-neutral-400">
+              {isExecutionGraphOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </div>
+          </div>
+
+          {isExecutionGraphOpen && (
+            <div className="p-3 space-y-2 text-xs">
+              {session.steps.length === 0 && (
+                <p className="text-[11px] text-neutral-400">No activity yet — send a prompt below.</p>
+              )}
+              {session.steps.map((step) => (
+                <div key={step.id} className="flex items-start gap-2.5">
+                  <div className="mt-0.5 shrink-0">
+                    {step.status === 'completed' ? (
+                      <CheckCircle2 size={13} className="text-emerald-500" />
+                    ) : step.status === 'running' ? (
+                      <Loader2 size={13} className="text-blue-500 animate-spin" />
+                    ) : step.status === 'failed' ? (
+                      <XCircle size={13} className="text-red-500" />
+                    ) : (
+                      <Clock size={13} className="text-neutral-400" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between text-[11.5px]">
+                      <span className={`font-medium capitalize ${step.status === 'completed' ? 'text-neutral-700 dark:text-neutral-300' : 'text-blue-500 font-semibold'}`}>
+                        {step.type}: {step.query.length > 48 ? `${step.query.slice(0, 48)}…` : step.query}
+                      </span>
+                      {step.durationMs != null && (
+                        <span className="text-[10px] font-mono text-neutral-400">{step.durationMs}ms</span>
+                      )}
+                    </div>
+                    {step.details && <div className="text-[11px] text-neutral-400 truncate">{step.details}</div>}
+                  </div>
+                </div>
               ))}
-              {changedFiles.length > 6 && (
-                <span className="rounded-full border border-border/70 px-2.5 py-1 font-mono text-[11px] text-muted-foreground">
-                  +{changedFiles.length - 6} more
-                </span>
-              )}
-              {lastRun && (
-                <span className="flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-mono text-[11px] text-foreground/80" title="Last run">
-                  <TerminalSquare className="size-3 shrink-0 text-emerald-600" />
-                  {lastRun.label} · exit {lastRun.exitCode ?? '?'} · {lastRun.durationMs}ms
-                </span>
-              )}
-            </div>
-          )}
 
-          <RecordCard onLog={onLog} />
-
-          {summary && (
-            <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm">
-              <div className="pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Summary</div>
-              <p className="line-clamp-4 whitespace-pre-wrap text-[13px] leading-relaxed" title={summary}>
-                {summary}
-              </p>
-              <p className="pt-1.5 font-mono text-[11px] text-muted-foreground">
-                {changedFiles.length} file{changedFiles.length === 1 ? '' : 's'} changed
-                {lastRun ? ` · last run ${lastRun.durationMs}ms` : ''}
-              </p>
+              <div className="flex items-center justify-end pt-2 border-t border-neutral-200/60 dark:border-neutral-700 text-[11px]">
+                <button
+                  onClick={() => onGenerateEdits('Review your last changes for issues and fix what you find')}
+                  className="px-2 py-0.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-500 cursor-pointer"
+                >
+                  Verify
+                </button>
+              </div>
             </div>
           )}
         </div>
-      </ScrollArea>
 
-      {/* Chat (backend tabs live here) */}
-      <div className="min-h-0 flex-1 border-t border-border/70">
-        <AiPanel
-          ref={panelRef}
-          key={active.id}
-          inline
-          hideHeader
-          hideInput
-          sessionKey={active.id}
-          initialMessages={messages}
-          initialBackend={active.backend as Backend | undefined}
-          onMessagesChange={(_id, msgs) => syncMessages(active.id, msgs)}
-          onSessionTitle={(t) => retitle(active.id, t)}
-          onBackendChange={(b) => setBackend(active.id, b)}
-          signedIn={signedIn}
-          onSignIn={onSignIn}
-          onClose={onClose}
-          selection={selection}
-        />
+        {/* Action Steps */}
+        {session.steps.length === 0 && !isGenerating && (
+          <p className="text-[12px] text-neutral-400 px-1">No activity yet — send a prompt below to start the agent.</p>
+        )}
+        <div className="space-y-1.5 text-[12.5px]">
+          {session.steps.map((step) => {
+            const isExpanded = expandedStepId === step.id;
+
+            return (
+              <div
+                key={step.id}
+                className={`rounded-lg transition-colors border ${
+                  isExpanded
+                    ? isDark
+                      ? 'bg-[#202025] border-neutral-700 p-2.5'
+                      : 'bg-neutral-50/80 border-neutral-300 p-2.5 shadow-2xs'
+                    : 'border-transparent hover:bg-neutral-500/5 px-1 py-0.5'
+                }`}
+              >
+                <div
+                  onClick={() => toggleStepExpand(step.id)}
+                  className="flex items-center justify-between cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5 font-medium min-w-0">
+                    <span className="text-neutral-400">
+                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                    </span>
+                    <span className={`font-semibold capitalize ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                      {step.type}
+                    </span>
+                    <span className="text-neutral-500 font-normal truncate">
+                      {step.query}
+                    </span>
+                  </div>
+
+                  {step.durationMs && (
+                    <span className="text-[10.5px] font-mono text-neutral-400 shrink-0 ml-1">
+                      {step.durationMs}ms
+                    </span>
+                  )}
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-2.5 pt-2 border-t border-neutral-200/60 dark:border-neutral-700 space-y-2 text-xs">
+                    {step.details && (
+                      <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400">
+                        {step.details}
+                      </p>
+                    )}
+
+                    {step.matches && step.matches.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 block">
+                          Matched Locations ({step.matches.length})
+                        </span>
+                        {step.matches.map((m, mi) => (
+                          <div
+                            key={mi}
+                            className={`p-1.5 rounded font-code text-[11px] leading-tight ${
+                              isDark ? 'bg-[#18181c] text-neutral-300' : 'bg-white border border-neutral-200 text-neutral-700'
+                            }`}
+                          >
+                            <div className="text-[10px] text-blue-500 truncate mb-0.5">
+                              {m.file}:{m.line}
+                            </div>
+                            <div className="truncate text-neutral-500">{m.preview}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {onRollbackCheckpoint && step.checkpointId && (
+                      <div className="pt-1 flex items-center justify-between">
+                        <span className="text-[10.5px] text-neutral-400 flex items-center gap-1">
+                          <CheckCircle2 size={11} className="text-emerald-500" />
+                          <span>Snapshot: {step.checkpointId}</span>
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRollbackCheckpoint(step.checkpointId!, `${step.type}: ${step.query}`);
+                          }}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                            isDark
+                              ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'
+                              : 'bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-700'
+                          }`}
+                        >
+                          <RotateCcw size={10} />
+                          <span>Roll back to step</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Feature 3: Real-Time Animated Left Gutter Glow in Agent Response */}
+        <div className={`p-3 rounded-xl border-l-3 border-emerald-500 space-y-2 transition-all ${
+          isDark ? 'bg-[#1e1e24] shadow-[0_0_15px_rgba(16,185,129,0.08)]' : 'bg-emerald-500/5 border-emerald-500 shadow-2xs'
+        }`}>
+          <p className={isDark ? 'text-neutral-200' : 'text-neutral-800'}>
+            {session.response}
+          </p>
+          {session.processedItem && (
+            <div className="flex items-center gap-1.5 text-[12.5px]">
+              <span className={`font-semibold ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                Processed
+              </span>
+              <span className="text-neutral-500 font-normal">{session.processedItem}</span>
+            </div>
+          )}
+        </div>
+
+        {session.videoPreview && (
+          <div
+            onClick={onOpenVideoModal}
+            className={`relative group rounded-xl overflow-hidden border aspect-[16/10] cursor-pointer shadow-2xs transition-all ${
+              isDark
+                ? 'border-neutral-700 bg-neutral-900 hover:border-neutral-500'
+                : 'border-[#dcdce0] bg-[#f2f2f5] hover:border-neutral-400'
+            }`}
+          >
+            <img
+              src={screenRecThumb}
+              alt="Processed screen recording"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+            />
+            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/15 transition-colors" />
+
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-neutral-900/75 backdrop-blur-xs text-white flex items-center justify-center shadow-md transition-all group-hover:scale-110 pl-0.5">
+                <Play size={18} fill="currentColor" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Card */}
+        {session.summary && (
+        <div className="pt-1">
+          <h4 className={`font-semibold text-[13px] mb-1 ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+            Summary
+          </h4>
+          <p className={`text-[13px] leading-[1.45] ${isDark ? 'text-neutral-300' : 'text-neutral-800'}`}>
+            {session.summary}
+          </p>
+
+          <div className="flex items-center justify-end gap-2.5 mt-2.5 text-neutral-400">
+            <button
+              onClick={handleCopySummary}
+              className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5 cursor-pointer"
+              title={copied ? 'Copied!' : 'Copy summary'}
+            >
+              {copied ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
+            </button>
+            <button className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5 cursor-pointer">
+              <MoreHorizontal size={13} />
+            </button>
+          </div>
+        </div>
+        )}
       </div>
 
-      {/* Follow-up bar */}
-      <div className="shrink-0 border-t border-border/70 px-3 pb-3 pt-2.5">
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            sendFollowUp()
-          }}
-        >
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a follow-up…"
-            className="h-9 rounded-full bg-muted/60"
-            aria-label="Ask a follow-up"
-          />
-          <Button type="submit" size="icon" className="h-9 w-9 shrink-0 rounded-full" disabled={!input.trim()}>
-            <Play className="size-4 fill-current" />
-          </Button>
-        </form>
-        <div className="flex items-center gap-1.5 pt-2">
-          <span className="rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-mono text-[11px]" title="Uncommitted changes vs last snapshot">
-            <span className="text-emerald-600">+{reviewAdded}</span>{' '}
-            <span className="text-red-600">-{reviewRemoved}</span>
-          </span>
-          <Button size="sm" className="h-7 rounded-full text-xs" onClick={onCommitPush}>
-            Commit &amp; Push
-          </Button>
-          <span className="ml-auto flex items-center gap-1.5">
-            <span className="relative">
-              <button
-                className="flex items-center gap-1 rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => setModelOpen((o) => !o)}
-                title="Agent backend"
-                aria-label="Agent backend"
-                aria-expanded={modelOpen}
-              >
-                {backendLabel} <ChevronDown className="size-3" />
-              </button>
-              {modelOpen && (
-                <>
-                  <span className="fixed inset-0 z-10" onClick={() => setModelOpen(false)} aria-hidden />
-                  <span className="absolute bottom-8 right-0 z-20 w-44 overflow-hidden rounded-lg border border-border bg-popover shadow-md">
-                    {BACKENDS.map((b) => (
-                      <button
-                        key={b.id}
-                        className={cn(
-                          'flex w-full cursor-pointer items-center px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-muted',
-                          backendLabel === b.label ? 'font-semibold text-foreground' : 'text-muted-foreground',
-                        )}
-                        onClick={() => {
-                          panelRef.current?.setBackend(b.id)
-                          setModelOpen(false)
-                        }}
-                      >
-                        {b.label}
-                      </button>
-                    ))}
-                  </span>
-                </>
-              )}
-            </span>
-            {micSupported && (
-              <button
-                className={cn(
-                  'grid size-7 shrink-0 place-content-center rounded-full border transition-colors',
-                  listening ? 'border-red-500 bg-red-500/10 text-red-600' : 'border-border/70 text-muted-foreground hover:text-foreground',
-                )}
-                onClick={toggleMic}
-                title={listening ? 'Stop listening' : 'Voice input'}
-                aria-label={listening ? 'Stop listening' : 'Voice input'}
-              >
-                <Mic className="size-3.5" />
-              </button>
-            )}
-          </span>
+      {/* Bottom Controls, Context Chips & Follow-up Input */}
+      <div
+        className={`p-3 border-t space-y-2.5 ${
+          isDark ? 'border-neutral-800 bg-[#18181b]' : 'border-[#e5e5e7] bg-white'
+        }`}
+      >
+        {/* Review Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onReviewClick}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium rounded-full border transition-colors cursor-pointer ${
+              isDark
+                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200 border-neutral-700'
+                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800 border-[#e2e2e6]'
+            }`}
+          >
+            <span>Review</span>
+            <span className="text-[#16a34a] font-medium">+{session.diffStats.additions}</span>
+            <span className="text-[#dc2626] font-medium">-{session.diffStats.deletions}</span>
+          </button>
+
+          <button
+            onClick={onCommitPush}
+            className={`flex items-center gap-1 px-3 py-1 text-[12px] font-medium rounded-full border transition-colors cursor-pointer ${
+              isDark
+                ? 'bg-[#1e1e24] hover:bg-neutral-800 text-neutral-300 border-neutral-700'
+                : 'bg-white hover:bg-neutral-50 text-neutral-700 border-[#d8d8dc]'
+            }`}
+          >
+            <span>Commit & Push</span>
+            <ChevronDown size={12} className="text-neutral-500" />
+          </button>
         </div>
+
+        {/* Attached Context Chips Bar */}
+        {attachedContexts.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {attachedContexts.map((ctx) => (
+              <div
+                key={ctx.id}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-mono border ${
+                  isDark
+                    ? 'bg-neutral-800 border-neutral-700 text-neutral-300'
+                    : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                }`}
+              >
+                <span>@{ctx.name}</span>
+                <span className="text-neutral-400">({ctx.tokens}t)</span>
+                <button
+                  onClick={() => setAttachedContexts(attachedContexts.filter((c) => c.id !== ctx.id))}
+                  className="hover:text-red-500 ml-0.5"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Input Bar with Context Mention Button */}
+        <form
+          onSubmit={handleSendFollowUp}
+          className={`relative flex items-center justify-between pl-2 pr-1.5 py-1.5 rounded-full border shadow-2xs transition-all ${
+            isDark
+              ? 'bg-[#222227] border-neutral-700 focus-within:border-blue-500'
+              : 'bg-white border-[#dcdcde] focus-within:border-neutral-400 focus-within:ring-2 focus-within:ring-neutral-200/50'
+          }`}
+        >
+          {/* @ Mention Popover Trigger */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsMentionMenuOpen(!isMentionMenuOpen)}
+              className="w-5 h-5 rounded-full flex items-center justify-center text-neutral-400 hover:text-purple-500 transition-colors cursor-pointer"
+              title="Attach context (@)"
+            >
+              <AtSign size={13} />
+            </button>
+
+            {isMentionMenuOpen && (
+              <div
+                className={`absolute left-0 bottom-full mb-2 w-48 border rounded-xl shadow-xl py-1 z-30 text-[11.5px] ${
+                  isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                }`}
+              >
+                <div className="px-2.5 py-1 text-[10px] font-semibold text-neutral-400 uppercase">
+                  Attach Context
+                </div>
+                {(attachableFiles ?? []).length === 0 && (
+                  <div className="px-2.5 py-1 text-neutral-400">No files in this project yet.</div>
+                )}
+                {(attachableFiles ?? []).map((f) => (
+                  <button
+                    key={f.name}
+                    type="button"
+                    onClick={() => addMentionContext(f.name, 'file', f.tokens)}
+                    className="w-full text-left px-2.5 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-between"
+                  >
+                    <span>@{f.name}</span>
+                    <span className="text-neutral-400 text-[10px]">file</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Follow up text input */}
+          <input
+            type="text"
+            value={followUpText}
+            onChange={(e) => setFollowUpText(e.target.value)}
+            disabled={isGenerating}
+            placeholder={isGenerating ? 'Synthesizing code...' : 'Send follow-up or type @'}
+            className={`flex-1 px-2 text-[12.5px] bg-transparent focus:outline-none placeholder-neutral-400 ${
+              isDark ? 'text-white' : 'text-neutral-800'
+            }`}
+          />
+
+          {/* Model selector dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+              className={`flex items-center gap-1 text-[11.5px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                isDark ? 'text-neutral-300 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              <span>{selectedModel}</span>
+              <ChevronDown size={11} className="text-neutral-400" />
+            </button>
+
+            {isModelDropdownOpen && (
+              <div
+                className={`absolute right-0 bottom-full mb-2 w-48 border rounded-lg shadow-xl py-1 z-30 text-[12px] ${
+                  isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                }`}
+              >
+                {modelOptions.map(
+                  (model) => (
+                    <button
+                      key={model}
+                      type="button"
+                      onClick={() => pickModel(model)}
+                      className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
+                        isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                      } ${selectedModel === model ? 'font-medium text-blue-500' : ''}`}
+                    >
+                      <span>{model}</span>
+                      {selectedModel === model && <Check size={12} />}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Mic / send action button (mic hidden where speech input is unsupported) */}
+          {(followUpText || speechCtor) && (
+          <button
+            type="button"
+            onClick={followUpText ? handleSendFollowUp : toggleVoice}
+            disabled={isGenerating}
+            className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer shadow-xs ${
+              isVoiceRecording
+                ? 'bg-red-500 text-white animate-pulse'
+                : isDark
+                ? 'bg-white text-neutral-900 hover:bg-neutral-200'
+                : 'bg-neutral-900 text-white hover:bg-black'
+            }`}
+            title={followUpText ? 'Send message' : 'Voice dictation'}
+          >
+            {isGenerating ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : followUpText ? (
+              <Sparkles size={11} />
+            ) : (
+              <Mic size={12} />
+            )}
+          </button>
+          )}
+        </form>
       </div>
     </div>
-  )
-}
+  );
+};

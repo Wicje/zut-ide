@@ -1,275 +1,301 @@
-import { useMemo, useState } from 'react'
-import { useWorkspace } from '../store/workspace'
-import type { ComposerSession } from '../lib/composers'
+import React, { useState } from 'react';
 import {
-  emptyProject,
-  reactStarter,
-  vueStarter,
-  pythonStarter,
-  goStarter,
-} from '../lib/templates'
-import type { FileMap } from '../types'
-import FileExplorer from './FileExplorer'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Plus,
-  Zap,
+  Sparkles,
+  Layers,
   SlidersHorizontal,
-  History,
   Search,
-  X,
+  PanelLeftClose,
+  MoreHorizontal,
+  FileText,
+  LayoutTemplate,
+  Bell,
   Settings,
-  LogOut,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-
-export interface SidebarActions {
-  onRun: () => void
-  onFormat: () => void
-  onSave: () => void
-  onDownload: () => void
-  onNewProject: (files: FileMap, name: string) => void
-  onImport: () => void
-  onOpenProjects: () => void
-  onOpenHistory: () => void
-  onToggleComposer: () => void
-  onLogin: () => void
-  onLogout: () => void
-}
+  Sliders,
+  GitBranch,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react';
+import { SidebarSection, SidebarItem } from '../types';
+import avatarImg from '../assets/images/sualeh_avatar_1791421944193.jpg';
 
 interface SidebarProps {
-  sessions: ComposerSession[]
-  activeSessionId: string
-  onSelectSession: (id: string) => void
-  onNewSession: () => void
-  onRemoveSession: (id: string) => void
-  user: { email?: string | null } | null | undefined
-  todayCount: number
-  dailyCap: number
-  actions: SidebarActions
+  sections: SidebarSection[];
+  onReorderItem?: (sectionTitle: string, itemId: string, direction: 'up' | 'down') => void;
+  activeItem: string;
+  onSelectItem: (id: string) => void;
+  onNewAgent?: () => void;
+  onOpenCommandPalette?: () => void;
+  onOpenAccount?: () => void;
+  theme?: 'light' | 'dark';
 }
 
-function initials(email?: string | null): string {
-  if (!email) return '··'
-  const head = email.split('@')[0].replace(/[^a-zA-Z]/g, '')
-  return (head.slice(0, 2) || '··').toUpperCase()
-}
-
-function timeAgo(ts: number): string {
-  const s = Math.max(0, Math.round((Date.now() - ts) / 1000))
-  if (s < 60) return 'now'
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h`
-  return `${Math.floor(h / 24)}d`
-}
-
-export default function Sidebar({
-  sessions,
-  activeSessionId,
-  onSelectSession,
-  onNewSession,
-  onRemoveSession,
-  user,
-  todayCount,
-  dailyCap,
-  actions,
-}: SidebarProps) {
-  const { state } = useWorkspace()
-  const [query, setQuery] = useState('')
-
-  const q = query.trim().toLowerCase()
-  const filteredSessions = useMemo(
-    () => (q ? sessions.filter((s) => s.title.toLowerCase().includes(q)) : sessions),
-    [sessions, q],
-  )
-  const fileFilter = q || undefined
+export const Sidebar: React.FC<SidebarProps> = ({
+  sections,
+  onReorderItem,
+  activeItem,
+  onSelectItem,
+  onNewAgent,
+  onOpenCommandPalette,
+  onOpenAccount,
+  theme = 'light',
+}) => {
+  const isDark = theme === 'dark';
+  const [searchFilter, setSearchFilter] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
-      {/* Traffic lights + search */}
-      <div className="flex shrink-0 items-center gap-2 px-3 pt-3">
-        <span className="flex items-center gap-1.5" aria-hidden>
-          <span className="size-3 rounded-full bg-[#ff5f57] ring-1 ring-black/10" />
-          <span className="size-3 rounded-full bg-[#febc2e] ring-1 ring-black/10" />
-          <span className="size-3 rounded-full bg-[#28c840] ring-1 ring-black/10" />
-        </span>
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search agents & files…"
-            className="h-7 bg-muted/60 pl-7 pr-6 text-xs"
-            aria-label="Search agents and files"
-          />
-          {query && (
+    <div
+      className={`w-[210px] shrink-0 border-r flex flex-col justify-between select-none text-[13px] transition-colors ${
+        isDark
+          ? 'bg-[#141416] text-neutral-300 border-neutral-800'
+          : 'bg-[#f4f4f6] text-[#2b2b2f] border-[#e5e5e7]'
+      }`}
+    >
+      {/* Top area */}
+      <div className="flex flex-col">
+        {/* Window controls bar */}
+        <div className="h-10 px-3.5 flex items-center justify-between">
+          {/* Traffic lights */}
+          <div className="flex items-center gap-1.5 group">
+            <div className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] cursor-pointer flex items-center justify-center text-[8px] text-black/50 group-hover:opacity-100 opacity-90 transition-opacity">
+              <span className="opacity-0 group-hover:opacity-100">✕</span>
+            </div>
+            <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] cursor-pointer flex items-center justify-center text-[8px] text-black/50 group-hover:opacity-100 opacity-90 transition-opacity">
+              <span className="opacity-0 group-hover:opacity-100">−</span>
+            </div>
+            <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] cursor-pointer flex items-center justify-center text-[8px] text-black/50 group-hover:opacity-100 opacity-90 transition-opacity">
+              <span className="opacity-0 group-hover:opacity-100">+</span>
+            </div>
+          </div>
+
+          {/* Quick search & toggle */}
+          <div className="flex items-center gap-2 text-neutral-400">
             <button
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
-              onClick={() => setQuery('')}
-              aria-label="Clear search"
+              onClick={() => setIsSearchActive(!isSearchActive)}
+              className="hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 rounded transition-colors cursor-pointer"
+              title="Search sessions"
             >
-              <X className="size-3.5" />
+              <Search size={14} strokeWidth={2} />
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex shrink-0 flex-col gap-1 px-3 pt-2.5">
-        <Button size="sm" className="w-full justify-start gap-1.5" onClick={onNewSession} title="Start a new agent conversation">
-          <Plus className="size-4" /> New Agent
-          <kbd className="ml-auto hidden rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground lg:inline">⌘N</kbd>
-        </Button>
-        <div className="flex gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="flex-1 justify-start gap-1.5 text-muted-foreground" title="Run, format, starters">
-                <Zap className="size-3.5" /> Automations
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Run this project</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={actions.onRun}>▶ Run (Ctrl+Enter)</DropdownMenuItem>
-              <DropdownMenuItem onSelect={actions.onFormat}>Format active file</DropdownMenuItem>
-              <DropdownMenuItem onSelect={actions.onSave}>Save</DropdownMenuItem>
-              <DropdownMenuItem onSelect={actions.onDownload}>Download ZIP</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Start from…</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => actions.onNewProject(emptyProject(), 'my-project')}>Blank canvas</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => actions.onNewProject(reactStarter(), 'react-app')}>React app</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => actions.onNewProject(vueStarter(), 'vue-app')}>Vue app</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => actions.onNewProject(pythonStarter(), 'python-app')}>Python</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => actions.onNewProject(goStarter(), 'go-app')}>Go</DropdownMenuItem>
-              <DropdownMenuItem onSelect={actions.onImport}>Import from URL…</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="flex-1 justify-start gap-1.5 text-muted-foreground" title="Views and account">
-                <SlidersHorizontal className="size-3.5" /> Customize
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-52">
-              <DropdownMenuItem onSelect={actions.onToggleComposer}>Toggle composer (Ctrl+K)</DropdownMenuItem>
-              <DropdownMenuItem onSelect={actions.onOpenProjects}>Projects…</DropdownMenuItem>
-              <DropdownMenuItem onSelect={actions.onOpenHistory}>History…</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {user ? (
-                <DropdownMenuItem onSelect={actions.onLogout}>Sign out{user.email ? ` (${user.email})` : ''}</DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onSelect={actions.onLogin}>Sign in…</DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Groups */}
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="px-1.5 py-2">
-          <div className="px-1.5 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Agents
+            <button
+              onClick={onOpenCommandPalette}
+              className="hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 rounded transition-colors cursor-pointer"
+              title="Command palette (⌘K)"
+            >
+              <PanelLeftClose size={14} strokeWidth={2} />
+            </button>
           </div>
-          <ul className="flex flex-col gap-px">
-            {filteredSessions.map((s) => {
-              const active = s.id === activeSessionId
-              return (
-                <li key={s.id} className="group relative">
-                  <button
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors',
-                      active ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground/80 hover:bg-accent/60',
-                    )}
-                    onClick={() => onSelectSession(s.id)}
-                    title={`${s.title} · ${timeAgo(s.updatedAt)} ago`}
-                    aria-current={active ? 'true' : undefined}
-                  >
-                    <span
-                      className={cn('size-1.5 shrink-0 rounded-full', active ? 'bg-emerald-500' : 'bg-muted-foreground/40')}
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1 truncate">{s.title}</span>
-                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{timeAgo(s.updatedAt)}</span>
-                  </button>
-                  {sessions.length > 1 && (
-                    <button
-                      className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground group-hover:block"
-                      onClick={(e) => { e.stopPropagation(); onRemoveSession(s.id) }}
-                      title={`Delete ${s.title}`}
-                      aria-label={`Delete ${s.title}`}
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-            {filteredSessions.length === 0 && (
-              <li className="px-2 py-2 text-xs text-muted-foreground">No agents match.</li>
-            )}
-          </ul>
-
-          <button
-            className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-            onClick={actions.onOpenHistory}
-            title="Snapshots and checkpoints"
-          >
-            <History className="size-3.5" /> History
-          </button>
-
-          <div className="px-1.5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Project
-          </div>
-          <FileExplorer readOnly={state.isSharedView || state.readOnly} filter={fileFilter} />
         </div>
-      </ScrollArea>
 
-      {/* Profile */}
-      <div className="flex shrink-0 items-center gap-2.5 border-t border-border/70 px-3 py-2.5">
-        <span
-          className="grid size-8 shrink-0 select-none place-content-center rounded-full bg-zinc-800 font-mono text-[11px] font-semibold text-white"
-          aria-hidden
-        >
-          {initials(user?.email)}
-        </span>
-        <span className="min-w-0 flex-1 leading-tight">
-          <span className="block truncate text-[13px] font-medium">{user?.email ?? 'Local mode'}</span>
-          <span className="block font-mono text-[10px] text-muted-foreground" title="Runs used today">
-            {todayCount}/{dailyCap} runs
-          </span>
-        </span>
-        {user ? (
-          <button
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={actions.onLogout}
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <LogOut className="size-4" />
-          </button>
-        ) : (
-          <button
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={actions.onLogin}
-            title="Account settings — sign in"
-            aria-label="Account settings"
-          >
-            <Settings className="size-4" />
-          </button>
+        {/* Search Input Filter if Active */}
+        {isSearchActive && (
+          <div className="px-2 pb-1.5 animate-fadeIn">
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="Filter sessions..."
+              className={`w-full px-2 py-1 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                isDark ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-300 text-neutral-800'
+              }`}
+              autoFocus
+            />
+          </div>
         )}
+
+        {/* Top actions */}
+        <div className="px-2 pt-1 pb-2 space-y-0.5">
+          <button
+            onClick={onNewAgent}
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+              isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles size={15} className="text-neutral-500" />
+              <span>New Agent</span>
+            </div>
+            <span className="text-[11px] font-mono text-neutral-400">⌘N</span>
+          </button>
+
+          <button
+            onClick={onOpenCommandPalette}
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+              isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Layers size={15} className="text-neutral-500" />
+              <span>Automations</span>
+            </div>
+            <span className="text-[11px] font-mono text-neutral-400">⌘K</span>
+          </button>
+
+          <button
+            onClick={onOpenCommandPalette}
+            className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+              isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
+            }`}
+          >
+            <SlidersHorizontal size={15} className="text-neutral-500" />
+            <span>Customize</span>
+          </button>
+        </div>
+
+        {/* Sections list */}
+        <div className="px-2 space-y-3.5 overflow-y-auto max-h-[calc(100vh-210px)] pb-4">
+          {sections.map((section) => {
+            const filteredItems = section.items.filter((item) =>
+              item.title.toLowerCase().includes(searchFilter.toLowerCase())
+            );
+
+            if (filteredItems.length === 0 && searchFilter) return null;
+
+            return (
+              <div key={section.title} className="space-y-0.5">
+                <div className="px-2.5 py-0.5 text-[11px] font-medium text-neutral-400 tracking-tight flex items-center justify-between">
+                  <span>{section.title}</span>
+                </div>
+
+                {filteredItems.map((item, index) => {
+                  const isActive = activeItem === item.id;
+                  if (item.isMore) {
+                    return (
+                      <button
+                        key={item.id}
+                        className="w-full flex items-center gap-1.5 px-2.5 py-1 rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 text-[12px] transition-colors cursor-pointer"
+                      >
+                        <MoreHorizontal size={13} />
+                        <span>More</span>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <div key={item.id} className="group/item relative flex items-center">
+                      <button
+                        onClick={() => onSelectItem(item.id)}
+                        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-[12.5px] transition-all cursor-pointer ${
+                          isActive
+                            ? isDark
+                              ? 'bg-[#242429] text-white font-medium shadow-xs'
+                              : 'bg-[#e7e7eb] text-neutral-900 font-medium shadow-2xs'
+                            : isDark
+                            ? 'text-neutral-300 hover:bg-white/5 font-normal'
+                            : 'text-neutral-700 hover:bg-black/4 font-normal'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {isActive ? (
+                            <MoreHorizontal size={13} className="text-neutral-400 shrink-0" />
+                          ) : item.badge === 'blue' ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] shrink-0" />
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600 shrink-0" />
+                          )}
+                          <span className="truncate">{item.title}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0 ml-1">
+                          {isActive && <GitBranch size={12} className="text-neutral-400" />}
+                          {item.hasIcon && item.iconType === 'card' && (
+                            <FileText size={12} className="text-neutral-400" />
+                          )}
+                          {item.hasIcon && item.iconType === 'panel' && (
+                            <LayoutTemplate size={12} className="text-neutral-400" />
+                          )}
+                          {item.hasIcon && item.iconType === 'toast' && (
+                            <Bell size={12} className="text-neutral-400" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Reorder Buttons (Hover) */}
+                      {onReorderItem && !item.isMore && (
+                        <div className="absolute right-1 opacity-0 group-hover/item:opacity-100 flex items-center gap-0.5 bg-neutral-200/90 dark:bg-neutral-700/90 rounded px-1 py-0.5 z-10 transition-opacity">
+                          {index > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onReorderItem(section.title, item.id, 'up');
+                              }}
+                              className="text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white"
+                              title="Move up (⌥↑)"
+                            >
+                              <ChevronUp size={11} />
+                            </button>
+                          )}
+                          {index < filteredItems.length - 2 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onReorderItem(section.title, item.id, 'down');
+                              }}
+                              className="text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white"
+                              title="Move down (⌥↓)"
+                            >
+                              <ChevronDown size={11} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Bottom Profile User Bar */}
+      <div
+        className={`p-2 border-t transition-colors ${
+          isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7]/80 bg-[#f4f4f6]'
+        }`}
+      >
+        <div
+          onClick={onOpenAccount || onOpenCommandPalette}
+          className={`flex items-center justify-between px-1.5 py-1 rounded-md transition-colors cursor-pointer ${
+            isDark ? 'hover:bg-white/5' : 'hover:bg-black/4'
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <img
+              src={avatarImg}
+              alt="Sualeh Asif"
+              className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-black/10"
+            />
+            <div className="flex flex-col min-w-0 leading-tight">
+              <span
+                className={`text-[12px] font-medium truncate ${
+                  isDark ? 'text-neutral-100' : 'text-neutral-800'
+                }`}
+              >
+                Sualeh Asif
+              </span>
+              <span className="text-[10.5px] text-neutral-500 truncate">
+                Anysphere
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-neutral-400">
+            <button
+              className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5"
+              title="Filter & View"
+            >
+              <Sliders size={13} />
+            </button>
+            <button
+              className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5"
+              title="Settings & Preferences"
+            >
+              <Settings size={13} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
