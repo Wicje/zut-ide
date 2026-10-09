@@ -275,6 +275,9 @@ export default function App() {
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
   const [isGenerating, setIsGenerating] = useState(false);
+  // Ref mirror so a workspace reset can cancel/restart turns synchronously
+  // (state reads in stale closures would otherwise block the new turn).
+  const generatingRef = useRef(false);
 
   const activeSession = sessions[activeSessionId] ?? Object.values(sessions)[0];
   const activeFiles = activeSession.files;
@@ -409,11 +412,12 @@ export default function App() {
   // ---- Real agent turn (Gemini direct, or cloud agent) ----
   async function runAgentTurn(sessionId: string, promptText: string) {
     const sess = sessionsRef.current[sessionId];
-    if (!sess || isGenerating) return;
+    if (!sess || generatingRef.current) return;
     const base = { ...filesRef.current };
     const snap = takeSnapshot(base);
     const t0 = performance.now();
     setSessionBases((prev) => ({ ...prev, [sessionId]: base }));
+    generatingRef.current = true;
     setIsGenerating(true);
     const runningStepId = `step-${Date.now()}`;
     const pushStep = (step: AgentStep) => {
@@ -511,6 +515,12 @@ export default function App() {
         }));
       }
 
+      // The workspace may have been reset (New Agent) while this turn ran —
+      // never let a stale turn overwrite the fresh instance.
+      if (!sessionsRef.current[sessionId]) {
+        dropRunning();
+        return;
+      }
       const ms = Math.round(performance.now() - t0);
       setFiles({ ...base });
       const files = buildDiffFiles(snap.files, base);
@@ -571,6 +581,7 @@ export default function App() {
       });
       showToast(`Agent failed: ${(e as Error).message}`);
     } finally {
+      generatingRef.current = false;
       setIsGenerating(false);
     }
   }
@@ -1449,14 +1460,38 @@ export default function App() {
         isOpen={isNewAgentOpen}
         onClose={() => setIsNewAgentOpen(false)}
         onSubmit={(prompt, model) => {
+          // Safety first: snapshot outgoing work so History can restore it.
+          takeSnapshot(filesRef.current);
+          // Fresh instance, clear of anything: starter files + clean slate.
+          const fresh = { ...STARTER };
           const newId = `session-${Date.now()}`;
           const newSession = blankSession(newId, prompt.slice(0, 32) || 'New agent', model);
           newSession.prompt = prompt;
-          setSessions((prev) => ({ ...prev, [newId]: newSession }));
+          generatingRef.current = false;
+          setIsGenerating(false);
+          setFiles(fresh);
+          setProjectName('my-project');
+          setProjectId(null);
+          setShareLink(null);
+          setSavedTo('device');
+          setActiveFilePath(Object.keys(fresh).sort()[0] ?? 'index.html');
+          setSessions({ [newId]: newSession });
+          setSessionBases({});
+          setChatHistories({});
           setActiveSessionId(newId);
+          setRuns([]);
+          setConsoleLines([]);
+          setSrcDoc('');
+          setBuildMs(null);
+          setPrData(null);
+          setVideoUrl(null);
+          setEvents([`[${stamp()}] Fresh workspace ready.`]);
+          // Clean diff baseline so the starter shows no stale changes
+          // (the pre-reset snapshot stays one step back in History).
+          takeSnapshot(fresh);
           setIsNewAgentOpen(false);
           setRightPaneMode('diff');
-          showToast(`Started new agent session: "${newSession.title}"`);
+          showToast('Fresh workspace started — previous work snapshotted in History.');
           void runAgentTurn(newId, prompt);
         }}
         models={modelOptions}
