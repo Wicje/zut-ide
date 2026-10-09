@@ -665,6 +665,27 @@ export default function App() {
     if (user) setIsLoginAccountOpen(false);
   }, [user]);
 
+  // Esc dismisses any open modal (backdrop click already does; keyboard parity).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsCommandPaletteOpen(false);
+      setIsNewAgentOpen(false);
+      setIsVideoModalOpen(false);
+      setIsPRModalOpen(false);
+      setIsPRStudioOpen(false);
+      setIsVercelDeployOpen(false);
+      setIsLoginAccountOpen(false);
+      setIsRulesModalOpen(false);
+      setShowHistory(false);
+      setShowShare(false);
+      setShowGithub(false);
+      setShowImport(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   async function captureScreen(): Promise<string | null> {
     const md = navigator.mediaDevices as MediaDevices & { getDisplayMedia?: (c?: unknown) => Promise<MediaStream> };
     if (!md?.getDisplayMedia) throw new Error('Screen capture is not supported in this browser.');
@@ -784,6 +805,7 @@ export default function App() {
     const base = sessionBases[activeSessionId] ?? {};
     const target = activeSession.files.find((f) => f.id === fileId);
     if (!target) return;
+    takeSnapshot(filesRef.current);
     setFiles((prev) => {
       const next = { ...prev };
       if (target.path in base) next[target.path] = base[target.path];
@@ -827,6 +849,7 @@ export default function App() {
       showToast('Snapshot not found.');
       return;
     }
+    takeSnapshot(filesRef.current);
     setFiles({ ...snap.files });
     logEvent('ROLLBACK', stepTitle);
     showToast(`Rolled back workspace to snapshot: ${checkpointId}`);
