@@ -61,7 +61,7 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
         }`}
       >
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-xs">Vitest Unit Suite</span>
+          <span className="font-semibold text-xs">Run Checks</span>
           <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             {passedCount} Passed
           </span>
@@ -78,7 +78,7 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
           className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-xs font-medium transition-colors shadow-xs cursor-pointer disabled:opacity-50"
         >
           <Play size={11} className={isRunning ? 'animate-spin' : ''} />
-          <span>{isRunning ? 'Running tests...' : 'Run All'}</span>
+          <span>{isRunning ? 'Running checks...' : 'Run All'}</span>
         </button>
       </div>
 
@@ -133,19 +133,21 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
                     {test.error}
                   </div>
 
-                  {/* Assertion Diff */}
-                  <div
-                    className={`p-2 rounded font-code text-[11.5px] space-y-1 ${
-                      isDark ? 'bg-black/50 text-neutral-300' : 'bg-white border border-neutral-200 text-neutral-700'
-                    }`}
-                  >
-                    <div className="text-emerald-600 dark:text-emerald-400">
-                      - Expected: {test.expected}
+                  {/* Assertion Diff (only for real framework assertions) */}
+                  {(test.expected !== undefined || test.actual !== undefined) && (
+                    <div
+                      className={`p-2 rounded font-code text-[11.5px] space-y-1 ${
+                        isDark ? 'bg-black/50 text-neutral-300' : 'bg-white border border-neutral-200 text-neutral-700'
+                      }`}
+                    >
+                      <div className="text-emerald-600 dark:text-emerald-400">
+                        - Expected: {test.expected}
+                      </div>
+                      <div className="text-red-600 dark:text-red-400">
+                        + Received: {test.actual}
+                      </div>
                     </div>
-                    <div className="text-red-600 dark:text-red-400">
-                      + Received: {test.actual}
-                    </div>
-                  </div>
+                  )}
 
                   {/* Auto-Fix Action */}
                   <div className="flex items-center justify-between pt-1">

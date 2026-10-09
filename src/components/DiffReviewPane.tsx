@@ -214,7 +214,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
                       : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
                   }`}
                 >
-                  Vitest
+                  Checks
                 </button>
               </div>
             )}

@@ -1,140 +1,128 @@
-# DESIGN.md — zut IDE
+# DESIGN.md — Cursor Composer Ghost
 
 > Living style contract for humans + AI agents. Change the UI only in ways
-> that keep every section below true. (Format borrowed from designmd.supply:
-> tokens first, components second, voice last.)
+> that keep every section below true.
 
 ## Brand
 
-- **Name:** zut, always lowercase. Single public name: zut.
-  Folder/repo names (`chisom_ide`, `zut-ide`) never appear in UI.
-- **Positioning:** "Code from any device." An AI-powered code editor for phones
-  and sub-2GB Chromebooks/gadgets, not a desktop replacement. AI is optional —
-  plain code + Run is the default path.
+- **Name:** Cursor Composer Ghost. Single public name (tab title, PWA manifest,
+  OG tags). Folder/repo names (`chisom_ide`, `zut-ide`) never appear in UI.
+- **Positioning:** desktop-class coding in the browser. Heavy work runs on the
+  broker; the browser renders. AI is optional — plain code + Run is the default path.
 - **Backend is invisible:** built on Mudbase, but UI says Run / Terminal / Preview.
   Never expose Cells, Small-hours, externalId, session ids, or quota internals.
   Trust line: "Your code lives in your private project. Editing is free — only runs use run time."
 - **Personality:** quiet workshop, not neon arcade. The UI recedes; the user's
   code and preview own the pixels.
 
-## Palette (light, refined)
+## Palette (light + dark, manual toggle)
 
-Light-only: no `.dark` class, no toggle. Soft gray app shell, white panels and
-cards, subtle borders, crisp monospace code. Prefer boring utilities on
-positioning-critical elements; Tailwind v4 exotic syntax (`w-(--…)`,
-`origin-(…)`) is decoration-only — it once broke menu widths.
+Theme lives in `App` state (`light | dark`), drilled as a `theme` prop into
+every pane and modal — each renders `isDark` ternaries. No Tailwind dark-mode
+config, no CSS variables file; tokens are inline.
 
-| Token | Value | Use |
-|---|---|---|
-| `background` | `oklch(0.955 0 0)` | app shell |
-| `card` | `oklch(1 0 0)` | panels, composer, editor chrome |
-| `muted` | `oklch(0.93 0 0)` | chips, pills, output wells |
-| `border` | `oklch(0.89 0 0)` for dividers | never full-contrast lines |
-| `emerald-600` | **the** accent | Run, success, added-lines |
-| `red-600 / destructive` | errors only | build failure, removed-lines, delete |
-| `amber-600` | warnings + transient | building state, key-missing dots |
-| `violet-500` | AI only | agent dots, proposal cards, file chips |
-| `sky-600` | navigation | clickable file links in console |
-| Console levels | `log #1f2937 · info #0369a1 · warn #b45309 · error #dc2626 · debug #6b7280` | always paired with a dot + text label, never color alone |
-| Code | Monaco `vs` (light), red/green diff | read-only diffs, light editor |
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| sidebar | `bg-[#f4f4f6]` | `bg-[#141416]` | nav rail |
+| panes | `bg-white` | `bg-[#18181b]` | editor, composer, diff |
+| headers | `bg-white` / `bg-[#fbfbfd]` | `bg-[#161619]` | `h-10` bars |
+| cards/inputs | `bg-[#fafafc]` | `bg-[#1e1e24]` / `bg-[#222228]` | modals, fields |
+| borders | `border-[#e5e5e7]` | `border-neutral-800` | dividers, cards |
+| text | `text-[#2b2b2f]` | `text-neutral-200` | body |
+| diff add | `bg-[#e6ffed]` / chip `bg-[#acf2bd]` | `bg-[#122818]` / chip `bg-[#1b4728]` | added lines |
+| diff del | `bg-[#ffeef0]` / chip `bg-[#ffc0c7]` | `bg-[#3b1219]` / chip `bg-[#5c2024]` | removed lines |
+| primary | `bg-blue-600 hover:bg-blue-500` | same | Run, confirm, deploy |
+| pass/fail | emerald / red pills | same | checks, tests |
 
 One accent per meaning. Emerald = go/success, red = broken, amber = wait,
-violet = AI. Do not add new accent hues without updating this table.
+blue = primary action. Do not add new accent hues without updating this table.
 
 ## Typography
 
-- **UI:** `Geist Variable` (`--font-sans`). Panel headers: `text-xs font-medium uppercase tracking-wider text-muted-foreground`.
-- **Code/paths:** monospace for file names, counts, status values, console.
-- **Editor:** Monaco `vs` (light), 14px, minimap off, word wrap on. Diffs read-only, side-by-side.
+- **UI:** `-apple-system, Inter, SF Pro Text, Segoe UI` (Google Fonts Inter).
+  Pane body `text-[13px]`, headers `text-xs`, pills `text-[10.5px]/text-[11px]`.
+- **Code/paths:** `JetBrains Mono` (`.font-code`, liga+calt on), diff rows
+  `text-[12px] leading-[20px]`.
+- **Editor:** Monaco (`vs` light / `vs-dark` dark), minimap off.
 
-## Shape & elevation (Linear-quiet)
+## Shape & elevation
 
-- Radius: `rounded-md` rows/chips, `rounded-lg` menus, `rounded-xl` proposal cards.
-- Panel headers `h-9/10`, toolbar `h-12`, status bar `h-7` — headers whisper (`uppercase text-xs muted`), content speaks.
-- Menus: `bg-popover ring-1 ring-foreground/10 shadow-md`, items `cursor-pointer`.
-- Active file: accent wash + 2px emerald edge bar (not just bold text).
+- Radius: `rounded-md` chips/inputs, `rounded-lg` cards, `rounded-xl` preview
+  canvas, `rounded-2xl` app window + modals, `rounded-full` top bar + toast + pills.
+- App window: `w-[96vw] max-w-[1240px] h-[92vh] max-h-[820px]`, wallpaper stage
+  behind (macOS light/dark images in `src/assets/images/`).
+- Pane headers `h-10 px-3.5 border-b`; resizers `w-1 cursor-col-resize`
+  (hover `blue-500/50`, active `blue-600`, double-click resets 210 / 380).
+- Sidebar traffic lights `w-3 h-3 rounded-full` (`#ff5f56/#ffbd2e/#27c93f`).
+- Modals: `fixed inset-0 z-50` backdrop `bg-black/50 backdrop-blur-xs`,
+  `max-w-md` (simple) / `max-w-lg` / `max-w-2xl max-h-[85vh]` (PR studio).
+- Scrollbars: 6px, `rgba(0,0,0,0.15)` thumb, transparent track.
 
-## Layout grammar (VS Code-like)
+## Layout grammar (Cursor-like)
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│ sidebar  │ composer            │ SCM bar: project · +A -D · Run PR Push │
-│ 280px    │ 360–420px          ├────────────────────────────┤
-│ ●●● search│ session ▾ · New   │ tabs: file · Changes (N)   │
-│ +New Agent│ request box       │                            │
-│ Automations│ file/run chips   │ code editor / multi-diff   │
-│ Customize │ recording · summary│                           │
-│ Agents ☉  │ chat              ├────────────────────────────┤
-│ Project ▾ │ follow-up bar:    │ preview + console          │
-│ History   │ +A -D · Push · model · mic                     │
-│ profile   │                   ├────────────────────────────┤
-├───────────┴───────────────────┴────────────────────────────┤
-│ status: run-state · project · files · errors               │
-└────────────────────────────────────────────────────────────┘
+┌ wallpaper stage (wallpaper image, centered content) ────────────┐
+│                                        [⌘K Deploy | tabs | theme]│ top bar
+│ ┌ app window: sidebar │ composer │ right ─────────────────────┐ │
+│ │ 210px (160-320)     │ 380px (260-540) │ Diff/Editor/Preview/ │ │
+│ │ ●●● search          │ model ▾         │ Checks tabs          │ │
+│ │ + New Agent         │ agent steps     │                      │ │
+│ │ Agents · Project    │ summary + copy  │ diff list / editor / │ │
+│ │ user footer         │ follow-up bar   │ preview / checks     │ │
+│ │                     │ commit / review │ + terminal drawer    │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ [toast bottom-center]              [13 modals fixed inset-0]    │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-- Desktop grid: sidebar / composer / editor+output. No top toolbar on desktop
-  (mobile keeps it); SCM bar + sidebar menus own every action. Composer
-  collapses via Customize or `Ctrl+K`; do not widen chrome at the editor's
-  expense.
-- Sidebar: traffic lights (chrome) + search (agents & files) + New Agent /
-  Automations / Customize. Agents group (sessions, active dot, delete),
-  Project files (search-filtered), History row, profile footer (avatar,
-  account, runs today). Labels stay zut-real — never borrow another
-  product's workspace names.
-- Composer: session feed (request box, changed-file + run chips, screen
-  recording, summary) above the chat; follow-up bar with review pill,
-  Commit & Push (save → publish), backend picker, voice input. Recording
-  stays in-browser; nothing uploads.
-- Right: SCM bar (project switcher, uncommitted badge, Run, Create PR =
-  review link, Commit & Push = save + publish), Code / Changes tabs.
-  Changes is a multi-file collapsible diff vs the last snapshot, rendered
-  lazily per file. Edits happen in Code.
-- Mobile (`≤860px`): single pane + 4-tab dock (Code / Result / Files / AI),
-  file strip on top, `env(safe-area-inset-bottom)` respected. Composer is a
-  full-screen overlay on mobile.
-- Status bar (desktop only): run state · project+saved · file count · active
-  file · error count (clickable) · build location (cloud/local).
+- 3 resizable panes; right pane switches Diff / Editor / Preview / Checks via
+  top bar, pane tabs, or `Cmd/Ctrl+1..4`. `Cmd/Ctrl+K` palette, `+N` new agent,
+  `+D` unified/split, `+J` terminal.
+- Sidebar: traffic lights + search + New Agent; Agents group (sessions) and
+  Project files (click → opens in editor); user footer (avatar, account modal).
+- Composer: model picker, agent steps timeline, summary, follow-up bar with
+  @-mention, commit/review buttons, rules modal entry.
+- Right: Diff = SCM header + per-file accept/revert + PR/deploy actions;
+  Editor = Monaco tree + tabs + inline prompt; Preview = sandboxed iframe +
+  viewport switch + console drawer + inspect-to-composer; Checks = run history
+  as pass/fail rows with agent auto-fix.
+- Every destructive or workspace-replacing action snapshots first (New Agent,
+  Import, Restore, revert, rollback) — History is the universal undo.
+- New Agent = fresh instance: starter files, cleared sessions/runs/console,
+  detached cloud link. Previous work stays one snapshot back.
+- No mobile dock: this shell is desktop-first (fixed max window, min pane widths).
 
 ## Components
 
-- **Run:** solid emerald, always visible, `Ctrl+Enter`. Preview empty state
-  offers the same Run — there is exactly one primary action.
-- **New:** one click = blank canvas (minimal HTML + CSS + JS). No template
-  maze — devs add files via explorer +. Starters/playgrounds/frameworks live
-  behind the chevron, each with a one-line description. Guarded by confirm
-  only when unsaved changes exist.
-- **Save:** ghost, `Ctrl+S`. Dirty = amber dot + "unsaved" in titlebar *and*
-  status bar. Never silent destructive actions: New/Import/Restore announce
-  to the console (`Created "x" with N files.`).
-- **Save model:** one home per sign-in state — device (logged out) or cloud
-  (logged in + project). Status bar names it (`saved · cloud/device`). No
-  surprise downloads: ZIP only on explicit click; History snapshots are the
-  safety net, with a pre-wipe checkpoint before every New/Import/Restore.
-- **Deploy dialog:** Netlify one-click is the whole default view. GitHub,
-  Vercel, Serverless and Check live behind an Advanced toggle that only
-  appears when configured.
-- **Menus:** pointer cursor, icons muted, destructive items red. File-type
-  rows: badge + name + rename/delete always visible on touch
-  (`md:` hover-reveal only with a mouse), rows keyboard-focusable.
-- **Console:** level = dot + label + message; file refs dotted-underline,
-  click jumps to file+line and switches to Code view on mobile.
-- **Preview:** header reads `Preview` + viewport chip (`375/768/Full`) +
-  status pill (`Not run yet / Waking… / Installing… / Starting… / Running / Build failed`) +
-  access badge (`private` default, `public link` only when shared) + Cancel while running.
-  Local web = `srcDoc` iframe; remote dev server = `previewUrl` iframe. Same chrome.
-  Non-web projects use the same slot: `RunOutput.tsx` shows `Output` + language
-  chip (`Python/Go`) + `exit N · Nms`, with stdout/stderr and an stdin box.
-  First run warns: "First run can take up to ~20s while the computer wakes."
-  One component, mobile and desktop — no separate mobile output.
-- **Write-back is explicit:** runs/agents never silently overwrite source.
-  Changed files show a diff + Accept. Receipts are counted ("applied N file changes").
-- **AI:** violet spark; backend tabs show key-missing amber dots and
-  server-status dots. Cloud agent edits apply with a counted receipt
-  ("applied N file changes"). AI never blocks coding: Run/Save/Format/Deploy
-  work with no key.
-- **Project kind:** `index.html` = web, else `main.py` = Python, `main.go` = Go
-  (`src/lib/projectKind.ts`). Kind decides the Output slot, never the chrome.
+- **Run:** terminal `run [entry]` / `status` / `help`, Checks-pane Run All, and
+  deploy/pr-review entry points all funnel to the same executors
+  (`executeEntry` → broker `/api/broker/run`, or in-browser esbuild preview).
+  Exactly one primary action per surface.
+- **New Agent:** one submit = fresh instance (starter files, cleared sessions /
+  runs / console, detached cloud link), pre-wipe snapshot kept in History.
+  Never silent destructive actions: every reset announces via toast.
+- **Save model:** autosave to device draft (localStorage); cloud project when
+  signed in. Editor status bar names it (`Saved · cloud/device`). ZIP only on
+  explicit click; History snapshots are the safety net.
+- **Deploy:** Vercel flow modal (build logs → live URL → push-to-GitHub),
+  Netlify one-click (`deployStatic`), GitHub push modal (token, private toggle).
+- **Palette:** `Cmd/Ctrl+K` fuzzy commands (sessions, theme, panes, terminal,
+  PR, deploy, account, history, share, import). Pointer cursor, muted icons.
+- **Console:** preview drawer streams console/errors; terminal drawer has
+  benchmarks / terminal / logs tabs. Level = dot + label + message.
+- **Preview:** sandboxed iframe (`allow-scripts`, no `same-origin`), desktop /
+  tablet / mobile widths, console drawer, inspect sends the element to Composer.
+  Remote broker URL renders when the broker exposes one.
+- **Write-back is explicit:** agent edits land as diffs with per-file
+  Accept / Revert (+ pre-revert snapshot). Receipts are counted.
+- **AI:** BYOK keys (Gemini/OpenRouter/Claude/ChatGPT, this browser only) in
+  the Account modal; optional cloud + self-hosted opencode turns. Key-missing
+  states show inline hints, never dead buttons. AI never blocks coding.
+- **Project kind:** `index.html` = web, else `main.py`/`app.py` = Python,
+  else `main.go`/`go.mod` = Go (`adapters/filemap.ts`).
+- **Checks honesty:** rows are run records (label, exit code, duration, output
+  excerpt) — never framework assertions. Assertion diffs render only when a
+  real `expected`/`actual` exists.
 
 ## Voice
 
@@ -146,10 +134,8 @@ violet = AI. Do not add new accent hues without updating this table.
 
 ## Non-goals
 
-- No new toolbar buttons without a home in mobile (every desktop action must
-  degrade: hide with reason, or live in the dock/dialogs).
 - No color-only signalling (dots + labels), no hover-only controls on touch,
-  no `window.confirm/prompt/alert` anywhere — destructive flows use
-  `ConfirmDialog.tsx`, explorer delete is two-tap, rename is inline.
-- No new eager imports for behind-a-click panels — `AiPanel`, `DeployDialog`,
-  `HistoryDialog`, `ProjectList` stay `React.lazy` so phones load editor first.
+  no `window.confirm/prompt/alert` anywhere — destructive flows announce and
+  stay recoverable via History snapshots.
+- No new eager animation/icon weight: wallpapers + esbuild-wasm are the heavy
+  assets and are precached by the PWA; modals share the one backdrop pattern.

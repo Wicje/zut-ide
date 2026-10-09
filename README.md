@@ -1,10 +1,9 @@
-# zut — full coding on a Chromebook or phone. Nothing to install.
+# Cursor Composer Ghost — desktop-class coding in the browser. Nothing to install.
 
-A browser IDE + optional run broker for people on phones, Chromebooks, and
-other gadgets with &lt;2GB RAM. Edit files, hit Run, see the result — on hardware
-that could never run a local toolchain. Heavy work (program runs, terminal,
-preview, AI file edits) runs on your private computer via the broker;
-the device just renders the UI.
+A Cursor-style browser IDE (resizable 3-pane shell: sidebar, agent composer,
+diff / editor / preview / checks) + optional run broker. Edit files, hit Run,
+see the result. Heavy work (program runs, terminal, preview, AI file edits)
+runs on your private computer via the broker; the browser just renders the UI.
 
 Your code lives in your private project. Editing is free — only runs use run time.
 
@@ -13,8 +12,9 @@ When you want it, bring your own key or use the cloud agent.
 
 - **Editor**: Monaco (VS Code's editor) with IntelliSense and red-squiggle type errors for JS/TS.
 - **Multiple files**: `index.html`, `style.css`, `script.js`, `script.ts`, `main.py`, `main.go`, JSON, text — anything.
-- **Mobile + desktop**: one UI that fits both. Below ~860 px the IDE becomes a scrollable file-tab strip with a Code /
-  Result / Files dock at the bottom; on desktop it's explorer / editor / output + console. Same RunOutput component either way.
+- **Desktop shell**: resizable sidebar / composer / right-pane window on a wallpaper
+  stage, with light + dark themes. The right pane switches Diff / Editor / Preview /
+  Checks; every pane and modal follows one token system (see `DESIGN.md`).
 - **Web projects**: JS/TS files can `import`/`export` across files. `.ts`/`.tsx` is compiled in
   the browser with **esbuild-wasm**.
 - **Python + Go**: *New ▾ → Languages* includes `main.py` and `main.go` starters. Programs execute on the remote runtime (`POST /run`) so weak devices never compile locally. Stdin is built into the Output panel.
@@ -48,9 +48,11 @@ When you want it, bring your own key or use the cloud agent.
   runtime, surfacing syntax and import-graph errors before you push.
 - **AI assistant** — the *✨ AI* button opens a chat with Claude that can see your project (files + the active
   file) and answer coding questions; the API key stays on the server.
-- **Quick-switch gestures** — on mobile, swipe left/right on the file-tab strip to cycle files.
-- **Collapsible console** — on mobile the result view folds the console into a drawer so the preview keeps
-  the whole screen.
+- **Run checks** — the Checks pane executes the project entry and lists each run
+  as a pass/fail row with output; failing rows offer agent auto-fix.
+- **Resilient workspace** — every New / Import / Restore / revert / rollback
+  snapshots first, so History can always undo. A crash boundary keeps a Reload
+  screen instead of a blank app.
 
 ## Quick start
 
@@ -291,45 +293,28 @@ token set when you do).
 
 ```
 src/
-  App.tsx                # routing, run loop, autosave, cloud sync, feature wiring
-  hooks/useRunLoop.ts    # staged runs (waking/installing/starting), cancel, quota, usage
-  lib/runner.ts          # esbuild bundling + srcdoc + console harness (web)
-  lib/projectKind.ts     # web vs python vs go detection + entry lookup
-  lib/runtime.ts         # legacy client for remote /build + /run
-  lib/broker.ts          # thin broker client (open/run/stop/terminal-token/preview)
-  lib/auth.ts            # user token (Supabase session, else local) — never service keys
-  lib/limits.ts          # single caps source (daily runs, sessions, file/output caps)
-  lib/usage.ts           # pilot cost trail (runs, Small-hours est, quota)
-  lib/ai.ts              # BYOK chat providers (OpenRouter, Anthropic, OpenAI, Gemini)
-  lib/composers.ts       # agent sessions (list/create/switch, per-session history)
-  lib/opencode.ts        # opencode agent + disk-sync bridge client
-  lib/backend.ts         # swappable persistence (broker BaaS → Supabase → local)
-  lib/supabase.ts        # client init / config check
-  lib/templates.ts       # starting templates (web, React, Vue, Python, Go)
-  lib/download.ts        # ZIP export
-  lib/deploy.ts          # Netlify one-click deploy
-  lib/hosting.ts         # Edge Function client (OAuth, GitHub push, Vercel, Claude)
-  lib/importer.ts        # import project from URL (HTML/CodePen/GitHub)
-  lib/formatter.ts       # Prettier formatting (web files; py/go run as-is)
-  store/workspace.tsx    # files / console / project state
-  components/
-    CodeEditor.tsx       # Monaco wrapper (language per extension)
-    Sidebar.tsx          # traffic lights, search, New Agent/Automations/Customize, agents, profile
-    ComposerPane.tsx     # agent feed (request, files, recording, summary) + follow-up bar
-    MultiDiffViewer.tsx  # collapsible multi-file diff vs snapshot (lazy per file)
-    RecordCard.tsx       # in-browser screen recording (MediaRecorder, no upload)
-    FileExplorer.tsx     # add / upload / drop / inline rename / two-tap delete
-    RunOutput.tsx        # unified output: staged status + Cancel (web + py/go)
-    Preview.tsx          # sandboxed iframe (local srcDoc or remote URL) + access badge
-    ConsolePanel.tsx     # console + error streaming
-    ConfirmDialog.tsx    # in-app confirm (no window.confirm/prompt anywhere)
-    TerminalPanel.tsx    # 60s terminal token lifecycle (xterm attaches here)
-    UsagePanel.tsx       # pilot cost dashboard (runs, Small-hours, quota)
-    Toolbar.tsx          # run / autosave / save / share / zip / deploy / AI (optional)
-    Login.tsx, ProjectList.tsx, ShareDialog.tsx
-    DeployDialog.tsx     # Publish hub: Netlify, Runner (terminal+usage), + advanced
-    AiPanel.tsx          # AI chat: BYOK providers + optional self-hosted agent
-  types.ts               # FileMap, RunStatus/RunStage, UsageRecord
+  App.tsx                # 3-pane shell, sessions, runs, preview, modal wiring
+  main.tsx               # root render + crash boundary
+  index.css              # Tailwind v4 + Inter/JetBrains + scrollbars (no config file)
+  types.ts               # agent/diff/session/check types + preserved backend contracts
+  components/ErrorBoundary.tsx # crash fallback (Reload IDE)
+  components/Sidebar.tsx       # traffic lights, New Agent, search, agents, files, profile
+  components/ComposerPane.tsx  # agent feed + follow-up bar + commit/review actions
+  components/DiffReviewPane.tsx# SCM header, file diffs, terminal drawer, PR/deploy entry
+  components/CodeEditorPane.tsx# Monaco tree + tabs + inline prompt + status bar
+  components/LiveAppPreviewPane.tsx # sandboxed iframe + viewports + console drawer
+  components/TestExplorerPane.tsx  # run checks (run history as pass/fail rows) + agent fix
+  components/TerminalDrawer.tsx    # benchmarks / terminal / logs tabs
+  components/CodeLine.tsx + SplitDiffViewer.tsx # unified + side-by-side diff rows
+  components/*Modal.tsx  # CommandPalette, NewAgent, VideoPreview, PR, PRReviewStudio,
+                         # VercelDeploy, History, Share, GitHubPush, Import,
+                         # LoginAndAccount, CursorRules
+  adapters/              # UI-facing backends: zut (broker + Supabase + drafts),
+                         # preview (esbuild bundle), filemap, aiEdits, gemini,
+                         # providers, github, mudauth, importer, opencode
+  data/mockData.ts       # legacy fixtures (not used live)
+  lib/ hooks/ store/     # preserved backend: broker/runtime/cloud clients, usage,
+                         # limits, persistence, templates, composers (untouched by port)
 broker/
   server.mjs             # thin broker (npm run broker): BaaS routes + run/terminal/preview
   cells.mjs              # ONLY file that speaks Cells (env-driven, VERIFY markers)

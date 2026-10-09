@@ -1042,7 +1042,7 @@ export default function App() {
               rightPaneMode === 'tests' ? 'bg-white/20 text-white font-semibold' : 'text-white/70 hover:text-white'
             }`}
           >
-            Vitest
+            Checks
           </button>
         </div>
 

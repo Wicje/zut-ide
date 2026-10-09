@@ -6,6 +6,19 @@ moved to a version section on release.
 ## [Unreleased]
 
 ### Added
+- Composer Ghost UI port (pixel-perfect): wallpaper stage + resizable
+  sidebar/composer/right shell (Diff/Editor/Preview/Checks), 13 modals, light
+  + dark themes, `src/adapters/*` UI backends. `lib/ hooks/ store/ broker/
+  runtime/ cloud/ supabase/` preserved; backend types appended to `types.ts`.
+- New Agent starts a fresh instance (snapshot-then-reset; stale agent turns
+  can't clobber it via a generation guard).
+- Tightening: crash boundary, undo-safe revert/rollback, Esc closes all
+  modals, PWA rebrand (manifest + icon), honest Run Checks pane (run records,
+  assertion diffs only for real assertions).
+- CI: broker syntax checks + no-deleted-shadcn-layer contract. Pages deploy
+  bakes `VITE_BROKER_URL` so the deployed site can run code.
+
+### Added
 - Light 3-column shell rebuilt from scratch: sidebar (traffic lights, search, New Agent/Automations/Customize, agent sessions, searchable files, profile), center composer (session feed with request box, file/run chips, in-browser screen recording, summary + follow-up bar with review pill, Commit & Push, backend picker, voice input), right pane (SCM bar with project switcher, uncommitted badge, Run, Create PR review link, Commit & Push; Code/Changes tabs; lazy multi-file diff vs snapshot).
 - Composer sessions (`lib/composers.ts`): multiple named agents, per-session persisted history, auto-titles, backend remembered per agent.
 - AiPanel as embeddable engine (ref send/focus/clear/setBackend, hideable header/input, session persistence hooks).
