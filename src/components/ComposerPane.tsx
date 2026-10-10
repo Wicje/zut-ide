@@ -760,7 +760,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             <button
               type="button"
               onClick={() => setIsMentionMenuOpen(!isMentionMenuOpen)}
-              className="w-5 h-5 rounded-full flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
+              className="w-5 h-5 rounded-md flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
               title="Attach context (@)"
             >
               <AtSign size={13} />
@@ -784,7 +784,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             <button
               type="button"
               onClick={() => imgInputRef.current?.click()}
-              className="w-5 h-5 rounded-full flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
+              className="w-5 h-5 rounded-md flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
               title="Attach images (seen by Gemini, OpenRouter, Claude, ChatGPT)"
             >
               <ImagePlus size={13} />
@@ -896,7 +896,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             type="button"
             onClick={followUpText ? handleSendFollowUp : toggleVoice}
             disabled={isGenerating}
-            className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer shadow-xs ${
+            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer shadow-xs ${
               isVoiceRecording
                 ? 'bg-red-500 text-white animate-pulse'
                 : isDark

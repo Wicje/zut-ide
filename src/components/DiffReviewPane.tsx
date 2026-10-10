@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   GitBranch,
-  Split,
   Sparkles,
   Plus,
   GitCommit,
@@ -15,7 +14,6 @@ import {
   Minimize2,
   MoreHorizontal,
   Terminal,
-  Activity,
   Layers,
   CheckSquare,
   Square,
@@ -120,107 +118,74 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
 
   return (
     <div
-      className={`flex-1 flex flex-col justify-between overflow-hidden select-none text-[13px] transition-colors ${
+      className={`@container flex-1 flex flex-col justify-between overflow-hidden select-none text-[13px] transition-colors ${
         isDark ? 'bg-[#1e1e24] text-neutral-200' : 'bg-white text-[#1e1e24]'
       }`}
     >
-      {/* Top Header Bar */}
+      {/* Top Header Bar (width-gated on the pane itself; never scrolls sideways) */}
       <div
-        className={`h-10 px-3.5 border-b flex items-center justify-between gap-2 ${
+        className={`h-10 px-3.5 border-b flex items-center justify-between gap-2 min-w-0 [overflow-x:clip] ${
           isDark ? 'border-neutral-800 bg-[#18181b]' : 'border-[#e5e5e7] bg-white'
         }`}
       >
         {/* Left cluster */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          {/* Quick utility icons (wide screens; in the ⋯ menu when narrow) */}
-          <div className="hidden md:flex items-center gap-1.5 text-neutral-400">
-            <button
-              onClick={onToggleDiffViewMode}
-              className={`p-1 rounded transition-colors cursor-pointer flex items-center gap-1 text-[11px] ${
-                diffViewMode === 'split'
-                  ? isDark
-                    ? 'bg-red-600/30 text-red-400'
-                    : 'bg-red-50 text-red-600'
-                  : 'hover:text-neutral-700 dark:hover:text-neutral-200'
-              }`}
-              title={`Switch to ${diffViewMode === 'split' ? 'Unified' : 'Split'} view`}
-            >
-              <Split size={14} />
-              <span className="font-sans font-medium capitalize hidden sm:inline">
-                {diffViewMode}
-              </span>
-            </button>
+          {/* Mode switcher (roomy panes; in the ⋯ menu when narrow).
+              Split/Telemetry live in the ⋯ menu too, so no width is wasted here. */}
+          {onSelectPaneMode && (
+            <div className="hidden @[540px]:flex items-center gap-1 shrink-0 bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-md border border-neutral-200 dark:border-neutral-700">
+              <button
+                onClick={() => onSelectPaneMode('diff')}
+                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                  rightPaneMode === 'diff'
+                    ? isDark
+                      ? 'bg-neutral-700 text-white'
+                      : 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                }`}
+              >
+                Diff
+              </button>
+              <button
+                onClick={() => onSelectPaneMode('editor')}
+                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                  rightPaneMode === 'editor'
+                    ? isDark
+                      ? 'bg-neutral-700 text-white'
+                      : 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                }`}
+              >
+                Editor
+              </button>
+              <button
+                onClick={() => onSelectPaneMode('preview')}
+                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                  rightPaneMode === 'preview'
+                    ? isDark
+                      ? 'bg-neutral-700 text-white'
+                      : 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                }`}
+              >
+                Preview
+              </button>
+              <button
+                onClick={() => onSelectPaneMode('tests')}
+                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                  rightPaneMode === 'tests'
+                    ? isDark
+                      ? 'bg-neutral-700 text-white'
+                      : 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                }`}
+              >
+                Checks
+              </button>
+            </div>
+          )}
 
-            <button
-              onClick={onToggleTerminal}
-              className={`p-1 rounded transition-colors cursor-pointer flex items-center gap-1 text-[11px] ${
-                isTerminalOpen
-                  ? isDark
-                    ? 'bg-emerald-600/30 text-emerald-400'
-                    : 'bg-emerald-50 text-emerald-600'
-                  : 'hover:text-neutral-700 dark:hover:text-neutral-200'
-              }`}
-              title="Toggle Terminal & Benchmarks drawer"
-            >
-              <Activity size={13} />
-              <span className="font-sans font-medium hidden sm:inline">Telemetry</span>
-            </button>
-
-            {onSelectPaneMode && (
-              <div className="flex items-center gap-1 shrink-0 bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-md border border-neutral-200 dark:border-neutral-700">
-                <button
-                  onClick={() => onSelectPaneMode('diff')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                    rightPaneMode === 'diff'
-                      ? isDark
-                        ? 'bg-neutral-700 text-white'
-                        : 'bg-white text-neutral-900 shadow-2xs'
-                      : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                  }`}
-                >
-                  Diff
-                </button>
-                <button
-                  onClick={() => onSelectPaneMode('editor')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                    rightPaneMode === 'editor'
-                      ? isDark
-                        ? 'bg-neutral-700 text-white'
-                        : 'bg-white text-neutral-900 shadow-2xs'
-                      : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                  }`}
-                >
-                  Editor
-                </button>
-                <button
-                  onClick={() => onSelectPaneMode('preview')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                    rightPaneMode === 'preview'
-                      ? isDark
-                        ? 'bg-neutral-700 text-white'
-                        : 'bg-white text-neutral-900 shadow-2xs'
-                      : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                  }`}
-                >
-                  Preview
-                </button>
-                <button
-                  onClick={() => onSelectPaneMode('tests')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                    rightPaneMode === 'tests'
-                      ? isDark
-                        ? 'bg-neutral-700 text-white'
-                        : 'bg-white text-neutral-900 shadow-2xs'
-                      : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                  }`}
-                >
-                  Checks
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="h-3.5 w-px bg-neutral-200 dark:bg-neutral-800 hidden md:block" />
+          <div className="h-3.5 w-px bg-neutral-200 dark:bg-neutral-800 hidden @[540px]:block" />
 
           {/* SCM Branch selector */}
           <div className="flex items-center gap-2 min-w-0">
@@ -277,26 +242,38 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
           </div>
         </div>
 
-        {/* Right Action buttons (wide screens; in the ⋯ menu when narrow) */}
-        <div className="hidden md:flex items-center gap-2 shrink-0">
-          <button
-            onClick={copyFullDiff}
-            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 transition-colors cursor-pointer"
-            title={copiedDiff ? 'Diff copied!' : 'Copy full diff to clipboard'}
-          >
-            {copiedDiff ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-          </button>
+        {/* Right actions: Save & deploy always; the rest inline when roomy */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="hidden @[540px]:flex items-center gap-2">
+            <button
+              onClick={copyFullDiff}
+              className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 transition-colors cursor-pointer"
+              title={copiedDiff ? 'Diff copied!' : 'Copy full diff to clipboard'}
+            >
+              {copiedDiff ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+            </button>
 
-          <button
-            onClick={onCreatePR}
-            className={`px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
-              isDark
-                ? 'bg-[#27272f] hover:bg-[#32323c] text-white border border-neutral-700'
-                : 'bg-white hover:bg-neutral-50 text-neutral-800 border border-[#d2d2d6]'
-            }`}
-          >
-            Create PR
-          </button>
+            <button
+              onClick={onCreatePR}
+              className={`px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
+                isDark
+                  ? 'bg-[#27272f] hover:bg-[#32323c] text-white border border-neutral-700'
+                  : 'bg-white hover:bg-neutral-50 text-neutral-800 border border-[#d2d2d6]'
+              }`}
+            >
+              Create PR
+            </button>
+
+            {onToggleMaximize && (
+              <button
+                onClick={onToggleMaximize}
+                className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 transition-colors ml-1 cursor-pointer"
+                title={isMaximized ? 'Restore window size' : 'Expand window'}
+              >
+                <Maximize2 size={13} />
+              </button>
+            )}
+          </div>
 
           <button
             onClick={onCommitPush}
@@ -309,21 +286,11 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
             <span>Save & deploy</span>
             <ChevronDown size={12} className="text-neutral-500" />
           </button>
-
-          {onToggleMaximize && (
-            <button
-              onClick={onToggleMaximize}
-              className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 transition-colors ml-1 cursor-pointer"
-              title={isMaximized ? 'Restore window size' : 'Expand window'}
-            >
-              <Maximize2 size={13} />
-            </button>
-          )}
         </div>
 
-        {/* Overflow menu (narrow screens): hover or tap to reveal */}
+        {/* Overflow menu (narrow panes): hover or tap to reveal */}
         <div
-          className="relative md:hidden shrink-0"
+          className="relative @[540px]:hidden shrink-0"
           onMouseEnter={() => setIsMoreOpen(true)}
           onMouseLeave={() => setIsMoreOpen(false)}
         >
@@ -352,6 +319,35 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
               >
                 Switch to {diffViewMode === 'split' ? 'Unified' : 'Split'} view
               </button>
+              {onSelectPaneMode && (
+                <div className="flex items-center gap-1 px-2 py-1.5">
+                  {(
+                    [
+                      ['diff', 'Diff'],
+                      ['editor', 'Editor'],
+                      ['preview', 'Preview'],
+                      ['tests', 'Checks'],
+                    ] as Array<[RightPaneMode, string]>
+                  ).map(([m, label]) => (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        onSelectPaneMode(m);
+                        setIsMoreOpen(false);
+                      }}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                        rightPaneMode === m
+                          ? isDark
+                            ? 'bg-neutral-700 text-white'
+                            : 'bg-neutral-200 text-neutral-900'
+                          : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 onClick={() => {
                   onToggleTerminal();

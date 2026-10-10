@@ -1174,7 +1174,7 @@ export default function App() {
     >
       {/* Top Floating Control Bar */}
       <div className="relative z-40 w-full flex justify-start sm:justify-center px-4 pt-3 shrink-0 overflow-x-auto">
-        <div className="flex items-center gap-2 shrink-0 bg-black/45 dark:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-white/90 text-xs shadow-xl border border-white/10 transition-opacity hover:opacity-100 opacity-80">
+        <div className="flex items-center gap-2 shrink-0 bg-black/45 dark:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl text-white/90 text-xs shadow-xl border border-white/10 transition-opacity hover:opacity-100 opacity-80">
         <button
           onClick={() => setIsCommandPaletteOpen(true)}
           className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
