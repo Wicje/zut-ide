@@ -98,11 +98,11 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden flex flex-col max-h-[85vh] ${
+        className={`w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden flex flex-col max-h-[85vh] max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark
             ? 'bg-[#18181c] border-neutral-700 text-neutral-100'
             : 'bg-white border-neutral-200 text-neutral-800'
@@ -120,7 +120,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex items-center gap-1 ${
                   prStatus === 'merged'
-                    ? 'bg-purple-600 text-white'
+                    ? 'bg-red-600 text-white'
                     : 'bg-emerald-600 text-white'
                 }`}>
                   {prStatus === 'merged' ? <GitMerge size={12} /> : <GitPullRequest size={12} />}
@@ -155,7 +155,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               onClick={() => setActiveTab('conversation')}
               className={`pb-1 flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'conversation'
-                  ? 'border-b-2 border-blue-500 font-semibold text-neutral-900 dark:text-white'
+                  ? 'border-b-2 border-red-500 font-semibold text-neutral-900 dark:text-white'
                   : 'text-neutral-400 hover:text-neutral-700'
               }`}
             >
@@ -167,7 +167,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               onClick={() => setActiveTab('commits')}
               className={`pb-1 flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'commits'
-                  ? 'border-b-2 border-blue-500 font-semibold text-neutral-900 dark:text-white'
+                  ? 'border-b-2 border-red-500 font-semibold text-neutral-900 dark:text-white'
                   : 'text-neutral-400 hover:text-neutral-700'
               }`}
             >
@@ -179,7 +179,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               onClick={() => setActiveTab('checks')}
               className={`pb-1 flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'checks'
-                  ? 'border-b-2 border-blue-500 font-semibold text-neutral-900 dark:text-white'
+                  ? 'border-b-2 border-red-500 font-semibold text-neutral-900 dark:text-white'
                   : 'text-neutral-400 hover:text-neutral-700'
               }`}
             >
@@ -191,7 +191,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               onClick={() => setActiveTab('files')}
               className={`pb-1 flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'files'
-                  ? 'border-b-2 border-blue-500 font-semibold text-neutral-900 dark:text-white'
+                  ? 'border-b-2 border-red-500 font-semibold text-neutral-900 dark:text-white'
                   : 'text-neutral-400 hover:text-neutral-700'
               }`}
             >
@@ -243,7 +243,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
 
               {/* Status Banner */}
               {prStatus === 'merged' && (
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300 flex items-center gap-2">
                   <GitMerge size={16} />
                   <span>Pull request successfully merged into main branch.</span>
                 </div>
@@ -262,7 +262,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
                   className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <GitCommit size={14} className="text-blue-500 shrink-0" />
+                    <GitCommit size={14} className="text-red-500 shrink-0" />
                     <span className="font-medium truncate">{c.message}</span>
                   </div>
                   <div className="flex items-center gap-2 text-neutral-400 font-mono text-[11px] shrink-0 ml-2">
@@ -355,7 +355,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
                   onClick={() => setIsReviewMenuOpen(false)}
                   className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 cursor-pointer"
                 >
-                  <MessageSquare size={12} className="text-blue-500" />
+                  <MessageSquare size={12} className="text-red-500" />
                   <span>Comment</span>
                 </button>
               </div>
@@ -386,7 +386,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
             ) : (
               <button
                 onClick={onClose}
-                className="px-4 py-1.5 rounded-lg bg-purple-600 text-white font-semibold text-xs shadow-sm"
+                className="px-4 py-1.5 rounded-lg bg-red-600 text-white font-semibold text-xs shadow-sm"
               >
                 Merged into Main
               </button>

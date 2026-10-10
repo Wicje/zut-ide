@@ -63,7 +63,7 @@ six-monthly rebuilds.
 ## Quota reset for a user (support request)
 
 File counter: `rm /data/.usage/<uid>-YYYY-MM.count` (exec into the volume via
-`docker compose exec zut-cloud sh`). Durable rows in `usage_meter` are audit
+`docker compose exec zut-cloud sh`). Durable rows in `zut_usage_meter` are audit
 only — the file counter is the live gate.
 
 ## Full backup / restore

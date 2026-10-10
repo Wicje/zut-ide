@@ -31,7 +31,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
 
     const newComment: LineComment = {
       id: `c-${Date.now()}`,
-      author: 'Sualeh Asif',
+      author: 'You',
       text: newCommentText.trim(),
       createdAt: 'Just now',
     };
@@ -181,7 +181,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
           <button
             onClick={() => setIsCommentBoxOpen(!isCommentBoxOpen)}
             className={`w-4 h-4 rounded flex items-center justify-center ${
-              isDark ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-blue-500 text-white hover:bg-blue-600'
+              isDark ? 'bg-red-600 text-white hover:bg-red-500' : 'bg-red-500 text-white hover:bg-red-600'
             } shadow-xs text-[9px]`}
             title="Add inline review comment"
           >
@@ -208,7 +208,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
             }`}
             title="Ask Composer about this line"
           >
-            <Sparkles size={10} className="text-purple-500" />
+            <Sparkles size={10} className="text-red-500" />
             <span className="hidden sm:inline font-sans">Ask</span>
           </button>
         )}
@@ -265,7 +265,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
               value={newCommentText}
               onChange={(e) => setNewCommentText(e.target.value)}
               placeholder="Leave a comment or suggestion..."
-              className={`w-full p-2 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              className={`w-full p-2 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-red-500 ${
                 isDark ? 'bg-[#27272a] border-neutral-700 text-white placeholder-neutral-500' : 'bg-white border-neutral-200 placeholder-neutral-400'
               }`}
               autoFocus
@@ -280,7 +280,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-medium flex items-center gap-1 shadow-xs"
+                className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[11px] font-medium flex items-center gap-1 shadow-xs"
               >
                 <Send size={10} />
                 <span>Comment</span>

@@ -75,7 +75,7 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
         <button
           onClick={handleRunAll}
           disabled={isRunning}
-          className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-xs font-medium transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-md text-xs font-medium transition-colors shadow-xs cursor-pointer disabled:opacity-50"
         >
           <Play size={11} className={isRunning ? 'animate-spin' : ''} />
           <span>{isRunning ? 'Running checks...' : 'Run All'}</span>

@@ -5,6 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 import { loadRules } from './zut';
 import { parseEdits, stripEditBlocks, type ProposedEdit } from './aiEdits';
 import type { FileMap } from './filemap';
+import { connectorsPromptBlock } from '../lib/connectors';
 
 export const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] as const;
 
@@ -57,6 +58,8 @@ export function buildSystemPrompt(
   }
   const rules = loadRules().trim();
   if (rules) parts.push('', `Project rules (always follow):\n${rules}`);
+  const tools = connectorsPromptBlock();
+  if (tools) parts.push('', tools);
   if (extra) parts.push('', extra);
   parts.push('', EDIT_PROTOCOL);
   return parts.join('\n');
@@ -71,17 +74,20 @@ export interface ChatTurn {
 export async function geminiTurn(
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
   prompt: string,
-  opts: { model: string; projectName: string; files: FileMap; activePath: string },
+  opts: { model: string; projectName: string; files: FileMap; activePath: string; images?: Array<{ mime: string; base64: string }> },
 ): Promise<ChatTurn> {
   const key = getGeminiKey();
   if (!key) throw new Error('Add a Gemini API key to chat (account settings).');
   const ai = new GoogleGenAI({ apiKey: key });
+  const imgParts = (opts.images ?? [])
+    .filter((im) => im.base64)
+    .map((im) => ({ inlineData: { mimeType: im.mime || 'image/jpeg', data: im.base64 } }));
   const contents = [
     ...history.map((m) => ({
       role: m.role === 'assistant' ? ('model' as const) : ('user' as const),
       parts: [{ text: m.content }],
     })),
-    { role: 'user' as const, parts: [{ text: prompt }] },
+    { role: 'user' as const, parts: [{ text: prompt }, ...imgParts] },
   ];
   const response = await ai.models.generateContent({
     model: opts.model,

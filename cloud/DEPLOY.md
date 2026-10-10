@@ -66,7 +66,7 @@ curl https://cloud.yourdomain.com/health
 
 ## 3. Wire the frontend
 
-Supabase SQL editor → run `supabase/usage_meter.sql` (adds free-plan caps table).
+Supabase SQL editor → run `supabase/schema_zut.sql` (adds namespaced `zut_*` tables + RPCs; use `schema.sql` only on a dedicated project).
 
 Build the PWA with two env vars:
 

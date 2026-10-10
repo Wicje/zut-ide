@@ -88,12 +88,12 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
     >
       {/* Top Browser Bar */}
       <div
-        className={`h-10 px-3.5 border-b flex items-center justify-between ${
+        className={`h-10 px-3.5 border-b flex items-center justify-between gap-2 overflow-x-auto ${
           isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-white'
         }`}
       >
         {/* Left: URL Bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 text-[11.5px] font-mono text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>{previewLabel ?? (hasLivePreview ? 'preview (sandboxed)' : 'no preview')}</span>
@@ -120,7 +120,7 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
         </div>
 
         {/* Center: Device Viewport Switcher */}
-        <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700">
+        <div className="flex items-center gap-1 shrink-0 bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700">
           <button
             onClick={() => setViewport('desktop')}
             className={`p-1 rounded transition-colors cursor-pointer ${
@@ -170,7 +170,7 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
             onClick={() => setIsInspectMode(!isInspectMode)}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer border ${
               isInspectMode
-                ? 'bg-blue-600 text-white border-blue-600 shadow-sm animate-pulse'
+                ? 'bg-red-600 text-white border-red-600 shadow-sm animate-pulse'
                 : isDark
                 ? 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white'
                 : 'bg-white border-neutral-300 text-neutral-700 hover:text-neutral-900'
@@ -185,7 +185,7 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
           <button
             onClick={() => setIsConsoleOpen(!isConsoleOpen)}
             className={`p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-white transition-colors cursor-pointer ${
-              isConsoleOpen ? 'text-blue-500' : ''
+              isConsoleOpen ? 'text-red-500' : ''
             }`}
             title="Toggle Browser Console"
           >

@@ -103,7 +103,7 @@ export interface StoredConnection {
 }
 
 export async function saveConnection(conn: StoredConnection): Promise<void> {
-  const res = await rest('/connections?on_conflict=owner_id,provider', {
+  const res = await rest('/zut_connections?on_conflict=owner_id,provider', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ ...conn, updated_at: new Date().toISOString() }),
@@ -116,7 +116,7 @@ export async function getConnection(
   provider: 'github' | 'vercel',
 ): Promise<{ access_token: string; meta: Record<string, unknown>; refresh_token?: string | null } | null> {
   const res = await rest(
-    `/connections?owner_id=eq.${ownerId}&provider=eq.${provider}&select=access_token,refresh_token,meta&limit=1`,
+    `/zut_connections?owner_id=eq.${ownerId}&provider=eq.${provider}&select=access_token,refresh_token,meta&limit=1`,
   )
   if (!res.ok) throw new Error(`Database error (${res.status})`)
   const rows = (await res.json()) as Array<{
@@ -128,7 +128,7 @@ export async function getConnection(
 }
 
 export async function deleteConnection(ownerId: string, provider: 'github' | 'vercel'): Promise<void> {
-  const res = await rest(`/connections?owner_id=eq.${ownerId}&provider=eq.${provider}`, { method: 'DELETE' })
+  const res = await rest(`/zut_connections?owner_id=eq.${ownerId}&provider=eq.${provider}`, { method: 'DELETE' })
   if (!res.ok && res.status !== 204) throw new Error(`Database error (${res.status})`)
 }
 
@@ -136,7 +136,7 @@ export async function listConnections(
   ownerId: string,
 ): Promise<Array<{ provider: string; meta: Record<string, unknown> }>> {
   const res = await rest(
-    `/connections?select=provider,meta&owner_id=eq.${ownerId}&order=provider`,
+    `/zut_connections?select=provider,meta&owner_id=eq.${ownerId}&order=provider`,
   )
   if (!res.ok) throw new Error(`Database error (${res.status})`)
   return (await res.json()) as Array<{ provider: string; meta: Record<string, unknown> }>

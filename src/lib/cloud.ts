@@ -94,7 +94,7 @@ export async function getAgentUsageThisMonth(): Promise<number | null> {
     start.setDate(1)
     start.setHours(0, 0, 0, 0)
     const { count, error } = await supabase
-      .from('usage_meter')
+      .from('zut_usage_meter')
       .select('id', { count: 'exact', head: true })
       .eq('owner_id', uid)
       .gte('ts', start.toISOString())

@@ -14,9 +14,8 @@ import { ShareModal } from './components/ShareModal';
 import { GitHubPushModal } from './components/GitHubPushModal';
 import { ImportModal } from './components/ImportModal';
 import { LoginAndAccountModal } from './components/LoginAndAccountModal';
-import { CursorRulesModal } from './components/CursorRulesModal';
+import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
-import { NewAgentModal } from './components/NewAgentModal';
 import type {
   AgentStep,
   DiffViewMode,
@@ -25,6 +24,7 @@ import type {
   SidebarSection,
   RightPaneMode,
   TestCase,
+  AttachedImage,
 } from './types';
 import type { FileMap } from './adapters/filemap';
 import {
@@ -53,12 +53,16 @@ import {
   saveDraft,
   listSnapshots,
   takeSnapshot,
+  saveSessionBackup,
+  loadSessionBackup,
   loadRules,
   saveRules,
   deployStatic,
 } from './adapters/zut';
 import { geminiTurn, getGeminiKey, setGeminiKey } from './adapters/gemini';
-import { getProviderKey, setProviderKey, clearProviderKey, type DirectProvider } from './adapters/providers';
+import { useMediaQuery } from './lib/useMediaQuery';
+import { getProviderKey, setProviderKey, clearProviderKey, getVercelToken, setVercelToken, clearVercelToken, type DirectProvider } from './adapters/providers';
+import { getConnectorKey } from './lib/connectors';
 import lightWallpaperImg from './assets/images/macos_mountain_wallpaper_1791421916911.jpg';
 import darkWallpaperImg from './assets/images/macos_dark_wallpaper_1791422419326.jpg';
 import {
@@ -69,14 +73,14 @@ import {
   Moon,
   RefreshCw,
   Command,
+  MessagesSquare,
+  Code,
+  Folder,
+  Image,
+  PanelLeftOpen,
 } from 'lucide-react';
 
-const STARTER: FileMap = {
-  'index.html':
-    '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <title>zut app</title>\n  <link rel="stylesheet" href="styles.css" />\n</head>\n<body>\n  <h1>Hello from zut</h1>\n  <script src="app.js"></script>\n</body>\n</html>\n',
-  'styles.css': 'body { font-family: system-ui, sans-serif; padding: 2rem; }\n',
-  'app.js': 'console.log("Hello from zut!");\n',
-};
+const STARTER: FileMap = {};
 
 const GEMINI_MODELS = [
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
@@ -142,7 +146,6 @@ export default function App() {
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified');
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isNewAgentOpen, setIsNewAgentOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isPRModalOpen, setIsPRModalOpen] = useState(false);
   const [isPRStudioOpen, setIsPRStudioOpen] = useState(false);
@@ -151,6 +154,84 @@ export default function App() {
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const [mobileTab, setMobileTab] = useState<'files' | 'agent' | 'code'>('agent');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [wallpaperOn, setWallpaperOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('zut:wallpaper') !== 'off';
+    } catch {
+      return true;
+    }
+  });
+  const toggleWallpaper = () => {
+    setWallpaperOn((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem('zut:wallpaper', next ? 'on' : 'off');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+  const [wallpaperChoice, setWallpaperChoice] = useState<'auto' | 'light' | 'dark' | 'custom'>(() => {
+    try {
+      const c = localStorage.getItem('zut:wallpaper-choice');
+      return c === 'light' || c === 'dark' || c === 'custom' ? c : 'auto';
+    } catch {
+      return 'auto';
+    }
+  });
+  const [customWallpaper, setCustomWallpaper] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('zut:wallpaper-custom');
+    } catch {
+      return null;
+    }
+  });
+  const [wallpaperMenuOpen, setWallpaperMenuOpen] = useState(false);
+  const chooseWallpaper = (c: 'auto' | 'light' | 'dark' | 'custom') => {
+    setWallpaperChoice(c);
+    try {
+      localStorage.setItem('zut:wallpaper-choice', c);
+    } catch {
+      /* ignore */
+    }
+    setWallpaperMenuOpen(false);
+  };
+  const handleWallpaperUpload = (fl: FileList | null) => {
+    const f = fl?.[0];
+    if (!f) return;
+    if (!f.type.startsWith('image/')) {
+      showToast('Pick an image file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result ?? '');
+      if (!url) return;
+      try {
+        localStorage.setItem('zut:wallpaper-custom', url);
+      } catch {
+        showToast('Image too large to keep — try a smaller one.');
+        return;
+      }
+      setCustomWallpaper(url);
+      chooseWallpaper('custom');
+      showToast('Wallpaper updated.');
+    };
+    reader.readAsDataURL(f);
+  };
+
+  // Tablet/narrow defaults: slimmer rails so the 3-column shell still fits.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1100) {
+      setSidebarWidth(180);
+      setComposerWidth(320);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Resizable Split-Pane Dimensions (Feature 1)
   const [sidebarWidth, setSidebarWidth] = useState(210);
@@ -164,6 +245,7 @@ export default function App() {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [geminiKeySet, setGeminiKeySet] = useState(() => getGeminiKey() !== null);
+  const [netlifyKeySet, setNetlifyKeySet] = useState(() => getVercelToken() !== null);
   const [providerKeySet, setProviderKeySet] = useState<Record<string, boolean>>(() => ({
     openrouter: getProviderKey('openrouter') !== null,
     anthropic: getProviderKey('anthropic') !== null,
@@ -214,7 +296,7 @@ export default function App() {
 
   // ---- Real project (local draft first, broker cloud when signed in) ----
   const [files, setFiles] = useState<FileMap>(() => loadDraft()?.files ?? STARTER);
-  const [projectName, setProjectName] = useState(() => loadDraft()?.name ?? 'my-project');
+  const [projectName, setProjectName] = useState(() => loadDraft()?.name ?? 'Untitled project');
   const [projectId, setProjectId] = useState<string | null>(null);
   const filesRef = useRef(files);
   filesRef.current = files;
@@ -229,22 +311,52 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load the most recent cloud project on sign-in (local draft stays otherwise).
+  // Sign-in: back up device work to the cloud first, then open the latest
+  // cloud project. Device files are never silently replaced — the `same`
+  // guard also makes re-runs (reload, token refresh) no-ops.
   useEffect(() => {
     if (!user || !brokerEnabled()) return;
     listProjects()
       .then((rows) => {
-        if (rows.length === 0) return;
+        const local = { ...filesRef.current };
+        const localCount = Object.keys(local).length;
         const latest = rows[0];
+        const same =
+          latest &&
+          JSON.stringify(Object.keys(local).sort().map((k) => [k, local[k]])) ===
+            JSON.stringify(Object.keys(latest.files ?? {}).sort().map((k) => [k, (latest.files as Record<string, string>)[k]]));
+        if (same && latest) {
+          setProjectId(latest.id);
+          setSavedTo('cloud');
+          if (latest.share_token) setShareLink(buildShareLink(latest.share_token));
+          return;
+        }
+        if (localCount > 0) {
+          takeSnapshot(local);
+          // Reuse the previous device backup instead of littering a new one.
+          const backupName = `${projectName} (this device)`;
+          const existing = rows.find((r) => r.name === backupName);
+          if (existing) {
+            updateProject(existing.id, backupName, local).catch(() => {});
+          } else {
+            createProject(backupName, local).catch(() => {});
+          }
+        }
+        if (!latest) {
+          if (localCount > 0) showToast('Signed in — device work kept and backed up to the cloud.');
+          return;
+        }
         setProjectId(latest.id);
         setSavedTo('cloud');
         if (latest.share_token) setShareLink(buildShareLink(latest.share_token));
-        if (Object.keys(filesRef.current).length <= 3) {
-          setFiles({ ...latest.files });
-          setProjectName(latest.name);
-          takeSnapshot({ ...latest.files });
-          showToast(`Opened cloud project "${latest.name}"`);
-        }
+        setFiles({ ...latest.files });
+        setProjectName(latest.name);
+        takeSnapshot({ ...latest.files });
+        showToast(
+          localCount > 0
+            ? `Signed in — device work backed up as "${projectName} (this device)". Opened cloud project "${latest.name}".`
+            : `Opened cloud project "${latest.name}"`,
+        );
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,16 +376,28 @@ export default function App() {
     return names[0] ?? 'index.html';
   });
 
-  // ---- Real sessions (agent conversations; no fixtures) ----
+  // ---- Real sessions (agent conversations; no fixtures; survive reload) ----
   const [sessions, setSessions] = useState<Record<string, SessionData>>(() => {
+    const backup = loadSessionBackup();
+    if (backup && Object.keys(backup.sessions).length > 0) return backup.sessions;
     const id = 'session-1';
     return { [id]: blankSession(id, 'New agent', 'Gemini 2.5 Flash') };
   });
-  const [activeSessionId, setActiveSessionId] = useState<string>('session-1');
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    const backup = loadSessionBackup();
+    if (backup && backup.sessions[backup.activeId]) return backup.activeId;
+    return 'session-1';
+  });
   const [sessionBases, setSessionBases] = useState<Record<string, FileMap>>({});
-  const [chatHistories, setChatHistories] = useState<Record<string, ChatMsg[]>>({});
+  const [chatHistories, setChatHistories] = useState<Record<string, ChatMsg[]>>(
+    () => (loadSessionBackup()?.chats as Record<string, ChatMsg[]> | undefined) ?? {},
+  );
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  // Sessions + chats survive reload (quota-safe, capped at 10).
+  useEffect(() => {
+    saveSessionBackup(sessions, chatHistories, activeSessionId);
+  }, [sessions, chatHistories, activeSessionId]);
   const [isGenerating, setIsGenerating] = useState(false);
   // Ref mirror so a workspace reset can cancel/restart turns synchronously
   // (state reads in stale closures would otherwise block the new turn).
@@ -410,7 +534,7 @@ export default function App() {
   }
 
   // ---- Real agent turn (Gemini direct, or cloud agent) ----
-  async function runAgentTurn(sessionId: string, promptText: string) {
+  async function runAgentTurn(sessionId: string, promptText: string, images: AttachedImage[] = []) {
     const sess = sessionsRef.current[sessionId];
     if (!sess || generatingRef.current) return;
     const base = { ...filesRef.current };
@@ -448,6 +572,9 @@ export default function App() {
         reply = r.reply;
         changedPaths = [...Object.keys(r.updated), ...Object.keys(r.created), ...r.deleted];
       } else if (modelLabel === OPENCODE_LABEL) {
+        if (images.length > 0) {
+          showToast('Self-host turns can’t see images yet — describe it in words.');
+        }
         const { opencodeTurn } = await import('./adapters/opencode');
         const { buildSystemPrompt } = await import('./adapters/gemini');
         const r = await opencodeTurn(
@@ -455,6 +582,7 @@ export default function App() {
           promptText,
           buildSystemPrompt(projectName, base, activeFilePath),
           () => {},
+          opencodeModel ?? undefined,
         );
         for (const [p, c] of Object.entries(r.updated)) base[p] = c;
         for (const [p, c] of Object.entries(r.created)) base[p] = c;
@@ -466,14 +594,17 @@ export default function App() {
         const { streamProvider } = await import('./adapters/providers');
         const { buildSystemPrompt } = await import('./adapters/gemini');
         const history = (chatHistories[sessionId] ?? []).slice(-12);
+        const withPrompt = [...history, { role: 'user' as const, content: promptText }];
         let acc = '';
         await streamProvider(
           provider,
-          history,
+          withPrompt,
           buildSystemPrompt(projectName, base, activeFilePath),
           (d) => {
             acc += d;
           },
+          undefined,
+          images.map((i) => ({ mime: i.mime, base64: i.dataUrl.split(',')[1] ?? '' })),
         );
         reply = acc;
         changedPaths = [];
@@ -497,6 +628,7 @@ export default function App() {
           projectName,
           files: base,
           activePath: activeFilePath,
+          images: images.map((i) => ({ mime: i.mime, base64: i.dataUrl.split(',')[1] ?? '' })),
         });
         reply = r.reply;
         changedPaths = [];
@@ -572,14 +704,17 @@ export default function App() {
       showToast(files.length > 0 ? `Agent updated ${files.length} file${files.length === 1 ? '' : 's'} — review the diff` : 'Agent replied (no file changes)');
     } catch (e) {
       dropRunning();
+      const msg = (e as Error).message;
+      // Missing-key failures land where keys live instead of dying quietly.
+      if (/api key/i.test(msg)) setIsLoginAccountOpen(true);
       pushStep({
         id: `step-${Date.now()}`,
         type: 'edit',
         query: promptText.slice(0, 64),
         status: 'failed',
-        details: (e as Error).message,
+        details: msg,
       });
-      showToast(`Agent failed: ${(e as Error).message}`);
+      showToast(`Agent failed: ${msg}`);
     } finally {
       generatingRef.current = false;
       setIsGenerating(false);
@@ -670,7 +805,6 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       setIsCommandPaletteOpen(false);
-      setIsNewAgentOpen(false);
       setIsVideoModalOpen(false);
       setIsPRModalOpen(false);
       setIsPRStudioOpen(false);
@@ -757,7 +891,7 @@ export default function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        setIsNewAgentOpen(true);
+        startNewProject();
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
@@ -890,13 +1024,27 @@ export default function App() {
   };
 
   const [opencodeReady, setOpencodeReady] = useState(false);
+  const [opencodeModels, setOpencodeModels] = useState<Array<{ providerID: string; id: string; name: string; free: boolean }>>([]);
+  const [opencodeModel, setOpencodeModel] = useState<{ providerID: string; modelID: string } | null>(null);
   useEffect(() => {
-    void import('./adapters/opencode').then(({ selfHostReady }) => {
+    void import('./adapters/opencode').then(({ selfHostReady, listOpencodeModels, getOpencodeModel }) => {
       selfHostReady()
-        .then(setOpencodeReady)
+        .then((ok) => {
+          setOpencodeReady(ok);
+          if (!ok) return;
+          setOpencodeModel(getOpencodeModel());
+          listOpencodeModels()
+            .then(setOpencodeModels)
+            .catch(() => {});
+        })
         .catch(() => {});
     });
   }, []);
+
+  const changeOpencodeModel = (m: { providerID: string; modelID: string } | null) => {
+    setOpencodeModel(m);
+    void import('./adapters/opencode').then(({ setOpencodeModel }) => setOpencodeModel(m));
+  };
 
   const modelOptions = [
     'Gemini 2.5 Flash',
@@ -923,6 +1071,36 @@ export default function App() {
     logEvent('RESTORE', id);
     setShowHistory(false);
     showToast('Snapshot restored (previous state checkpointed).');
+  }
+
+  // Start a blank project immediately — no modal. Old sessions stay in the
+  // sidebar, outgoing files were snapshotted, model carries over.
+  function startNewProject() {
+    takeSnapshot(filesRef.current);
+    const fresh = { ...STARTER };
+    const newId = `session-${Date.now()}`;
+    const newSession = blankSession(newId, 'New project', activeSession?.model ?? 'Gemini 2.5 Flash');
+    generatingRef.current = false;
+    setIsGenerating(false);
+    setFiles(fresh);
+    setProjectName('Untitled project');
+    setProjectId(null);
+    setShareLink(null);
+    setSavedTo('device');
+    setActiveFilePath(Object.keys(fresh).sort()[0] ?? 'index.html');
+    setSessions((prev) => ({ ...prev, [newId]: newSession }));
+    setActiveSessionId(newId);
+    if (isMobile) setMobileTab('agent');
+    setRuns([]);
+    setConsoleLines([]);
+    setSrcDoc('');
+    setBuildMs(null);
+    setPrData(null);
+    setVideoUrl(null);
+    setEvents([`[${stamp()}] New project started.`]);
+    takeSnapshot(fresh);
+    setRightPaneMode('editor');
+    showToast('New project started — old work kept in the sidebar + History.');
   }
 
   async function handleImport(url: string): Promise<{ name: string; files: number }> {
@@ -974,19 +1152,29 @@ export default function App() {
 
   const isDark = theme === 'dark';
   const currentWallpaper = isDark ? darkWallpaperImg : lightWallpaperImg;
+  const effectiveWallpaper = !wallpaperOn
+    ? undefined
+    : wallpaperChoice === 'custom' && customWallpaper
+    ? customWallpaper
+    : wallpaperChoice === 'light'
+    ? lightWallpaperImg
+    : wallpaperChoice === 'dark'
+    ? darkWallpaperImg
+    : currentWallpaper;
 
   return (
     <div
-      className={`relative w-screen h-screen overflow-hidden flex items-center justify-center bg-cover bg-center select-none transition-colors duration-500 ${
+      className={`relative w-screen h-dvh overflow-hidden flex flex-col items-center justify-center bg-cover bg-center select-none transition-colors duration-500 ${
         isDark ? 'dark' : ''
       }`}
       style={{
-        backgroundImage: `url(${currentWallpaper})`,
+        backgroundImage: effectiveWallpaper ? `url(${effectiveWallpaper})` : undefined,
         backgroundColor: isDark ? '#141416' : '#6c798a',
       }}
     >
       {/* Top Floating Control Bar */}
-      <div className="absolute top-3 right-4 z-40 flex items-center gap-2 bg-black/45 dark:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-white/90 text-xs shadow-xl border border-white/10 transition-opacity hover:opacity-100 opacity-80">
+      <div className="relative z-40 w-full flex justify-start sm:justify-center px-4 pt-3 shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-2 shrink-0 bg-black/45 dark:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-white/90 text-xs shadow-xl border border-white/10 transition-opacity hover:opacity-100 opacity-80">
         <button
           onClick={() => setIsCommandPaletteOpen(true)}
           className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
@@ -1053,7 +1241,17 @@ export default function App() {
           className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
           title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
         >
-          {isDark ? <Sun size={12} className="text-amber-400" /> : <Moon size={12} className="text-purple-300" />}
+          {isDark ? <Sun size={12} className="text-amber-400" /> : <Moon size={12} className="text-red-300" />}
+        </button>
+
+        <span className="text-white/20 text-xs">|</span>
+
+        <button
+          onClick={() => setWallpaperMenuOpen((v) => !v)}
+          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+          title="Wallpaper"
+        >
+          <Image size={12} className={wallpaperMenuOpen ? 'text-white' : wallpaperOn ? 'text-white/90' : 'text-white/40'} />
         </button>
 
         <span className="text-white/20 text-xs">|</span>
@@ -1075,18 +1273,65 @@ export default function App() {
         >
           <RefreshCw size={11} />
         </button>
+        </div>
+        {wallpaperMenuOpen && (
+          <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 w-60 rounded-xl border border-white/10 bg-black/75 backdrop-blur-md p-2 text-white/90 text-xs shadow-xl">
+            {(['auto', 'light', 'dark'] as const).map((c) => (
+              <button
+                key={c}
+                onClick={() => chooseWallpaper(c)}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer capitalize"
+              >
+                <span>{c === 'auto' ? 'Auto (follows theme)' : `${c[0].toUpperCase()}${c.slice(1)} wallpaper`}</span>
+                {wallpaperChoice === c && <span className="text-red-400">✓</span>}
+              </button>
+            ))}
+            {customWallpaper && (
+              <button
+                onClick={() => chooseWallpaper('custom')}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <span>Custom photo</span>
+                {wallpaperChoice === 'custom' && <span className="text-red-400">✓</span>}
+              </button>
+            )}
+            <label className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+              <span>Upload custom…</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  handleWallpaperUpload(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            <div className="h-px bg-white/10 my-1" />
+            <button
+              onClick={() => {
+                toggleWallpaper();
+                setWallpaperMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <span>{wallpaperOn ? 'Hide wallpaper' : 'Show wallpaper'}</span>
+              {!wallpaperOn && <span className="text-red-400">✓</span>}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Main Cursor App Window with Interactive Drag Handles */}
+      {/* Main Zut App Window with Interactive Drag Handles */}
       <div
         ref={containerRef}
         className={`relative z-10 transition-all duration-100 ease-out flex shadow-2xl overflow-hidden border ${
-          isMaximized
-            ? 'w-full h-full rounded-none border-none'
-            : 'w-[96vw] max-w-[1240px] h-[92vh] max-h-[820px] rounded-2xl shadow-2xl shadow-black/50 border-black/15'
-        }`}
+          isMobile || isMaximized
+            ? 'w-full flex-1 min-h-0 rounded-none border-none'
+            : 'w-[96vw] max-w-[1240px] h-[88vh] max-h-[800px] rounded-2xl shadow-2xl shadow-black/50 border-black/15'
+        } ${isMobile ? 'flex-col' : ''}`}
         style={{
-          boxShadow: isMaximized
+          boxShadow: isMaximized || isMobile
             ? 'none'
             : isDark
             ? '0 30px 70px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1)'
@@ -1094,7 +1339,27 @@ export default function App() {
         }}
       >
         {/* Left Column: Sidebar with Dynamic Width */}
-        <div style={{ width: `${sidebarWidth}px` }} className="shrink-0 h-full overflow-hidden flex flex-col">
+        <div
+          style={isMobile ? undefined : { width: `${sidebarCollapsed ? 44 : sidebarWidth}px` }}
+          className={`shrink-0 overflow-hidden flex flex-col ${
+            isMobile ? (mobileTab === 'files' ? 'w-full h-full' : 'hidden') : 'h-full'
+          }`}
+        >
+          {sidebarCollapsed && !isMobile ? (
+            <div
+              className={`w-full h-full flex flex-col items-center pt-2 border-r ${
+                isDark ? 'bg-[#141416] border-neutral-800' : 'bg-[#f4f4f6] border-[#e5e5e7]'
+              }`}
+            >
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                className="hover:text-neutral-700 dark:hover:text-neutral-200 text-neutral-400 p-0.5 rounded transition-colors cursor-pointer"
+                title="Expand sidebar"
+              >
+                <PanelLeftOpen size={14} strokeWidth={2} />
+              </button>
+            </div>
+          ) : (
           <Sidebar
             sections={sections}
             activeItem={activeSessionId}
@@ -1102,33 +1367,48 @@ export default function App() {
               if (id.startsWith('file:')) {
                 setActiveFilePath(id.slice(5));
                 setRightPaneMode('editor');
+                if (isMobile) setMobileTab('code');
               } else if (sessions[id]) {
                 setActiveSessionId(id);
+                if (isMobile) setMobileTab('agent');
                 showToast(`Switched session to ${sessions[id].title}`);
               }
             }}
-            onNewAgent={() => setIsNewAgentOpen(true)}
+            onNewAgent={startNewProject}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
             onOpenAccount={() => setIsLoginAccountOpen(true)}
+            onOpenRules={() => setIsRulesModalOpen(true)}
+            user={user}
             theme={theme}
+            onToggleSidebar={() => setSidebarCollapsed(true)}
           />
+          )}
         </div>
 
         {/* Feature 1: Draggable Resizer 1 (Between Sidebar & Composer) */}
         <div
           onMouseDown={() => setIsResizingSidebar(true)}
           onDoubleClick={() => setSidebarWidth(210)}
-          className={`w-1 shrink-0 h-full cursor-col-resize transition-colors relative z-20 hover:bg-blue-500/50 ${
-            isResizingSidebar ? 'bg-blue-600' : isDark ? 'bg-neutral-800' : 'bg-neutral-200'
+          className={`w-1 shrink-0 h-full cursor-col-resize transition-colors relative z-20 hover:bg-red-500/50 ${
+            isMobile || sidebarCollapsed ? 'hidden' : isResizingSidebar ? 'bg-red-600' : isDark ? 'bg-neutral-800' : 'bg-neutral-200'
           }`}
           title="Drag to resize sidebar (Double-click to reset)"
         />
 
         {/* Middle Column: Composer Ghost Chat Pane with Dynamic Width */}
-        <div style={{ width: `${composerWidth}px` }} className="shrink-0 h-full overflow-hidden flex flex-col">
+        <div
+          style={isMobile ? undefined : { width: `${composerWidth}px` }}
+          className={`shrink-0 overflow-hidden flex flex-col ${
+            isMobile ? (mobileTab === 'agent' ? 'w-full h-full' : 'hidden') : 'h-full'
+          }`}
+        >
           <ComposerPane
             session={activeSession}
             models={modelOptions}
+            selfHostLabel={OPENCODE_LABEL}
+            opencodeModels={opencodeModels}
+            opencodeModel={opencodeModel}
+            onOpencodeModelChange={changeOpencodeModel}
             onModelChange={(model) => {
               setSessions((prev) => {
                 const s = prev[activeSessionId];
@@ -1146,10 +1426,18 @@ export default function App() {
             }}
             onReviewClick={() => {
               setRightPaneMode('diff');
+              if (isMobile) setMobileTab('code');
               showToast('Focusing SCM diff review pane');
             }}
-            onGenerateEdits={(prompt) => {
-              void runAgentTurn(activeSessionId, prompt);
+            onGenerateEdits={(prompt, images) => {
+              if (images && images.length > 0) {
+                setSessions((prev) => {
+                  const s = prev[activeSessionId];
+                  if (!s) return prev;
+                  return { ...prev, [activeSessionId]: { ...s, attachments: [...(s.attachments ?? []), ...images] } };
+                });
+              }
+              void runAgentTurn(activeSessionId, prompt, images ?? []);
             }}
             onRollbackCheckpoint={handleRollbackCheckpoint}
             onOpenRules={() => setIsRulesModalOpen(true)}
@@ -1162,14 +1450,18 @@ export default function App() {
         <div
           onMouseDown={() => setIsResizingComposer(true)}
           onDoubleClick={() => setComposerWidth(380)}
-          className={`w-1 shrink-0 h-full cursor-col-resize transition-colors relative z-20 hover:bg-blue-500/50 ${
-            isResizingComposer ? 'bg-blue-600' : isDark ? 'bg-neutral-800' : 'bg-neutral-200'
+          className={`w-1 shrink-0 h-full cursor-col-resize transition-colors relative z-20 hover:bg-red-500/50 ${
+            isMobile ? 'hidden' : isResizingComposer ? 'bg-red-600' : isDark ? 'bg-neutral-800' : 'bg-neutral-200'
           }`}
           title="Drag to resize composer pane (Double-click to reset)"
         />
 
         {/* Right Column: Dynamic Pane Selection (flex-1) */}
-        <div className="flex-1 h-full overflow-hidden flex flex-col">
+        <div
+          className={`flex-1 overflow-hidden flex flex-col ${
+            isMobile ? (mobileTab === 'code' ? 'w-full h-full' : 'hidden') : 'h-full'
+          }`}
+        >
           {rightPaneMode === 'diff' && (
             <DiffReviewPane
               files={activeFiles}
@@ -1181,7 +1473,6 @@ export default function App() {
                 void save();
                 setIsVercelDeployOpen(true);
               }}
-              onOpenDeploy={() => setIsVercelDeployOpen(true)}
               onAskComposer={handleAskComposerAboutLine}
               onSwitchToEditor={() => setRightPaneMode('editor')}
               rightPaneMode={rightPaneMode}
@@ -1219,6 +1510,94 @@ export default function App() {
               saveState={savedTo === 'cloud' ? 'Saved · cloud' : 'Saved · this device'}
               buildMs={buildMs}
               onSwitchToDiff={() => setRightPaneMode('diff')}
+              onCreateFile={() => {
+                try {
+                  const existing = filesRef.current;
+                  let n = Object.keys(existing).length + 1;
+                  let name = `untitled-${n}.html`;
+                  while (existing[name]) {
+                    n += 1;
+                    name = `untitled-${n}.html`;
+                  }
+                  setFiles((prev) => ({ ...prev, [name]: '' }));
+                  setActiveFilePath(name);
+                  showToast(`Created ${name} — name it below.`);
+                  return name;
+                } catch (e) {
+                  showToast(`Could not create file: ${(e as Error).message}`);
+                  return null;
+                }
+              }}
+              onCreateFolder={() => {
+                try {
+                  const existing = filesRef.current;
+                  let f = 1;
+                  let folder = 'new-folder';
+                  while (Object.keys(existing).some((k) => k === folder || k.startsWith(`${folder}/`))) {
+                    f += 1;
+                    folder = `new-folder-${f}`;
+                  }
+                  let n = 1;
+                  let name = `${folder}/untitled-${n}.html`;
+                  while (existing[name]) {
+                    n += 1;
+                    name = `${folder}/untitled-${n}.html`;
+                  }
+                  setFiles((prev) => ({ ...prev, [name]: '' }));
+                  setActiveFilePath(name);
+                  showToast(`Created ${name} — name it below.`);
+                  return name;
+                } catch (e) {
+                  showToast(`Could not create folder: ${(e as Error).message}`);
+                  return null;
+                }
+              }}
+              onSuggestPrompt={(p) => {
+                void runAgentTurn(activeSessionId, p);
+              }}
+              onRenameFile={(oldId, newId) => {
+                const clean = newId.trim().replace(/^\/+/, '');
+                if (!clean || clean === oldId) return;
+                if (filesRef.current[clean]) {
+                  showToast('A file with that name already exists.');
+                  return;
+                }
+                takeSnapshot(filesRef.current);
+                setFiles((prev) => {
+                  const next = { ...prev };
+                  next[clean] = next[oldId] ?? '';
+                  delete next[oldId];
+                  return next;
+                });
+                if (activeFilePath === oldId) setActiveFilePath(clean);
+                showToast(`Renamed to ${clean.split('/').pop()}`);
+              }}
+              onDeleteFile={(fileId) => {
+                takeSnapshot(filesRef.current);
+                setFiles((prev) => {
+                  const next = { ...prev };
+                  delete next[fileId];
+                  return next;
+                });
+                const rest = Object.keys(filesRef.current).filter((k) => k !== fileId).sort();
+                setActiveFilePath(rest[0] ?? 'index.html');
+                showToast(`Deleted ${fileId.split('/').pop()}`);
+              }}
+              onDuplicateFile={(fileId) => {
+                const dot = fileId.lastIndexOf('.');
+                const base = dot > 0 ? fileId.slice(0, dot) : fileId;
+                const ext = dot > 0 ? fileId.slice(dot) : '';
+                let n = 2;
+                let name = `${base}-copy${ext}`;
+                while (filesRef.current[name]) {
+                  n += 1;
+                  name = `${base}-copy-${n}${ext}`;
+                }
+                takeSnapshot(filesRef.current);
+                setFiles((prev) => ({ ...prev, [name]: prev[fileId] ?? '' }));
+                setActiveFilePath(name);
+                showToast(`Duplicated as ${name.split('/').pop()}`);
+              }}
               theme={theme}
             />
           )}
@@ -1262,6 +1641,36 @@ export default function App() {
             />
           )}
         </div>
+
+        {/* Mobile bottom nav: one pane at a time on small screens */}
+        {isMobile && (
+          <div
+            className={`shrink-0 h-14 px-2 flex items-center justify-around border-t ${
+              isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7] bg-[#f4f4f6]'
+            }`}
+          >
+            {(
+              [
+                { id: 'files', label: 'Files', Icon: Folder },
+                { id: 'agent', label: 'Agent', Icon: MessagesSquare },
+                { id: 'code', label: 'Code', Icon: Code },
+              ] as const
+            ).map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => setMobileTab(id)}
+                className={`flex flex-col items-center gap-0.5 px-6 py-1.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+                  mobileTab === id
+                    ? 'text-red-500'
+                    : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                }`}
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Interactive Modals */}
@@ -1356,8 +1765,8 @@ export default function App() {
         onClose={() => setIsVercelDeployOpen(false)}
         branchName={projectName}
         onDeploy={async (onLog) => {
-          onLog('Zipping project…');
-          const { url } = await deployStatic(filesRef.current);
+          onLog('Uploading to Vercel…');
+          const { url } = await deployStatic(filesRef.current, { name: projectName, token: getVercelToken() });
           onLog(`Live at ${url}`);
           logEvent('DEPLOY', url);
           return { url };
@@ -1440,10 +1849,21 @@ export default function App() {
           setProviderKeySet((prev) => ({ ...prev, [p]: false }));
           showToast('Provider key removed.');
         }}
+        deployKeySet={netlifyKeySet}
+        onSaveDeployKey={(key) => {
+          setVercelToken(key);
+          setNetlifyKeySet(true);
+          showToast('Vercel token saved in this browser.');
+        }}
+        onClearDeployKey={() => {
+          clearVercelToken();
+          setNetlifyKeySet(false);
+          showToast('Vercel token removed.');
+        }}
         theme={theme}
       />
 
-      <CursorRulesModal
+      <RulesModal
         isOpen={isRulesModalOpen}
         onClose={() => setIsRulesModalOpen(false)}
         onSaveRules={(rules) => {
@@ -1469,55 +1889,13 @@ export default function App() {
           void save();
           setIsVercelDeployOpen(true);
         }}
-        onNewAgent={() => setIsNewAgentOpen(true)}
+        onNewAgent={startNewProject}
         onOpenDeploy={() => setIsVercelDeployOpen(true)}
         onOpenAccount={() => setIsLoginAccountOpen(true)}
         onOpenHistory={() => setShowHistory(true)}
         onShare={() => setShowShare(true)}
         onImportUrl={() => setShowImport(true)}
         onPushGithub={() => setShowGithub(true)}
-        theme={theme}
-      />
-
-      <NewAgentModal
-        isOpen={isNewAgentOpen}
-        onClose={() => setIsNewAgentOpen(false)}
-        onSubmit={(prompt, model) => {
-          // Safety first: snapshot outgoing work so History can restore it.
-          takeSnapshot(filesRef.current);
-          // Fresh instance, clear of anything: starter files + clean slate.
-          const fresh = { ...STARTER };
-          const newId = `session-${Date.now()}`;
-          const newSession = blankSession(newId, prompt.slice(0, 32) || 'New agent', model);
-          newSession.prompt = prompt;
-          generatingRef.current = false;
-          setIsGenerating(false);
-          setFiles(fresh);
-          setProjectName('my-project');
-          setProjectId(null);
-          setShareLink(null);
-          setSavedTo('device');
-          setActiveFilePath(Object.keys(fresh).sort()[0] ?? 'index.html');
-          setSessions({ [newId]: newSession });
-          setSessionBases({});
-          setChatHistories({});
-          setActiveSessionId(newId);
-          setRuns([]);
-          setConsoleLines([]);
-          setSrcDoc('');
-          setBuildMs(null);
-          setPrData(null);
-          setVideoUrl(null);
-          setEvents([`[${stamp()}] Fresh workspace ready.`]);
-          // Clean diff baseline so the starter shows no stale changes
-          // (the pre-reset snapshot stays one step back in History).
-          takeSnapshot(fresh);
-          setIsNewAgentOpen(false);
-          setRightPaneMode('diff');
-          showToast('Fresh workspace started — previous work snapshotted in History.');
-          void runAgentTurn(newId, prompt);
-        }}
-        models={modelOptions}
         theme={theme}
       />
 
@@ -1551,12 +1929,24 @@ export default function App() {
         isOpen={showGithub}
         onClose={() => setShowGithub(false)}
         defaultRepo={projectName}
-        onPush={async (repo, isPrivate, token) => {
-          const { pushToGithub } = await import('./adapters/github');
-          const r = await pushToGithub(repo, isPrivate, filesRef.current, token);
+        initialToken={getConnectorKey('github') ?? undefined}
+        onPush={async (repo, isPrivate, token, opts) => {
+          const { pushToGithub, createPullRequest, defaultPushMessage } = await import('./adapters/github');
+          const r = await pushToGithub(repo, isPrivate, filesRef.current, token, opts);
           logEvent('GITHUB', r.url);
-          showToast(`Pushed to ${r.url}`);
-          return r;
+          let prUrl: string | null = null;
+          if (r.branch !== r.defaultBranch) {
+            const title = opts.message?.trim() || defaultPushMessage(r.repo);
+            try {
+              const pr = await createPullRequest(r.owner, r.repo, r.branch, r.defaultBranch, title, token);
+              prUrl = pr.url;
+              logEvent('GITHUB', `PR ${pr.url}`);
+            } catch (e) {
+              showToast(`Pushed — PR step said: ${(e as Error).message}`);
+            }
+          }
+          showToast(prUrl ? `Pushed + PR opened: ${prUrl}` : `Pushed to ${r.url}`);
+          return { url: prUrl ?? r.url, prUrl };
         }}
         theme={theme}
       />

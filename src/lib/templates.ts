@@ -33,7 +33,7 @@ export function emptyProject(): FileMap {
 }
 
 h1 {
-  color: #4f46e5;
+  color: #e5484d;
 }
 `,
     [JS_FILE]: `console.log('Hello from script.js!');
@@ -41,7 +41,7 @@ h1 {
 const heading = document.querySelector('h1');
 heading.addEventListener('click', () => {
   console.log('You clicked the heading!');
-  heading.style.color = heading.style.color === 'red' ? '#4f46e5' : 'red';
+  heading.style.color = heading.style.color === 'red' ? '#e5484d' : 'red';
 });
 `,
   }

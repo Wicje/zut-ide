@@ -49,3 +49,7 @@ export default async function handler(req: Request) {
     return json(200, result)
   })
 }
+
+// Edge Functions must start their own server — without this the deployment
+// boots but never answers (requests hang until timeout).
+Deno.serve((req: Request) => handler(req))

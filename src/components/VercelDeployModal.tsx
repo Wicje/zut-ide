@@ -74,11 +74,11 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden transition-all ${
+        className={`w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden transition-all max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark
             ? 'bg-[#18181c] border-neutral-700 text-neutral-100'
             : 'bg-white border-neutral-200 text-neutral-800'
@@ -115,7 +115,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
-                <GitBranch size={13} className="text-blue-500" />
+                <GitBranch size={13} className="text-red-500" />
                 <span className="font-semibold">{branchName}</span>
               </div>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
@@ -124,14 +124,14 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
             </div>
 
             <p className="text-[11.5px] text-neutral-500">
-              Publishes this project to a free live URL. No account needed — share the link when it's done.
+              Publishes this project to a live Vercel URL using your Vercel token (free at vercel.com → Settings → Tokens). Add it once in your Zut account, then publish as often as you like.
             </p>
           </div>
 
           {/* Idle State Banner */}
           {deployState === 'idle' && (
             <div className="py-4 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center">
                 <Zap size={24} />
               </div>
               <div>
@@ -175,7 +175,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
             <div className="space-y-3 py-2">
               <div className="flex items-center justify-between text-xs font-medium">
                 <div className="flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin text-blue-500" />
+                  <Loader2 size={14} className="animate-spin text-red-500" />
                   <span>Publishing…</span>
                 </div>
                 <span className="font-mono text-neutral-400">{logs.length} log lines</span>
@@ -215,7 +215,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 font-medium">
-                    <Globe size={13} className="text-blue-500" />
+                    <Globe size={13} className="text-red-500" />
                     <span>Domain:</span>
                   </div>
                   <button
@@ -228,7 +228,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black/40 border border-neutral-200 dark:border-neutral-700 font-mono text-[11.5px]">
-                  <span className="text-blue-600 dark:text-blue-400 truncate">
+                  <span className="text-red-600 dark:text-red-400 truncate">
                     {deploymentUrl}
                   </span>
                   <a

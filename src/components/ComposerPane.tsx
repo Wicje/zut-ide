@@ -24,8 +24,11 @@ import {
   Pause,
   X,
   XCircle,
+  ThumbsUp,
+  ThumbsDown,
+  ImagePlus,
 } from 'lucide-react';
-import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext } from '../types';
+import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext, AttachedImage } from '../types';
 import screenRecThumb from '../assets/images/screen_recording_thumb_1791421930526.jpg';
 
 interface ComposerPaneProps {
@@ -33,7 +36,7 @@ interface ComposerPaneProps {
   onOpenVideoModal: () => void;
   onCommitPush: () => void;
   onReviewClick: () => void;
-  onGenerateEdits: (promptText: string) => void;
+  onGenerateEdits: (promptText: string, images?: AttachedImage[]) => void;
   onRollbackCheckpoint?: (checkpointId: string, stepTitle: string) => void;
   onOpenRules?: () => void;
   isGenerating?: boolean;
@@ -43,6 +46,58 @@ interface ComposerPaneProps {
   onModelChange?: (model: string) => void;
   /** Real attachable files for @ mentions. */
   attachableFiles?: Array<{ name: string; tokens: number }>;
+  /** Self-host model picker (shown when the opencode model is selected). */
+  selfHostLabel?: string;
+  opencodeModels?: Array<{ providerID: string; id: string; name: string; free: boolean }>;
+  opencodeModel?: { providerID: string; modelID: string } | null;
+  onOpencodeModelChange?: (m: { providerID: string; modelID: string } | null) => void;
+}
+
+/** Turn ratings (pilot signal: which turns actually helped). Capped, local-only. */
+const RATINGS_LS = 'zut:step-ratings';
+function readRatings(): Record<string, 1 | -1> {
+  try {
+    const j = JSON.parse(localStorage.getItem(RATINGS_LS) ?? '{}') as Record<string, unknown>;
+    const out: Record<string, 1 | -1> = {};
+    for (const [k, v] of Object.entries(j)) {
+      if (v === 1 || v === -1) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function downscaleImage(file: File): Promise<AttachedImage> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const MAX = 1568;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas unavailable');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        URL.revokeObjectURL(url);
+        resolve({ id: `img-${Date.now()}`, name: file.name, mime: 'image/jpeg', dataUrl });
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Could not read that image.'));
+    };
+    img.src = url;
+  });
 }
 
 export const ComposerPane: React.FC<ComposerPaneProps> = ({
@@ -58,20 +113,42 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
   models,
   onModelChange,
   attachableFiles,
+  selfHostLabel,
+  opencodeModels,
+  opencodeModel,
+  onOpencodeModelChange,
 }) => {
   const isDark = theme === 'dark';
   const modelOptions = models ?? ['Composer 2.5 Fast', 'Claude 3.7 Sonnet', 'GPT-4.5 Preview', 'Claude 3.5 Haiku'];
   const [copied, setCopied] = useState(false);
   const [followUpText, setFollowUpText] = useState('');
+  const [pendingImages, setPendingImages] = useState<AttachedImage[]>([]);
+  const [ratings, setRatings] = useState<Record<string, 1 | -1>>(() => readRatings());
+  const rateStep = (id: string, v: 1 | -1) => {
+    setRatings((prev) => {
+      const next = { ...prev, [id]: v };
+      try {
+        const ids = Object.keys(next).slice(-200);
+        localStorage.setItem(RATINGS_LS, JSON.stringify(Object.fromEntries(ids.map((k) => [k, next[k]]))));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+  const imgInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedModel, setSelectedModel] = useState(session.model || modelOptions[0]);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [opencodeCustom, setOpencodeCustom] = useState('');
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  const [voiceHint, setVoiceHint] = useState<string | null>(null);
 
   interface VoiceRecognizer {
     interimResults: boolean;
+    lang: string;
     onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
     onend: (() => void) | null;
-    onerror: (() => void) | null;
+    onerror: ((e: { error?: string }) => void) | null;
     start: () => void;
     stop: () => void;
   }
@@ -113,7 +190,15 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
     const userText = followUpText.trim();
     setFollowUpText('');
-    onGenerateEdits(userText);
+    const images = pendingImages;
+    setPendingImages([]);
+    onGenerateEdits(userText, images);
+  };
+
+  const sendPromptText = (text: string) => {
+    const images = pendingImages;
+    setPendingImages([]);
+    onGenerateEdits(text, images);
   };
 
   const speechCtor: (new () => VoiceRecognizer) | null =
@@ -130,20 +215,45 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
       return;
     }
     if (!speechCtor) return;
+    const fail = (msg: string) => {
+      setVoiceHint(msg);
+      setIsVoiceRecording(false);
+      window.setTimeout(() => setVoiceHint(null), 5000);
+    };
     try {
       const rec = new speechCtor();
       voiceRecRef.current = rec;
       rec.interimResults = false;
+      try {
+        rec.lang = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
+      } catch {
+        /* ignore */
+      }
       rec.onresult = (e) => {
         const t = e.results[0]?.[0]?.transcript ?? '';
-        if (t) setFollowUpText((v) => (v ? `${v} ${t}` : t));
+        if (t) {
+          setVoiceHint(null);
+          setFollowUpText((v) => (v ? `${v} ${t}` : t));
+        }
       };
       rec.onend = () => setIsVoiceRecording(false);
-      rec.onerror = () => setIsVoiceRecording(false);
+      rec.onerror = (e) => {
+        const kind = e?.error ?? '';
+        if (kind === 'not-allowed' || kind === 'service-not-allowed') {
+          fail('Microphone blocked — allow it in the browser address bar, then try again.');
+        } else if (kind === 'no-speech') {
+          fail("Didn't catch that — try again.");
+        } else if (kind === 'network') {
+          fail('Speech service unreachable — check your connection.');
+        } else {
+          fail('Voice input failed — try again.');
+        }
+      };
       rec.start();
+      setVoiceHint(null);
       setIsVoiceRecording(true);
     } catch {
-      setIsVoiceRecording(false);
+      fail('Microphone blocked — allow it in the browser address bar, then try again.');
     }
   };
 
@@ -163,7 +273,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col justify-between select-none text-[13px] transition-colors">
+    <div className={`h-full min-h-0 flex flex-col justify-between select-none text-[13px] transition-colors ${isDark ? 'bg-[#141416]' : 'bg-[#f4f4f6]'}`}>
       {/* Top Header */}
       <div
         className={`h-10 px-4 border-b flex items-center justify-between ${
@@ -181,8 +291,8 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           {onOpenRules && (
             <button
               onClick={onOpenRules}
-              className="text-neutral-400 hover:text-purple-500 transition-colors p-1 rounded text-[11px] flex items-center gap-1 cursor-pointer"
-              title="Project .cursorrules"
+              className="text-neutral-400 hover:text-red-500 transition-colors p-1 rounded text-[11px] flex items-center gap-1 cursor-pointer"
+              title="Project Agent Guidelines"
             >
               <FileCode size={13} />
               <span className="hidden sm:inline font-mono">.rules</span>
@@ -199,7 +309,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
       </div>
 
       {/* Main Conversation Stream */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3.5">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3.5">
         {/* User Prompt Box */}
         <div
           className={`border rounded-xl p-3 text-[13px] leading-[1.45] shadow-2xs font-normal ${
@@ -209,6 +319,19 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           }`}
         >
           {session.prompt || <span className="text-neutral-400">New agent — send a prompt below to begin.</span>}
+          {(session.attachments ?? []).length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+              {(session.attachments ?? []).map((img) => (
+                <img
+                  key={img.id}
+                  src={img.dataUrl}
+                  alt={img.name}
+                  title={img.name}
+                  className="w-12 h-12 rounded-lg object-cover border border-neutral-300 dark:border-neutral-700"
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Live working indicator (only while the agent runs) */}
@@ -218,7 +341,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
               isDark ? 'bg-[#1c1c22] border-neutral-700/80' : 'bg-neutral-50/80 border-neutral-200'
             }`}
           >
-            <Loader2 size={13} className="text-blue-500 animate-spin shrink-0" />
+            <Loader2 size={13} className="text-red-500 animate-spin shrink-0" />
             <span className="text-neutral-600 dark:text-neutral-300">Agent working… steps appear below as they complete.</span>
           </div>
         )}
@@ -255,7 +378,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                     {step.status === 'completed' ? (
                       <CheckCircle2 size={13} className="text-emerald-500" />
                     ) : step.status === 'running' ? (
-                      <Loader2 size={13} className="text-blue-500 animate-spin" />
+                      <Loader2 size={13} className="text-red-500 animate-spin" />
                     ) : step.status === 'failed' ? (
                       <XCircle size={13} className="text-red-500" />
                     ) : (
@@ -265,7 +388,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between text-[11.5px]">
-                      <span className={`font-medium capitalize ${step.status === 'completed' ? 'text-neutral-700 dark:text-neutral-300' : 'text-blue-500 font-semibold'}`}>
+                      <span className={`font-medium capitalize ${step.status === 'completed' ? 'text-neutral-700 dark:text-neutral-300' : 'text-red-500 font-semibold'}`}>
                         {step.type}: {step.query.length > 48 ? `${step.query.slice(0, 48)}…` : step.query}
                       </span>
                       {step.durationMs != null && (
@@ -273,14 +396,40 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                       )}
                     </div>
                     {step.details && <div className="text-[11px] text-neutral-400 truncate">{step.details}</div>}
+                    {(step.status === 'completed' || step.status === 'failed') && (
+                      <div className="flex items-center gap-0.5 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => rateStep(step.id, 1)}
+                          className={`p-0.5 rounded transition-colors cursor-pointer ${
+                            ratings[step.id] === 1 ? 'text-emerald-500' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                          }`}
+                          title="Good turn"
+                          aria-label="Rate turn good"
+                        >
+                          <ThumbsUp size={11} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => rateStep(step.id, -1)}
+                          className={`p-0.5 rounded transition-colors cursor-pointer ${
+                            ratings[step.id] === -1 ? 'text-red-500' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                          }`}
+                          title="Bad turn"
+                          aria-label="Rate turn bad"
+                        >
+                          <ThumbsDown size={11} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
 
               <div className="flex items-center justify-end pt-2 border-t border-neutral-200/60 dark:border-neutral-700 text-[11px]">
                 <button
-                  onClick={() => onGenerateEdits('Review your last changes for issues and fix what you find')}
-                  className="px-2 py-0.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-500 cursor-pointer"
+                  onClick={() => sendPromptText('Review your last changes for issues and fix what you find')}
+                  className="px-2 py-0.5 rounded bg-red-600 text-white font-medium hover:bg-red-500 cursor-pointer"
                 >
                   Verify
                 </button>
@@ -291,7 +440,24 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
         {/* Action Steps */}
         {session.steps.length === 0 && !isGenerating && (
-          <p className="text-[12px] text-neutral-400 px-1">No activity yet — send a prompt below to start the agent.</p>
+          <div className="space-y-2 px-1">
+            <p className="text-[12px] text-neutral-400">No activity yet — send a prompt below to start the agent.</p>
+            <div className="flex flex-wrap gap-1.5">
+              {['Build a landing page', 'Create a starter index.html', 'Review the workspace and suggest next steps'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => sendPromptText(s)}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] transition-colors cursor-pointer ${
+                    isDark
+                      ? 'border-neutral-700 text-neutral-300 hover:bg-neutral-800'
+                      : 'border-neutral-300 text-neutral-600 hover:bg-neutral-100'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         <div className="space-y-1.5 text-[12.5px]">
           {session.steps.map((step) => {
@@ -351,7 +517,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                               isDark ? 'bg-[#18181c] text-neutral-300' : 'bg-white border border-neutral-200 text-neutral-700'
                             }`}
                           >
-                            <div className="text-[10px] text-blue-500 truncate mb-0.5">
+                            <div className="text-[10px] text-red-500 truncate mb-0.5">
                               {m.file}:{m.line}
                             </div>
                             <div className="truncate text-neutral-500">{m.preview}</div>
@@ -456,9 +622,74 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         )}
       </div>
 
+        {/* Self-host model picker (free-first + custom ID) */}
+        {selfHostLabel && selectedModel === selfHostLabel && (opencodeModels ?? []).length > 0 && (
+          <div className="space-y-1.5">
+            <select
+              value={opencodeModel ? `${opencodeModel.providerID}/${opencodeModel.modelID}` : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) {
+                  onOpencodeModelChange?.(null);
+                  return;
+                }
+                const i = v.indexOf('/');
+                if (i > 0) onOpencodeModelChange?.({ providerID: v.slice(0, i), modelID: v.slice(i + 1) });
+              }}
+              className={`w-full px-2 py-1.5 rounded-lg border text-[11.5px] focus:outline-none focus:ring-1 focus:ring-red-500 cursor-pointer ${
+                isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-300 text-neutral-700'
+              }`}
+              aria-label="Self-hosted model"
+            >
+              <option value="">Server default</option>
+              {(opencodeModels ?? []).map((m) => (
+                <option key={`${m.providerID}/${m.id}`} value={`${m.providerID}/${m.id}`}>
+                  {m.name} — {m.providerID}
+                  {m.free ? ' · free' : ''}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1.5">
+              <input
+                value={opencodeCustom}
+                onChange={(e) => setOpencodeCustom(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  const v = opencodeCustom.trim();
+                  const i = v.indexOf('/');
+                  if (i > 0) {
+                    onOpencodeModelChange?.({ providerID: v.slice(0, i).trim(), modelID: v.slice(i + 1).trim() });
+                    setOpencodeCustom('');
+                  }
+                }}
+                placeholder="or provider/model-id, Enter to use"
+                spellCheck={false}
+                aria-label="Custom model ID"
+                className={`flex-1 min-w-0 px-2 py-1 rounded-lg border font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 ${
+                  isDark
+                    ? 'bg-transparent border-neutral-700 text-neutral-300 placeholder-neutral-600'
+                    : 'bg-transparent border-neutral-300 text-neutral-600 placeholder-neutral-400'
+                }`}
+              />
+              {opencodeModel && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpencodeModelChange?.(null);
+                    setOpencodeCustom('');
+                  }}
+                  className="text-[11px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline-offset-2 hover:underline cursor-pointer shrink-0"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
       {/* Bottom Controls, Context Chips & Follow-up Input */}
       <div
-        className={`p-3 border-t space-y-2.5 ${
+        className={`p-3 border-t space-y-2.5 shrink-0 ${
           isDark ? 'border-neutral-800 bg-[#18181b]' : 'border-[#e5e5e7] bg-white'
         }`}
       >
@@ -466,7 +697,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onReviewClick}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium rounded-full border transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium rounded-lg border transition-colors cursor-pointer ${
               isDark
                 ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200 border-neutral-700'
                 : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800 border-[#e2e2e6]'
@@ -479,13 +710,13 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
           <button
             onClick={onCommitPush}
-            className={`flex items-center gap-1 px-3 py-1 text-[12px] font-medium rounded-full border transition-colors cursor-pointer ${
+            className={`flex items-center gap-1 px-3 py-1 text-[12px] font-medium rounded-lg border transition-colors cursor-pointer ${
               isDark
                 ? 'bg-[#1e1e24] hover:bg-neutral-800 text-neutral-300 border-neutral-700'
                 : 'bg-white hover:bg-neutral-50 text-neutral-700 border-[#d8d8dc]'
             }`}
           >
-            <span>Commit & Push</span>
+            <span>Save & deploy</span>
             <ChevronDown size={12} className="text-neutral-500" />
           </button>
         </div>
@@ -518,9 +749,9 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         {/* Input Bar with Context Mention Button */}
         <form
           onSubmit={handleSendFollowUp}
-          className={`relative flex items-center justify-between pl-2 pr-1.5 py-1.5 rounded-full border shadow-2xs transition-all ${
+          className={`relative flex items-center justify-between pl-2 pr-1.5 py-1.5 rounded-2xl border shadow-2xs transition-all ${
             isDark
-              ? 'bg-[#222227] border-neutral-700 focus-within:border-blue-500'
+              ? 'bg-[#222227] border-neutral-700 focus-within:border-red-500'
               : 'bg-white border-[#dcdcde] focus-within:border-neutral-400 focus-within:ring-2 focus-within:ring-neutral-200/50'
           }`}
         >
@@ -529,10 +760,34 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             <button
               type="button"
               onClick={() => setIsMentionMenuOpen(!isMentionMenuOpen)}
-              className="w-5 h-5 rounded-full flex items-center justify-center text-neutral-400 hover:text-purple-500 transition-colors cursor-pointer"
+              className="w-5 h-5 rounded-full flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
               title="Attach context (@)"
             >
               <AtSign size={13} />
+            </button>
+            <input
+              ref={imgInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              aria-label="Attach images"
+              onChange={(e) => {
+                const list = Array.from(e.target.files ?? []).slice(0, 3);
+                e.target.value = '';
+                if (list.length === 0) return;
+                void Promise.all(list.map((f) => downscaleImage(f)))
+                  .then((imgs) => setPendingImages((prev) => [...prev, ...imgs].slice(0, 3)))
+                  .catch(() => {});
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => imgInputRef.current?.click()}
+              className="w-5 h-5 rounded-full flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
+              title="Attach images (seen by Gemini, OpenRouter, Claude, ChatGPT)"
+            >
+              <ImagePlus size={13} />
             </button>
 
             {isMentionMenuOpen && (
@@ -561,6 +816,29 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
               </div>
             )}
           </div>
+
+          {/* Pending image attachments */}
+          {pendingImages.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {pendingImages.map((img) => (
+                <div key={img.id} className="relative">
+                  <img
+                    src={img.dataUrl}
+                    alt={img.name}
+                    className="w-12 h-12 rounded-lg object-cover border border-neutral-300 dark:border-neutral-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPendingImages((prev) => prev.filter((p) => p.id !== img.id))}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center cursor-pointer"
+                    title={`Remove ${img.name}`}
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Follow up text input */}
           <input
@@ -601,7 +879,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                       onClick={() => pickModel(model)}
                       className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
                         isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                      } ${selectedModel === model ? 'font-medium text-blue-500' : ''}`}
+                      } ${selectedModel === model ? 'font-medium text-red-500' : ''}`}
                     >
                       <span>{model}</span>
                       {selectedModel === model && <Check size={12} />}
@@ -637,6 +915,9 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           </button>
           )}
         </form>
+        {voiceHint && (
+          <p className="px-4 pb-2 text-[11px] text-red-500">{voiceHint}</p>
+        )}
       </div>
     </div>
   );

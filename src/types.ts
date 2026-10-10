@@ -72,10 +72,19 @@ export interface ProjectFile {
   isModified?: boolean;
 }
 
+export interface AttachedImage {
+  id: string;
+  name: string;
+  mime: string;
+  /** Downscaled JPEG data URL (client-side, bounded size). */
+  dataUrl: string;
+}
+
 export interface SessionData {
   id: string;
   title: string;
   prompt: string;
+  attachments?: AttachedImage[];
   steps: AgentStep[];
   response: string;
   processedItem?: string;

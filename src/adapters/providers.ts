@@ -70,12 +70,82 @@ export function clearProviderKey(p: DirectProvider): void {
   }
 }
 
+// Deploy key (Vercel personal token, BYOK like the chat keys).
+const VERCEL_LS = 'gpide:key:vercel';
+
+export function getVercelToken(): string | null {
+  try {
+    return store().get(VERCEL_LS);
+  } catch {
+    return null;
+  }
+}
+
+export function setVercelToken(key: string): void {
+  try {
+    store().set(VERCEL_LS, key);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearVercelToken(): void {
+  try {
+    store().del(VERCEL_LS);
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface ChatMsg {
   role: 'user' | 'assistant';
   content: string;
 }
 
 type DeltaHandler = (piece: string) => void;
+
+export interface ProviderImage {
+  mime: string;
+  base64: string;
+}
+
+/** Attach images to the last user message, OpenAI-style parts. */
+function withOpenAIImages(
+  messages: Array<{ role: string; content: string }>,
+  images: ProviderImage[],
+): Array<{ role: string; content: unknown }> {
+  if (images.length === 0) return messages;
+  const out = messages.map((m) => ({ role: m.role, content: m.content as unknown }));
+  const target = [...out].reverse().find((m) => m.role === 'user') ?? out[out.length - 1];
+  if (!target) return out;
+  const text = typeof target.content === 'string' ? target.content : '';
+  target.content = [
+    { type: 'text', text },
+    ...images
+      .filter((i) => i.base64)
+      .map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime || 'image/jpeg'};base64,${i.base64}` } })),
+  ];
+  return out;
+}
+
+/** Attach images to the last user message, Anthropic-style blocks. */
+function withAnthropicImages(
+  messages: Array<{ role: string; content: string }>,
+  images: ProviderImage[],
+): Array<{ role: string; content: unknown }> {
+  if (images.length === 0) return messages;
+  const out = messages.map((m) => ({ role: m.role, content: m.content as unknown }));
+  const target = [...out].reverse().find((m) => m.role === 'user') ?? out[out.length - 1];
+  if (!target) return out;
+  const text = typeof target.content === 'string' ? target.content : '';
+  target.content = [
+    { type: 'text', text },
+    ...images
+      .filter((i) => i.base64)
+      .map((i) => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: i.base64 } })),
+  ];
+  return out;
+}
 
 async function consumeSse(res: Response, onDelta: (text: string) => void): Promise<void> {
   if (!res.ok) {
@@ -137,6 +207,7 @@ export async function streamOpenRouter(
   system: string,
   onDelta: DeltaHandler,
   model: string,
+  images: ProviderImage[] = [],
 ): Promise<void> {
   const key = getProviderKey('openrouter');
   if (!key) throw new Error('Add an OpenRouter API key first (account settings).');
@@ -152,7 +223,7 @@ export async function streamOpenRouter(
       body: JSON.stringify({
         model,
         max_tokens: 4096,
-        messages: [{ role: 'system', content: system }, ...toHistory(messages)],
+        messages: withOpenAIImages([{ role: 'system', content: system }, ...toHistory(messages)], images),
         stream: true,
       }),
     }),
@@ -165,6 +236,7 @@ export async function streamAnthropic(
   system: string,
   onDelta: DeltaHandler,
   model: string,
+  images: ProviderImage[] = [],
 ): Promise<void> {
   const key = getProviderKey('anthropic');
   if (!key) throw new Error('Add an Anthropic API key first (account settings).');
@@ -181,7 +253,7 @@ export async function streamAnthropic(
         model,
         max_tokens: 4096,
         system,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: withAnthropicImages(messages.map((m) => ({ role: m.role, content: m.content })), images),
         stream: true,
       }),
     }),
@@ -189,14 +261,14 @@ export async function streamAnthropic(
   );
 }
 
-export async function streamChatGPT(messages: ChatMsg[], system: string, onDelta: DeltaHandler, model: string): Promise<void> {
+export async function streamChatGPT(messages: ChatMsg[], system: string, onDelta: DeltaHandler, model: string, images: ProviderImage[] = []): Promise<void> {
   const key = getProviderKey('chatgpt');
   if (!key) throw new Error('Add an OpenAI API key first (account settings).');
   await consumeSse(
     await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, ...toHistory(messages)], stream: true }),
+      body: JSON.stringify({ model, messages: withOpenAIImages([{ role: 'system', content: system }, ...toHistory(messages)], images), stream: true }),
     }),
     onDelta,
   );
@@ -208,9 +280,10 @@ export async function streamProvider(
   system: string,
   onDelta: DeltaHandler,
   model?: string,
+  images: ProviderImage[] = [],
 ): Promise<void> {
   const m = model ?? PROVIDER_DEFAULT_MODEL[provider];
-  if (provider === 'openrouter') return streamOpenRouter(messages, system, onDelta, m);
-  if (provider === 'anthropic') return streamAnthropic(messages, system, onDelta, m);
-  return streamChatGPT(messages, system, onDelta, m);
+  if (provider === 'openrouter') return streamOpenRouter(messages, system, onDelta, m, images);
+  if (provider === 'anthropic') return streamAnthropic(messages, system, onDelta, m, images);
+  return streamChatGPT(messages, system, onDelta, m, images);
 }

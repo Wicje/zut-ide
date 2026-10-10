@@ -13,6 +13,7 @@ import {
   FileCode,
   Maximize2,
   Minimize2,
+  MoreHorizontal,
   Terminal,
   Activity,
   Layers,
@@ -31,7 +32,6 @@ interface DiffReviewPaneProps {
   onToggleStageFile: (fileId: string) => void;
   onCreatePR: () => void;
   onCommitPush: () => void;
-  onOpenDeploy?: () => void;
   onAskComposer?: (codeSnippet: string) => void;
   onSwitchToEditor?: () => void;
   rightPaneMode?: RightPaneMode;
@@ -60,7 +60,6 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
   onToggleStageFile,
   onCreatePR,
   onCommitPush,
-  onOpenDeploy,
   onAskComposer,
   onSwitchToEditor,
   rightPaneMode = 'diff',
@@ -81,6 +80,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
   const [currentBranch, setCurrentBranch] = useState(branchName ?? 'workspace');
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [copiedDiff, setCopiedDiff] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   function copyFullDiff() {
     const text = files
@@ -126,21 +126,21 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
     >
       {/* Top Header Bar */}
       <div
-        className={`h-10 px-3.5 border-b flex items-center justify-between ${
+        className={`h-10 px-3.5 border-b flex items-center justify-between gap-2 ${
           isDark ? 'border-neutral-800 bg-[#18181b]' : 'border-[#e5e5e7] bg-white'
         }`}
       >
         {/* Left cluster */}
-        <div className="flex items-center gap-3">
-          {/* Quick utility icons */}
-          <div className="flex items-center gap-1.5 text-neutral-400">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
+          {/* Quick utility icons (wide screens; in the ⋯ menu when narrow) */}
+          <div className="hidden md:flex items-center gap-1.5 text-neutral-400">
             <button
               onClick={onToggleDiffViewMode}
               className={`p-1 rounded transition-colors cursor-pointer flex items-center gap-1 text-[11px] ${
                 diffViewMode === 'split'
                   ? isDark
-                    ? 'bg-blue-600/30 text-blue-400'
-                    : 'bg-blue-50 text-blue-600'
+                    ? 'bg-red-600/30 text-red-400'
+                    : 'bg-red-50 text-red-600'
                   : 'hover:text-neutral-700 dark:hover:text-neutral-200'
               }`}
               title={`Switch to ${diffViewMode === 'split' ? 'Unified' : 'Split'} view`}
@@ -167,7 +167,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
             </button>
 
             {onSelectPaneMode && (
-              <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-md border border-neutral-200 dark:border-neutral-700">
+              <div className="flex items-center gap-1 shrink-0 bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-md border border-neutral-200 dark:border-neutral-700">
                 <button
                   onClick={() => onSelectPaneMode('diff')}
                   className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
@@ -220,10 +220,10 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
             )}
           </div>
 
-          <div className="h-3.5 w-px bg-neutral-200 dark:bg-neutral-800" />
+          <div className="h-3.5 w-px bg-neutral-200 dark:bg-neutral-800 hidden md:block" />
 
           {/* SCM Branch selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="text-neutral-400">
               <GitCommit size={14} />
             </span>
@@ -235,16 +235,16 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
               Local
             </span>
 
-            <div className="relative">
+            <div className="relative min-w-0">
               <button
                 onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-                className={`flex items-center gap-1 text-[12px] font-normal px-1 py-0.5 rounded transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 text-[12px] font-normal px-1 py-0.5 rounded transition-colors cursor-pointer min-w-0 ${
                   isDark
                     ? 'text-neutral-300 hover:text-white hover:bg-neutral-800'
                     : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100'
                 }`}
               >
-                <span>{currentBranch}</span>
+                <span className="truncate max-w-[90px]">{currentBranch}</span>
                 <ChevronDown size={12} className="text-neutral-400" />
               </button>
 
@@ -264,7 +264,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
                         }}
                         className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
                           isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                        } ${currentBranch === b ? 'font-medium text-blue-500' : ''}`}
+                        } ${currentBranch === b ? 'font-medium text-red-500' : ''}`}
                       >
                         <span>{b}</span>
                         {currentBranch === b && <Check size={12} />}
@@ -277,8 +277,8 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
           </div>
         </div>
 
-        {/* Right Action buttons */}
-        <div className="flex items-center gap-2">
+        {/* Right Action buttons (wide screens; in the ⋯ menu when narrow) */}
+        <div className="hidden md:flex items-center gap-2 shrink-0">
           <button
             onClick={copyFullDiff}
             className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 transition-colors cursor-pointer"
@@ -298,23 +298,6 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
             Create PR
           </button>
 
-          {onOpenDeploy && (
-            <button
-              onClick={onOpenDeploy}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
-                isDark
-                  ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700'
-                  : 'bg-white hover:bg-neutral-50 text-neutral-800 border border-[#d2d2d6]'
-              }`}
-              title="Push to GitHub & Deploy to Vercel (⌘V)"
-            >
-              <svg viewBox="0 0 76 65" fill="currentColor" className="w-2.5 h-2.5">
-                <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-              </svg>
-              <span>Deploy</span>
-            </button>
-          )}
-
           <button
             onClick={onCommitPush}
             className={`flex items-center gap-1 px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
@@ -323,7 +306,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
                 : 'bg-white hover:bg-neutral-50 text-neutral-800 border border-[#d2d2d6]'
             }`}
           >
-            <span>Commit & Push</span>
+            <span>Save & deploy</span>
             <ChevronDown size={12} className="text-neutral-500" />
           </button>
 
@@ -335,6 +318,98 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
             >
               <Maximize2 size={13} />
             </button>
+          )}
+        </div>
+
+        {/* Overflow menu (narrow screens): hover or tap to reveal */}
+        <div
+          className="relative md:hidden shrink-0"
+          onMouseEnter={() => setIsMoreOpen(true)}
+          onMouseLeave={() => setIsMoreOpen(false)}
+        >
+          <button
+            onClick={() => setIsMoreOpen((v) => !v)}
+            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded transition-colors cursor-pointer"
+            title="More actions"
+            aria-label="More actions"
+          >
+            <MoreHorizontal size={15} />
+          </button>
+          {isMoreOpen && (
+            <div
+              className={`absolute right-0 top-full mt-1 w-48 rounded-lg border py-1 shadow-xl z-40 text-[12px] ${
+                isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+              }`}
+            >
+              <button
+                onClick={() => {
+                  onToggleDiffViewMode();
+                  setIsMoreOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                }`}
+              >
+                Switch to {diffViewMode === 'split' ? 'Unified' : 'Split'} view
+              </button>
+              <button
+                onClick={() => {
+                  onToggleTerminal();
+                  setIsMoreOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                }`}
+              >
+                Telemetry drawer
+              </button>
+              <button
+                onClick={() => {
+                  copyFullDiff();
+                  setIsMoreOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                }`}
+              >
+                {copiedDiff ? 'Diff copied!' : 'Copy full diff'}
+              </button>
+              <button
+                onClick={() => {
+                  onCreatePR();
+                  setIsMoreOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                }`}
+              >
+                Create PR
+              </button>
+              <button
+                onClick={() => {
+                  onCommitPush();
+                  setIsMoreOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                }`}
+              >
+                Save & deploy
+              </button>
+              {onToggleMaximize && (
+                <button
+                  onClick={() => {
+                    onToggleMaximize();
+                    setIsMoreOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                  }`}
+                >
+                  {isMaximized ? 'Restore window size' : 'Expand window'}
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -355,7 +430,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
         </div>
 
         <div className="text-[11px] text-neutral-400 hidden md:block">
-          Click <span className="font-code text-blue-500">+</span> on line gutter to comment
+          Click <span className="font-code text-red-500">+</span> on line gutter to comment
         </div>
       </div>
 
@@ -383,11 +458,11 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
                       e.stopPropagation();
                       onToggleStageFile(file.id);
                     }}
-                    className="text-neutral-400 hover:text-blue-500 transition-colors p-0.5"
+                    className="text-neutral-400 hover:text-red-500 transition-colors p-0.5"
                     title={file.staged ? 'Unstage file' : 'Stage file'}
                   >
                     {file.staged ? (
-                      <CheckSquare size={13} className="text-blue-500" />
+                      <CheckSquare size={13} className="text-red-500" />
                     ) : (
                       <Square size={13} />
                     )}

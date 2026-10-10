@@ -1,11 +1,11 @@
-# DESIGN.md — Cursor Composer Ghost
+# DESIGN.md — Zut
 
 > Living style contract for humans + AI agents. Change the UI only in ways
 > that keep every section below true.
 
 ## Brand
 
-- **Name:** Cursor Composer Ghost. Single public name (tab title, PWA manifest,
+- **Name:** Zut. Single public name (tab title, PWA manifest,
   OG tags). Folder/repo names (`chisom_ide`, `zut-ide`) never appear in UI.
 - **Positioning:** desktop-class coding in the browser. Heavy work runs on the
   broker; the browser renders. AI is optional — plain code + Run is the default path.
@@ -31,11 +31,11 @@ config, no CSS variables file; tokens are inline.
 | text | `text-[#2b2b2f]` | `text-neutral-200` | body |
 | diff add | `bg-[#e6ffed]` / chip `bg-[#acf2bd]` | `bg-[#122818]` / chip `bg-[#1b4728]` | added lines |
 | diff del | `bg-[#ffeef0]` / chip `bg-[#ffc0c7]` | `bg-[#3b1219]` / chip `bg-[#5c2024]` | removed lines |
-| primary | `bg-blue-600 hover:bg-blue-500` | same | Run, confirm, deploy |
+| primary | `bg-red-600 hover:bg-red-500` | same | Run, confirm, deploy |
 | pass/fail | emerald / red pills | same | checks, tests |
 
-One accent per meaning. Emerald = go/success, red = broken, amber = wait,
-blue = primary action. Do not add new accent hues without updating this table.
+One accent per meaning. Emerald = go/success, amber = wait,
+red = primary action (and error states). Do not add new accent hues without updating this table.
 
 ## Typography
 
@@ -49,16 +49,16 @@ blue = primary action. Do not add new accent hues without updating this table.
 
 - Radius: `rounded-md` chips/inputs, `rounded-lg` cards, `rounded-xl` preview
   canvas, `rounded-2xl` app window + modals, `rounded-full` top bar + toast + pills.
-- App window: `w-[96vw] max-w-[1240px] h-[92vh] max-h-[820px]`, wallpaper stage
-  behind (macOS light/dark images in `src/assets/images/`).
+- App window: `w-[96vw] max-w-[1240px] h-[88vh] max-h-[800px]`, wallpaper stage
+  behind (macOS light/dark images in `src/assets/images/`), control pill centered
+  above the window (never overlapping).
 - Pane headers `h-10 px-3.5 border-b`; resizers `w-1 cursor-col-resize`
-  (hover `blue-500/50`, active `blue-600`, double-click resets 210 / 380).
-- Sidebar traffic lights `w-3 h-3 rounded-full` (`#ff5f56/#ffbd2e/#27c93f`).
+  (hover `red-500/50`, active `red-600`, double-click resets 210 / 380).
 - Modals: `fixed inset-0 z-50` backdrop `bg-black/50 backdrop-blur-xs`,
   `max-w-md` (simple) / `max-w-lg` / `max-w-2xl max-h-[85vh]` (PR studio).
 - Scrollbars: 6px, `rgba(0,0,0,0.15)` thumb, transparent track.
 
-## Layout grammar (Cursor-like)
+## Layout grammar (Zut shell)
 
 ```
 ┌ wallpaper stage (wallpaper image, centered content) ────────────┐

@@ -35,11 +35,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${
+        className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark ? 'bg-[#18181c] border-neutral-700 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -50,7 +50,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           }`}
         >
           <div className="flex items-center gap-2 text-xs font-semibold">
-            <Link2 size={15} className="text-blue-500" />
+            <Link2 size={15} className="text-red-500" />
             <span>Share read-only link</span>
           </div>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600">

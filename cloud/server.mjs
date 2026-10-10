@@ -175,7 +175,7 @@ async function bumpAgentCount(uid) {
 async function recordUsage(uid, model, ms, inputBytes) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/usage_meter`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/zut_usage_meter`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_SERVICE_KEY,

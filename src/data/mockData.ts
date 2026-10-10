@@ -2,33 +2,33 @@ import { DiffFile, SidebarSection, SessionData, ProjectFile } from '../types';
 
 export const INITIAL_SECTIONS: SidebarSection[] = [
   {
-    title: 'Cursor',
+    title: 'Zut',
     items: [
-      { id: 'composer-ghost', title: 'Composer ghost', category: 'Cursor' },
-      { id: 'sidebar-reorderable', title: 'Sidebar reorderable', badge: 'blue', category: 'Cursor' },
-      { id: 'agentic-chat', title: 'Agentic chat', badge: 'blue', hasIcon: true, iconType: 'card', category: 'Cursor' },
-      { id: 'command-palette', title: 'Command palette', badge: 'gray', hasIcon: true, iconType: 'panel', category: 'Cursor' },
-      { id: 'toast-notification', title: 'Toast notification', badge: 'gray', hasIcon: true, iconType: 'toast', category: 'Cursor' },
-      { id: 'cursor-more', title: 'More', isMore: true, category: 'Cursor' },
+      { id: 'composer-ghost', title: 'Welcome to Zut', category: 'Zut' },
+      { id: 'sidebar-reorderable', title: 'Sidebar reorderable', badge: 'blue', category: 'Zut' },
+      { id: 'agentic-chat', title: 'Agentic chat', badge: 'blue', hasIcon: true, iconType: 'card', category: 'Zut' },
+      { id: 'command-palette', title: 'Command palette', badge: 'gray', hasIcon: true, iconType: 'panel', category: 'Zut' },
+      { id: 'toast-notification', title: 'Toast notification', badge: 'gray', hasIcon: true, iconType: 'toast', category: 'Zut' },
+      { id: 'cursor-more', title: 'More', isMore: true, category: 'Zut' },
     ],
   },
   {
-    title: 'Anysphere',
+    title: 'Project',
     items: [
-      { id: 'chat-model-routing', title: 'Chat model auto-routing', badge: 'gray', category: 'Anysphere' },
-      { id: 'cloud-settings', title: 'Cloud settings catalog', badge: 'gray', category: 'Anysphere' },
-      { id: 'cursor-landing', title: 'cursor.com landing refresh', badge: 'blue', category: 'Anysphere' },
-      { id: 'chat-reactions', title: 'Chat message reactions', badge: 'blue', category: 'Anysphere' },
-      { id: 'anysphere-more', title: 'More', isMore: true, category: 'Anysphere' },
+      { id: 'chat-model-routing', title: 'Chat model auto-routing', badge: 'gray', category: 'Project' },
+      { id: 'cloud-settings', title: 'Cloud settings catalog', badge: 'gray', category: 'Project' },
+      { id: 'cursor-landing', title: 'Landing page refresh', badge: 'blue', category: 'Project' },
+      { id: 'chat-reactions', title: 'Chat message reactions', badge: 'blue', category: 'Project' },
+      { id: 'anysphere-more', title: 'More', isMore: true, category: 'Project' },
     ],
   },
   {
-    title: 'Everysphere',
+    title: 'Ideas',
     items: [
-      { id: 'unified-search', title: 'Unified search index', badge: 'blue', category: 'Everysphere' },
-      { id: 'settings-ui', title: 'Settings & Config UI', badge: 'blue', category: 'Everysphere' },
-      { id: 'shared-diff', title: 'Shared diff review flows', badge: 'gray', category: 'Everysphere' },
-      { id: 'tab-autocomplete', title: 'Tab Autocomplete Rewrite', badge: 'gray', category: 'Everysphere' },
+      { id: 'unified-search', title: 'Unified search index', badge: 'blue', category: 'Ideas' },
+      { id: 'settings-ui', title: 'Settings & Config UI', badge: 'blue', category: 'Ideas' },
+      { id: 'shared-diff', title: 'Shared diff review flows', badge: 'gray', category: 'Ideas' },
+      { id: 'tab-autocomplete', title: 'Tab Autocomplete Rewrite', badge: 'gray', category: 'Ideas' },
     ],
   },
 ];

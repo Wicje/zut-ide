@@ -65,11 +65,11 @@ export const VideoPreviewModal: React.FC<VideoPreviewModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#1e1e24] text-white rounded-xl shadow-2xl overflow-hidden border border-white/10"
+        className="w-full max-w-2xl bg-[#1e1e24] text-white rounded-xl shadow-2xl overflow-hidden border border-white/10 max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -157,7 +157,7 @@ export const VideoPreviewModal: React.FC<VideoPreviewModalProps> = ({
             }}
           >
             <div
-              className="h-full bg-blue-500 rounded-full transition-all"
+              className="h-full bg-red-500 rounded-full transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>

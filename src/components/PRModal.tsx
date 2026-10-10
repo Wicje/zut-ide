@@ -36,11 +36,11 @@ export const PRModal: React.FC<PRModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden text-neutral-800"
+        className="w-full max-w-lg bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden text-neutral-800 max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-11 px-4 bg-neutral-50 border-b border-neutral-200 flex items-center justify-between text-[13px] font-medium">
@@ -71,7 +71,7 @@ export const PRModal: React.FC<PRModalProps> = ({
               type="text"
               value={prTitle}
               onChange={(e) => setPrTitle(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
             />
           </div>
 
@@ -83,7 +83,7 @@ export const PRModal: React.FC<PRModalProps> = ({
               rows={3}
               value={prDesc}
               onChange={(e) => setPrDesc(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none"
+              className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 resize-none"
             />
           </div>
 

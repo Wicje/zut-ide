@@ -3,6 +3,7 @@
 // only the signed-in user's token is sent, per request.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { FileMap } from './filemap';
+import type { SessionData } from '../types';
 
 export interface StoredProject {
   id: string;
@@ -233,6 +234,55 @@ export function takeSnapshot(files: FileMap): Snapshot {
   return snap;
 }
 
+// ---- agent session backup (sidebar + chats survive reload) ----
+const SESS_KEY = 'gpide:sessions';
+
+export interface SessionBackup {
+  sessions: Record<string, SessionData>;
+  chats: Record<string, Array<{ role: string; content: string }>>;
+  activeId: string;
+}
+
+const MAX_BACKUP_SESSIONS = 10;
+
+/** Persist agent state. Quota-safe: trims, then leaves the old backup alone. */
+export function saveSessionBackup(
+  sessions: Record<string, SessionData>,
+  chats: Record<string, Array<{ role: string; content: string }>>,
+  activeId: string,
+): void {
+  try {
+    const ids = Object.keys(sessions).sort().slice(-MAX_BACKUP_SESSIONS);
+    const slimSessions = Object.fromEntries(ids.map((id) => [id, sessions[id]]));
+    const slimChats = Object.fromEntries(ids.map((id) => [id, chats[id] ?? []]));
+    localStorage.setItem(SESS_KEY, JSON.stringify({ sessions: slimSessions, chats: slimChats, activeId }));
+  } catch {
+    try {
+      const ids = Object.keys(sessions).sort().slice(-5);
+      const slimSessions = Object.fromEntries(ids.map((id) => [id, sessions[id]]));
+      localStorage.setItem(SESS_KEY, JSON.stringify({ sessions: slimSessions, chats: {}, activeId }));
+    } catch {
+      /* leave the previous backup intact */
+    }
+  }
+}
+
+export function loadSessionBackup(): SessionBackup | null {
+  try {
+    const raw = localStorage.getItem(SESS_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as Partial<SessionBackup>;
+    if (!j || typeof j.sessions !== 'object' || !j.sessions) return null;
+    return {
+      sessions: j.sessions as Record<string, SessionData>,
+      chats: (j.chats ?? {}) as Record<string, Array<{ role: string; content: string }>>,
+      activeId: typeof j.activeId === 'string' ? j.activeId : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ---- agent usage meter (this device; server enforces) ----
 const USAGE_KEY = 'gpide:agent-use';
 
@@ -279,19 +329,30 @@ export function saveRules(rules: string): void {
   }
 }
 
-// ---- one-click static deploy (no account; visitor sites via public API) ----
-export async function deployStatic(files: FileMap): Promise<{ url: string }> {
-  const { default: JSZip } = await import('jszip');
-  const zip = new JSZip();
-  for (const [path, content] of Object.entries(files)) zip.file(path, content);
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const res = await fetch('https://api.netlify.com/api/v1/sites', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/zip' },
-    body: blob,
+// ---- Vercel deploy via our edge function (signed-in users only, never anonymous) ----
+export async function deployStatic(
+  files: FileMap,
+  opts?: { name?: string; token?: string | null },
+): Promise<{ url: string }> {
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error('Sign in to deploy (Supabase is not configured).');
+  const sb = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: true, autoRefreshToken: true },
   });
-  if (!res.ok) throw new Error(`Deploy failed (${res.status})`);
-  const data = (await res.json()) as { ssl_url?: string; url?: string };
-  if (!data.ssl_url && !data.url) throw new Error('Deploy did not return a URL.');
-  return { url: data.ssl_url ?? data.url ?? '' };
+  const { data: sess } = await sb.auth.getSession();
+  const jwt = sess.session?.access_token;
+  if (!jwt) throw new Error('Sign in to deploy.');
+  if (Object.keys(files).length === 0) throw new Error('Nothing to deploy — the project is empty.');
+  const res = await fetch(`${supabaseUrl}/functions/v1/vercel-deploy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${jwt}`,
+    },
+    body: JSON.stringify({ name: opts?.name ?? 'untitled', files, ...(opts?.token ? { token: opts.token } : {}) }),
+  });
+  const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+  if (!res.ok) throw new Error(data?.error ?? `Deploy failed (${res.status})`);
+  if (!data?.url) throw new Error('Deploy did not return a URL.');
+  return { url: data.url };
 }

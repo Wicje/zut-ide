@@ -40,6 +40,61 @@ export async function selfHostReady(): Promise<boolean> {
   return a && b;
 }
 
+export interface OpencodeModelOption {
+  providerID: string;
+  id: string;
+  name: string;
+  free: boolean;
+}
+
+let modelsCache: OpencodeModelOption[] | null = null;
+
+/** Models served by the local opencode server (connected providers only). */
+export async function listOpencodeModels(): Promise<OpencodeModelOption[]> {
+  if (modelsCache) return modelsCache;
+  const res = await fetch(`${baseUrl}/provider`, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`Model list failed (${res.status})`);
+  const json = (await res.json()) as {
+    all?: Array<{ id?: string; providerID?: string; name?: string; cost?: { input?: number; output?: number } }>;
+    connected?: string[];
+  };
+  const connected = new Set(json.connected ?? []);
+  const out = (json.all ?? [])
+    .filter((m) => m.id && m.providerID && connected.has(m.providerID))
+    .map((m) => ({
+      providerID: m.providerID as string,
+      id: m.id as string,
+      name: m.name || (m.id as string),
+      free: (m.cost?.input ?? 1) === 0 && (m.cost?.output ?? 1) === 0,
+    }))
+    .sort((a, b) => Number(b.free) - Number(a.free) || a.name.localeCompare(b.name));
+  modelsCache = out;
+  return out;
+}
+
+const MODEL_LS = 'zut:opencode-model';
+
+export function getOpencodeModel(): { providerID: string; modelID: string } | null {
+  try {
+    const raw = localStorage.getItem(MODEL_LS);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as { providerID?: string; modelID?: string };
+    if (j.providerID && j.modelID) return { providerID: j.providerID, modelID: j.modelID };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function setOpencodeModel(m: { providerID: string; modelID: string } | null): void {
+  try {
+    if (!m) localStorage.removeItem(MODEL_LS);
+    else localStorage.setItem(MODEL_LS, JSON.stringify(m));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Write the IDE's virtual project files to the disk workspace opencode edits. */
 export async function syncProjectToDisk(files: FileMap): Promise<void> {
   const res = await fetch(`${bridgeUrl}/write`, {
@@ -98,6 +153,7 @@ export async function opencodeTurn(
   prompt: string,
   system: string,
   onDelta: (text: string) => void,
+  model?: { providerID: string; modelID: string },
 ): Promise<{ reply: string; updated: Record<string, string>; created: Record<string, string>; deleted: string[] }> {
   await syncProjectToDisk(files);
   const sessionId = await createSession();
@@ -105,7 +161,7 @@ export async function opencodeTurn(
   await fetch(`${baseUrl}/session/${sessionId}/prompt_async`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: prompt }], system }),
+    body: JSON.stringify({ parts: [{ type: 'text', text: prompt }], system, ...(model ? { model } : {}) }),
   }).then((res) => {
     if (!res.ok) throw new Error(`Agent prompt failed (${res.status})`);
   });

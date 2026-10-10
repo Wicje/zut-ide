@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Zut — the AI IDE that runs anywhere</title>
+  <meta name="description" content="Zut is a browser-based AI IDE with agent workflow, chat stream, and multi-file code diff review. Runs on laptops and Chromebooks with zero install." />
+  <link rel="icon" type="image/svg+xml" href="../public/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Zut home">
+      <span class="brand-mark">Z</span>
+      <span class="brand-word">Zut</span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#models">Models</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="nav-login" href="#top" id="loginBtn">Log in</a>
+      <a class="btn btn-primary" href="#top" id="launchBtn">Get Zut free</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <h1>Where you and agents<br /><span class="build">build <span class="pill">anywhere<span class="pill-dot"></span></span></span></h1>
+      <p class="lede">Describe what you want. Zut's agent writes the code, shows you the diff, and previews it live — in your browser, on any laptop or Chromebook. Nothing to install.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" href="#top" id="heroLaunch">Get Zut free</a>
+        <a class="btn btn-soft btn-lg" href="#how">See how it works</a>
+      </div>
+      <figure class="shot">
+        <img src="images/shot-app.jpg" alt="The Zut IDE: agent composer, editor and preview panes with a red accent" width="1600" height="766" loading="eager" />
+      </figure>
+    </section>
+
+    <!-- Devices -->
+    <section class="strip">
+      <div class="strip-items">
+        <span>Chromebook</span><span class="sep">·</span><span>Laptop</span><span class="sep">·</span><span>Tablet</span><span class="sep">·</span><span>Phone</span>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features">
+      <p class="eyebrow">Features</p>
+      <h2>Everything around the agent,<br />nothing in its way.</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Agent composer</h3>
+          <p>Prompt in plain English. Every turn streams back as reviewable steps with checkpoints you can roll back to.</p>
+        </article>
+        <article class="card">
+          <h3>Diff review</h3>
+          <p>Unified and split views of exactly what changed, per file, with accept and revert line by line.</p>
+        </article>
+        <article class="card">
+          <h3>Live preview</h3>
+          <p>Sandboxed preview that rebuilds as you type, with desktop and mobile viewports and a console drawer.</p>
+        </article>
+        <article class="card">
+          <h3>Checks</h3>
+          <p>Run your checks, see pass and fail rows, and hand failures straight back to the agent to fix.</p>
+        </article>
+        <article class="card">
+          <h3>Console &amp; telemetry</h3>
+          <p>Real run history with timings and logs, so performance is a fact, not a feeling.</p>
+        </article>
+        <article class="card">
+          <h3>Share links</h3>
+          <p>One link puts a read-only copy of any project in front of anyone. No account needed to view.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Connectors -->
+    <section class="section" id="connectors">
+      <p class="eyebrow">Connectors</p>
+      <h2>Plays well with your stack.</h2>
+      <p class="section-lede">Keys stay in your browser. The agent sees what's connected and offers to use it — nothing runs without your click.</p>
+      <div class="grid">
+        <article class="card">
+          <h3>Vercel</h3>
+          <p>Ship the project to your Vercel account straight from the Deploy button.</p>
+        </article>
+        <article class="card">
+          <h3>GitHub</h3>
+          <p>Push code without leaving Zut. Token saved once, prefilled ever after.</p>
+        </article>
+        <article class="card">
+          <h3>Cloudinary</h3>
+          <p>Upload images from the explorer; the URL lands on your clipboard.</p>
+        </article>
+        <article class="card">
+          <h3>Supabase</h3>
+          <p>Link a project and the agent designs tables and RLS for it.</p>
+        </article>
+        <article class="card">
+          <h3>Pexels</h3>
+          <p>Stock photos for landing pages, searched with your key.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="section" id="how">
+      <p class="eyebrow">How it works</p>
+      <h2>Prompt to preview in four steps.</h2>
+      <ol class="steps">
+        <li><span class="step-n">1</span><div><h3>Describe</h3><p>Type what you want in plain English, or pick a starter chip.</p></div></li>
+        <li><span class="step-n">2</span><div><h3>Agent builds</h3><p>Steps stream into Activity with a snapshot before every turn.</p></div></li>
+        <li><span class="step-n">3</span><div><h3>Review the diff</h3><p>Accept what you like, revert what you don't, ask follow-ups.</p></div></li>
+        <li><span class="step-n">4</span><div><h3>Run &amp; deploy</h3><p>Preview locally, run checks, then ship it to the web.</p></div></li>
+      </ol>
+    </section>
+
+    <!-- Models -->
+    <section class="section" id="models">
+      <p class="eyebrow">Models</p>
+      <h2>Your key, your bill, your business.</h2>
+      <p class="section-lede">Zut works with the providers you already pay — or none at all for plain code and Run. Keys are stored only on your device and never leave it except to call the provider.</p>
+      <div class="chips">
+        <span>Gemini</span><span>OpenRouter</span><span>Claude</span><span>ChatGPT</span><span>opencode (self-host)</span>
+      </div>
+      <p class="fineprint">Self-hosting with opencode on your own machine? Pick any model it serves — including free ones — from the session picker, or type any model ID.</p>
+    </section>
+
+    <!-- Pricing -->
+    <section class="section" id="pricing">
+      <p class="eyebrow">Pricing</p>
+      <h2>Editing is free.<br />Only runs use run time.</h2>
+      <div class="price-grid">
+        <article class="card price">
+          <h3>Pilot</h3>
+          <p class="price-line"><strong>Free</strong> while we're in pilot</p>
+          <ul>
+            <li>Full IDE, all panes</li>
+            <li>Agent turns included</li>
+            <li>Share links included</li>
+          </ul>
+        </article>
+        <article class="card price price-hot">
+          <h3>Bring your own key</h3>
+          <p class="price-line"><strong>Free app</strong> — pay your provider</p>
+          <ul>
+            <li>Use Gemini, OpenRouter, Claude, ChatGPT</li>
+            <li>Your usage billed by them, never us</li>
+            <li>Works offline from our cloud</li>
+          </ul>
+        </article>
+      </div>
+      <p class="fineprint">If it weren't for compute cost, Zut would be free entirely. We only ever charge what the machines cost.</p>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq">
+      <p class="eyebrow">FAQ</p>
+      <h2>Asked, answered.</h2>
+      <div class="faq">
+        <details>
+          <summary>Do I need to install anything?</summary>
+          <p>No. Zut runs entirely in your browser. Optional local helpers (run broker, opencode self-host) unlock more power on your own machine, but the IDE works without them.</p>
+        </details>
+        <details>
+          <summary>Which AI models can I use?</summary>
+          <p>Any you hold a key for — Gemini, OpenRouter, Claude, ChatGPT — plus anything your self-hosted opencode serves, including free models. Pick per session; type any model ID.</p>
+        </details>
+        <details>
+          <summary>Does it really work on a Chromebook?</summary>
+          <p>Yes. Zero install, no terminal, no build tools on your device. Heavy work runs in the browser tab or on a machine you choose.</p>
+        </details>
+        <details>
+          <summary>Is my code private?</summary>
+          <p>Projects live in your own Supabase project or on your device. API keys never leave your browser except to call the provider you chose.</p>
+        </details>
+        <details>
+          <summary>How do I publish a site?</summary>
+          <p>Connect your Vercel token once in account settings, hit Deploy, and you get a live URL. No anonymous deploys, ever.</p>
+        </details>
+        <details>
+          <summary>What does it cost?</summary>
+          <p>Editing is free. While we're in pilot, agent turns are on us; afterwards you either bring your own key or cover raw compute — never more.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="cta">
+      <h2>Your next project starts with a sentence.</h2>
+      <a class="btn btn-primary btn-lg" href="#top" id="ctaLaunch">Get Zut free</a>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand" href="#top"><span class="brand-mark">Z</span><span class="brand-word">Zut</span></a>
+    <p>Browser-based AI IDE. Runs on laptops and Chromebooks with zero install.</p>
+    <p class="fineprint">© <span id="year">2026</span> Zut. Editing is free — only runs use run time.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

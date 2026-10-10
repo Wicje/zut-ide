@@ -1,7 +1,7 @@
 {
-  "name": "Cursor Composer Ghost",
-  "short_name": "Composer Ghost",
-  "description": "Pixel-perfect recreation of Cursor's Composer Ghost AI IDE interface with agent workflow, chat stream, and multi-file code diff review pane.",
+  "name": "Zut",
+  "short_name": "Zut",
+  "description": "Zut is a browser-based AI IDE with agent workflow, chat stream, and multi-file code diff review. Runs on laptops and Chromebooks with zero install.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#141416",

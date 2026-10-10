@@ -14,9 +14,9 @@ import {
   GitBranch,
   ChevronUp,
   ChevronDown,
+  User,
 } from 'lucide-react';
 import { SidebarSection, SidebarItem } from '../types';
-import avatarImg from '../assets/images/sualeh_avatar_1791421944193.jpg';
 
 interface SidebarProps {
   sections: SidebarSection[];
@@ -26,6 +26,9 @@ interface SidebarProps {
   onNewAgent?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenAccount?: () => void;
+  onOpenRules?: () => void;
+  onToggleSidebar?: () => void;
+  user?: { name: string; email: string } | null;
   theme?: 'light' | 'dark';
 }
 
@@ -37,36 +40,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewAgent,
   onOpenCommandPalette,
   onOpenAccount,
+  onOpenRules,
+  onToggleSidebar,
+  user,
   theme = 'light',
 }) => {
   const isDark = theme === 'dark';
+  const displayName = user?.name
+    ? user.name
+    : user?.email
+    ? user.email.split('@')[0]
+    : 'Guest';
+  const displaySub = user?.email ?? 'Not signed in';
+  const initials = (user?.name ?? user?.email ?? 'G')
+    .split(/\s+/)
+    .map((s) => s[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
   const [searchFilter, setSearchFilter] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
 
   return (
     <div
-      className={`w-[210px] shrink-0 border-r flex flex-col justify-between select-none text-[13px] transition-colors ${
+      className={`w-[210px] shrink-0 border-r flex flex-col justify-between h-full select-none text-[13px] transition-colors ${
         isDark
           ? 'bg-[#141416] text-neutral-300 border-neutral-800'
           : 'bg-[#f4f4f6] text-[#2b2b2f] border-[#e5e5e7]'
       }`}
     >
       {/* Top area */}
-      <div className="flex flex-col">
+      <div className="flex flex-col flex-1 min-h-0">
         {/* Window controls bar */}
-        <div className="h-10 px-3.5 flex items-center justify-between">
-          {/* Traffic lights */}
-          <div className="flex items-center gap-1.5 group">
-            <div className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] cursor-pointer flex items-center justify-center text-[8px] text-black/50 group-hover:opacity-100 opacity-90 transition-opacity">
-              <span className="opacity-0 group-hover:opacity-100">✕</span>
-            </div>
-            <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] cursor-pointer flex items-center justify-center text-[8px] text-black/50 group-hover:opacity-100 opacity-90 transition-opacity">
-              <span className="opacity-0 group-hover:opacity-100">−</span>
-            </div>
-            <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] cursor-pointer flex items-center justify-center text-[8px] text-black/50 group-hover:opacity-100 opacity-90 transition-opacity">
-              <span className="opacity-0 group-hover:opacity-100">+</span>
-            </div>
-          </div>
+        <div className="h-10 px-3.5 flex items-center justify-end">
 
           {/* Quick search & toggle */}
           <div className="flex items-center gap-2 text-neutral-400">
@@ -78,9 +84,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Search size={14} strokeWidth={2} />
             </button>
             <button
-              onClick={onOpenCommandPalette}
+              onClick={onToggleSidebar}
               className="hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 rounded transition-colors cursor-pointer"
-              title="Command palette (⌘K)"
+              title="Collapse sidebar"
             >
               <PanelLeftClose size={14} strokeWidth={2} />
             </button>
@@ -95,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Filter sessions..."
-              className={`w-full px-2 py-1 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              className={`w-full px-2 py-1 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-red-500 ${
                 isDark ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-300 text-neutral-800'
               }`}
               autoFocus
@@ -113,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex items-center gap-2">
               <Sparkles size={15} className="text-neutral-500" />
-              <span>New Agent</span>
+              <span>New project</span>
             </div>
             <span className="text-[11px] font-mono text-neutral-400">⌘N</span>
           </button>
@@ -126,13 +132,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex items-center gap-2">
               <Layers size={15} className="text-neutral-500" />
-              <span>Automations</span>
+              <span>Commands</span>
             </div>
             <span className="text-[11px] font-mono text-neutral-400">⌘K</span>
           </button>
 
           <button
-            onClick={onOpenCommandPalette}
+            onClick={onOpenRules}
             className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
               isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
             }`}
@@ -143,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Sections list */}
-        <div className="px-2 space-y-3.5 overflow-y-auto max-h-[calc(100vh-210px)] pb-4">
+        <div className="px-2 space-y-3.5 overflow-y-auto flex-1 min-h-0 pb-4">
           {sections.map((section) => {
             const filteredItems = section.items.filter((item) =>
               item.title.toLowerCase().includes(searchFilter.toLowerCase())
@@ -189,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {isActive ? (
                             <MoreHorizontal size={13} className="text-neutral-400 shrink-0" />
                           ) : item.badge === 'blue' ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] shrink-0" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#e5484d] shrink-0" />
                           ) : (
                             <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600 shrink-0" />
                           )}
@@ -250,7 +256,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom Profile User Bar */}
       <div
-        className={`p-2 border-t transition-colors ${
+        className={`p-2 border-t shrink-0 transition-colors ${
           isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7]/80 bg-[#f4f4f6]'
         }`}
       >
@@ -261,21 +267,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }`}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <img
-              src={avatarImg}
-              alt="Sualeh Asif"
-              className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-black/10"
-            />
+            {user?.email ? (
+              <div
+                className={`w-7 h-7 rounded-full shrink-0 ring-1 ring-black/10 flex items-center justify-center text-[11px] font-semibold ${
+                  isDark ? 'bg-red-600 text-white' : 'bg-red-600 text-white'
+                }`}
+              >
+                {initials}
+              </div>
+            ) : (
+              <div
+                className={`w-7 h-7 rounded-full shrink-0 ring-1 ring-black/10 flex items-center justify-center ${
+                  isDark ? 'bg-neutral-700 text-neutral-300' : 'bg-neutral-200 text-neutral-500'
+                }`}
+              >
+                <User size={14} />
+              </div>
+            )}
             <div className="flex flex-col min-w-0 leading-tight">
               <span
                 className={`text-[12px] font-medium truncate ${
                   isDark ? 'text-neutral-100' : 'text-neutral-800'
                 }`}
               >
-                Sualeh Asif
+                {displayName}
               </span>
               <span className="text-[10.5px] text-neutral-500 truncate">
-                Anysphere
+                {displaySub}
               </span>
             </div>
           </div>

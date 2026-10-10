@@ -1,7 +1,7 @@
 // Mudbase end-user auth (local email+password provider).
-// Docs: /docs/guides/user-authentication — register, login -> JWT (24h) +
-// refreshToken, GET /api/auth/session to validate. Project API keys stay
-// server-side; only the user's own token lives here (localStorage).
+// Docs: register, login -> JWT (24h) + refreshToken, GET /api/auth/local/session
+// to validate. Project API keys stay server-side; only the user's own token
+// lives here (localStorage).
 const BASE = (import.meta.env.VITE_MUDBASE_URL as string | undefined)?.replace(/\/+$/, '') ?? 'https://api.mudbase.dev';
 const PROJECT_ID = import.meta.env.VITE_MUDBASE_PROJECT_ID as string | undefined;
 
@@ -85,9 +85,10 @@ export async function mudRegister(email: string, password: string, name?: string
 
 /** Sign in. Returns the user; tokens are persisted for later calls. */
 export async function mudLogin(email: string, password: string): Promise<MudUser> {
+  if (!PROJECT_ID) throw new Error('Mudbase is not configured (VITE_MUDBASE_PROJECT_ID).');
   const data = await call<{ token: string; refreshToken?: string; expiresIn?: number; user?: MudUser }>(
     '/api/auth/local/login',
-    { email: email.trim(), password },
+    { projectId: PROJECT_ID, email: email.trim(), password },
   );
   if (!data?.token) throw new Error('Sign-in did not return a session.');
   const user: MudUser = data.user ?? { email: email.trim() };
@@ -133,7 +134,7 @@ export function mudUser(): MudUser | null {
 export async function mudSession(): Promise<MudUser | null> {
   const token = await mudToken();
   if (!token) return null;
-  const res = await fetch(`${BASE}/api/auth/session`, {
+  const res = await fetch(`${BASE}/api/auth/local/session`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -159,6 +160,14 @@ export function mudLogout(): void {
   st.del(REFRESH_KEY);
   st.del(EXP_KEY);
   st.del(USER_KEY);
+}
+
+/** Re-send the verification email (no auth). For users stuck at sign-in
+ *  with an unverified address. */
+export async function mudResendVerification(email: string): Promise<string> {
+  if (!PROJECT_ID) throw new Error('Mudbase is not configured (VITE_MUDBASE_PROJECT_ID).');
+  await call<unknown>('/api/auth/resend-verification', { projectId: PROJECT_ID, email: email.trim() });
+  return 'Verification email sent — check your inbox, then sign in.';
 }
 
 /** Send a password-reset email for this project + email. */

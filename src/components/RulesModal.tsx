@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Check, Save, FileText, ArrowRight } from 'lucide-react';
 
-interface CursorRulesModalProps {
+interface RulesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaveRules: (rules: string) => void;
@@ -14,7 +14,7 @@ const DEFAULT_RULES = `# Project Agent Rules
 - Use Tailwind CSS v4 utility classes. Avoid inline styles and separate CSS files.
 - Prefer functional components and React hooks.`;
 
-export const CursorRulesModal: React.FC<CursorRulesModalProps> = ({
+export const RulesModal: React.FC<RulesModalProps> = ({
   isOpen,
   onClose,
   onSaveRules,
@@ -33,11 +33,11 @@ export const CursorRulesModal: React.FC<CursorRulesModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-lg rounded-2xl shadow-2xl border overflow-hidden ${
+        className={`w-full max-w-lg rounded-2xl shadow-2xl border overflow-hidden max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark
             ? 'bg-[#18181c] border-neutral-700 text-neutral-100'
             : 'bg-white border-neutral-200 text-neutral-800'
@@ -50,8 +50,8 @@ export const CursorRulesModal: React.FC<CursorRulesModalProps> = ({
           }`}
         >
           <div className="flex items-center gap-2 text-xs font-semibold">
-            <FileText size={15} className="text-purple-500" />
-            <span>Project Agent Guidelines (.cursorrules)</span>
+            <FileText size={15} className="text-red-500" />
+            <span>Project Agent Guidelines</span>
           </div>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600">
             <X size={15} />
@@ -67,7 +67,7 @@ export const CursorRulesModal: React.FC<CursorRulesModalProps> = ({
             rows={8}
             value={rules}
             onChange={(e) => setRules(e.target.value)}
-            className={`w-full p-3 font-code text-[11.5px] rounded-xl border leading-relaxed focus:outline-none focus:ring-2 focus:ring-purple-500/30 ${
+            className={`w-full p-3 font-code text-[11.5px] rounded-xl border leading-relaxed focus:outline-none focus:ring-2 focus:ring-red-500/30 ${
               isDark
                 ? 'bg-[#222227] border-neutral-700 text-neutral-200'
                 : 'bg-neutral-50 border-neutral-300 text-neutral-800'
@@ -96,7 +96,7 @@ export const CursorRulesModal: React.FC<CursorRulesModalProps> = ({
                 className="px-3.5 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium flex items-center gap-1.5 shadow-sm hover:opacity-90"
               >
                 <Save size={13} />
-                <span>Save .cursorrules</span>
+                <span>Save Guidelines</span>
               </button>
             </div>
           </div>

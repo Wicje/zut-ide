@@ -1,6 +1,6 @@
-# Cursor Composer Ghost — desktop-class coding in the browser. Nothing to install.
+# Zut — desktop-class coding in the browser. Nothing to install.
 
-A Cursor-style browser IDE (resizable 3-pane shell: sidebar, agent composer,
+A browser IDE (resizable 3-pane shell: sidebar, agent composer,
 diff / editor / preview / checks) + optional run broker. Edit files, hit Run,
 see the result. Heavy work (program runs, terminal, preview, AI file edits)
 runs on your private computer via the broker; the browser just renders the UI.
@@ -37,17 +37,19 @@ When you want it, bring your own key or use the cloud agent.
   full width to test responsive layouts without leaving the IDE.
 - **Import from URL** — *New ▾ → Import from URL* accepts an HTML page, a CodePen, or a raw GitHub file,
   and scaffolds a project from it.
-- **One-click deploy** — the *Deploy* button zips the project and publishes it to a free, live Netlify URL
-  (visitor-created sites via Netlify's open API).
-- **GitHub push** — sign in and connect your GitHub account, then publish any project as a new (private or
-  public) repository. It's created and pushed for you.
-- **Vercel deploy** — connect your Vercel account and push the project straight to a live `.vercel.app` URL.
-  Next.js projects are auto-detected and built on Vercel.
+- **One-click deploy** — the *Deploy* button publishes the project to a live
+  Vercel URL through your own Vercel token (saved once in account settings,
+  validated and stored server-side). Signed-in users only; never anonymous.
+- **GitHub push** — push any project with one commit (repo auto-created when
+  missing), your branch and message, and a real pull request for feature
+  branches. Classic token with `repo` scope, kept in your browser.
 - **Server compile-check** — for Express / NestJS / Next.js projects, the *Deploy* dialog can
   compile-check your server entry (`src/main.ts`, `server.js`, …) in the browser without a Node
   runtime, surfacing syntax and import-graph errors before you push.
-- **AI assistant** — the *✨ AI* button opens a chat with Claude that can see your project (files + the active
-  file) and answer coding questions; the API key stays on the server.
+- **AI assistant** — prompt in plain English; the agent streams reviewable steps
+  with checkpoints. Bring your own key (Gemini, OpenRouter, Claude, ChatGPT),
+  run free models via self-hosted opencode, and attach images the models can
+  actually see. Keys stay in your browser.
 - **Run checks** — the Checks pane executes the project entry and lists each run
   as a pass/fail row with output; failing rows offer agent auto-fix.
 - **Resilient workspace** — every New / Import / Restore / revert / rollback
@@ -308,7 +310,7 @@ src/
   components/CodeLine.tsx + SplitDiffViewer.tsx # unified + side-by-side diff rows
   components/*Modal.tsx  # CommandPalette, NewAgent, VideoPreview, PR, PRReviewStudio,
                          # VercelDeploy, History, Share, GitHubPush, Import,
-                         # LoginAndAccount, CursorRules
+                         # LoginAndAccount, Rules
   adapters/              # UI-facing backends: zut (broker + Supabase + drafts),
                          # preview (esbuild bundle), filemap, aiEdits, gemini,
                          # providers, github, mudauth, importer, opencode

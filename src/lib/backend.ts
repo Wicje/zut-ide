@@ -91,7 +91,7 @@ export async function listProjects(): Promise<StoredRow[]> {
     return rows.map((r): StoredRow => ({ id: r.id, name: r.name, files: r.files, share_token: null, updated_at: r.updated_at }))
   }
   const { data, error } = await supabase
-    .from('projects')
+    .from('zut_projects')
     .select('id, name, files, share_token, updated_at')
     .order('updated_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -109,7 +109,7 @@ export async function getProject(id: string): Promise<StoredRow> {
   }
   const supabase = supabaseOrNull()
   if (!supabase) throw new Error('Not signed in')
-  const { data, error } = await supabase.from('projects').select('id, name, files, share_token, updated_at').eq('id', id).maybeSingle()
+  const { data, error } = await supabase.from('zut_projects').select('id, name, files, share_token, updated_at').eq('id', id).maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('Project not found')
   return data as StoredRow
@@ -134,7 +134,7 @@ export async function createProject(name: string, files: FileMap): Promise<strin
     return row.id
   }
   const { data, error } = await supabase
-    .from('projects')
+    .from('zut_projects')
     .insert({ name, files })
     .select('id')
     .single()
@@ -162,7 +162,7 @@ export async function updateProject(id: string, name: string, files: FileMap): P
     }
     return
   }
-  const { error } = await supabase.from('projects').update({ name, files, updated_at: new Date().toISOString() }).eq('id', id)
+  const { error } = await supabase.from('zut_projects').update({ name, files, updated_at: new Date().toISOString() }).eq('id', id)
   if (error) throw new Error(error.message)
 }
 
@@ -180,7 +180,7 @@ export async function deleteProject(id: string): Promise<void> {
     await deleteLocalProjectDurable(id)
     return
   }
-  const { error } = await supabase.from('projects').delete().eq('id', id)
+  const { error } = await supabase.from('zut_projects').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
 
@@ -199,12 +199,12 @@ export async function setProjectShared(id: string, shared: boolean): Promise<str
   const supabase = supabaseOrNull()
   if (!supabase) throw new Error('Sign in to share projects')
   if (!shared) {
-    const { error } = await supabase.from('projects').update({ share_token: null }).eq('id', id)
+    const { error } = await supabase.from('zut_projects').update({ share_token: null }).eq('id', id)
     if (error) throw new Error(error.message)
     return null
   }
   const uuid = crypto.randomUUID()
-  const { error } = await supabase.rpc('set_share_token', { p_project_id: id, p_token: uuid })
+  const { error } = await supabase.rpc('zut_set_share_token', { p_project_id: id, p_token: uuid })
   if (error) throw new Error(error.message)
   return uuid
 }
@@ -221,7 +221,7 @@ export async function getSharedProject(token: string): Promise<{ name: string; f
   }
   const supabase = supabaseOrNull()
   if (!supabase) throw new Error('Sharing requires Supabase to be configured')
-  const { data, error } = await supabase.rpc('get_shared_project', { p_token: token })
+  const { data, error } = await supabase.rpc('zut_get_shared_project', { p_token: token })
   if (error) throw new Error(error.message)
   if (!data || !data.files) throw new Error('Project not found')
   return { name: data.name, files: data.files }

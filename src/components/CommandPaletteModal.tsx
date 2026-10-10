@@ -76,7 +76,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       title: isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme',
       shortcut: '⌘T',
       category: 'Preferences',
-      icon: isDark ? <Sun size={14} className="text-amber-500" /> : <Moon size={14} className="text-purple-500" />,
+      icon: isDark ? <Sun size={14} className="text-amber-500" /> : <Moon size={14} className="text-red-500" />,
       action: () => {
         onToggleTheme();
         onClose();
@@ -87,7 +87,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       title: 'Deploy Preview to Vercel (Production Edge)',
       shortcut: '⌘V',
       category: 'Deployment',
-      icon: <Terminal size={14} className="text-blue-500" />,
+      icon: <Terminal size={14} className="text-red-500" />,
       action: () => {
         if (onOpenDeploy) onOpenDeploy();
         onClose();
@@ -97,7 +97,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       id: 'account-settings',
       title: 'Account Settings & Usage',
       category: 'Preferences',
-      icon: <Layers size={14} className="text-purple-500" />,
+      icon: <Layers size={14} className="text-red-500" />,
       action: () => {
         if (onOpenAccount) onOpenAccount();
         onClose();
@@ -107,7 +107,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       id: 'history',
       title: 'Version History (snapshots)',
       category: 'Project',
-      icon: <History size={14} className="text-purple-500" />,
+      icon: <History size={14} className="text-red-500" />,
       action: () => {
         if (onOpenHistory) onOpenHistory();
         onClose();
@@ -117,7 +117,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       id: 'share-link',
       title: 'Share read-only link',
       category: 'Project',
-      icon: <Link2 size={14} className="text-blue-500" />,
+      icon: <Link2 size={14} className="text-red-500" />,
       action: () => {
         if (onShare) onShare();
         onClose();
@@ -148,7 +148,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       title: 'Toggle Split / Unified Diff View',
       shortcut: '⌘D',
       category: 'Editor',
-      icon: <Split size={14} className="text-blue-500" />,
+      icon: <Split size={14} className="text-red-500" />,
       action: () => {
         onToggleDiffMode();
         onClose();
@@ -156,10 +156,10 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     },
     {
       id: 'new-agent',
-      title: 'New Agent Session',
+      title: 'New Project',
       shortcut: '⌘N',
       category: 'Agent',
-      icon: <Sparkles size={14} className="text-indigo-500" />,
+      icon: <Sparkles size={14} className="text-red-500" />,
       action: () => {
         onNewAgent();
         onClose();
@@ -189,10 +189,10 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     },
     {
       id: 'commit-push',
-      title: 'Git: Commit & Push Changes',
+      title: 'Save & Deploy',
       shortcut: '⌘S',
-      category: 'Source Control',
-      icon: <GitCommit size={14} className="text-blue-600" />,
+      category: 'Workspace',
+      icon: <GitCommit size={14} className="text-red-600" />,
       action: () => {
         onCommitPush();
         onClose();
@@ -248,11 +248,11 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50 backdrop-blur-xs p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-xl rounded-xl shadow-2xl overflow-hidden border ${
+        className={`w-full max-w-xl rounded-xl shadow-2xl overflow-hidden border max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark ? 'bg-[#1e1e24] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -292,7 +292,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                   className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
                     isSelected
                       ? isDark
-                        ? 'bg-blue-600/30 text-white'
+                        ? 'bg-red-600/30 text-white'
                         : 'bg-neutral-100 text-neutral-900 font-medium'
                       : isDark
                       ? 'text-neutral-300 hover:bg-neutral-800'
@@ -315,7 +315,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                         {item.shortcut}
                       </kbd>
                     )}
-                    {isSelected && <ArrowRight size={12} className="text-blue-500" />}
+                    {isSelected && <ArrowRight size={12} className="text-red-500" />}
                   </div>
                 </div>
               );

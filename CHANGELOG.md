@@ -5,6 +5,31 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-10 — Zut pilot batch)
+- Zut identity: product renamed everywhere (tab, manifest, PWA, docs),
+  Cursor/Anysphere branding purged, red Cursor-style accent across all of
+  `src/`, DESIGN.md contract updated.
+- Blank-by-default workspaces; sessions + chats persist across reload;
+  snapshots capped and quota-safe; sign-in backs up device work first.
+- File ops: rename (inline), duplicate, delete (confirmed), new file/folder
+  with rename-into-place; all snapshot History first.
+- Responsive shell: mobile single-pane + bottom nav, tablet rails, `100dvh`,
+  full-screen modals, scrolling pane headers, hover overflow menu in Diff.
+- Dev connectors (BYOK, browser-only): Vercel, GitHub, Cloudinary, Supabase,
+  Pexels — account section, explorer upload, agent prompt awareness.
+- Vercel-only deploys via edge function (signed-in users, token validated +
+  stored server-side); Netlify anonymous path removed.
+- Industry-standard GitHub push: create-if-missing, single tree commit,
+  feature branches, conventional messages, real pull requests.
+- Agent upgrades: image attachments (multimodal on Gemini/OpenRouter/Claude/
+  ChatGPT), opencode model picker (free-first + custom IDs), turn ratings,
+  loud failure states (missing key opens account settings).
+- Localhost locked down: bridge + runtime tokens, one-command
+  `scripts/start-local.ps1`, Sentry wiring (env-gated).
+- Landing page (`landing/`, Notion-style, real screenshots) + Notion-style
+  sign-in/register pages; de-pilled action buttons; collapsible sidebar;
+  wallpaper picker; working mic error states.
+
 ### Added
 - Composer Ghost UI port (pixel-perfect): wallpaper stage + resizable
   sidebar/composer/right shell (Diff/Editor/Preview/Checks), 13 modals, light

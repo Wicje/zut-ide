@@ -110,8 +110,8 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
             className={`flex items-center gap-1.5 pb-0.5 transition-colors cursor-pointer ${
               activeTab === 'benchmarks' && isOpen
                 ? isDark
-                  ? 'text-white border-b-2 border-blue-500 font-semibold'
-                  : 'text-neutral-900 border-b-2 border-blue-600 font-semibold'
+                  ? 'text-white border-b-2 border-red-500 font-semibold'
+                  : 'text-neutral-900 border-b-2 border-red-600 font-semibold'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >
@@ -127,13 +127,13 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
             className={`flex items-center gap-1.5 pb-0.5 transition-colors cursor-pointer ${
               activeTab === 'terminal' && isOpen
                 ? isDark
-                  ? 'text-white border-b-2 border-blue-500 font-semibold'
-                  : 'text-neutral-900 border-b-2 border-blue-600 font-semibold'
+                  ? 'text-white border-b-2 border-red-500 font-semibold'
+                  : 'text-neutral-900 border-b-2 border-red-600 font-semibold'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >
-            <Terminal size={12} className="text-blue-500" />
-            <span>Terminal (zsh)</span>
+            <Terminal size={12} className="text-red-500" />
+            <span>Console</span>
           </button>
 
           <button
@@ -144,12 +144,12 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
             className={`flex items-center gap-1.5 pb-0.5 transition-colors cursor-pointer ${
               activeTab === 'logs' && isOpen
                 ? isDark
-                  ? 'text-white border-b-2 border-blue-500 font-semibold'
-                  : 'text-neutral-900 border-b-2 border-blue-600 font-semibold'
+                  ? 'text-white border-b-2 border-red-500 font-semibold'
+                  : 'text-neutral-900 border-b-2 border-red-600 font-semibold'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >
-            <FileText size={12} className="text-purple-500" />
+            <FileText size={12} className="text-red-500" />
             <span>Telemetry</span>
           </button>
         </div>
@@ -182,7 +182,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                 <button
                   onClick={runBenchmark}
                   disabled={isBenchmarking}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-xs transition-colors text-[11px]"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-medium shadow-xs transition-colors text-[11px]"
                 >
                   <Play size={11} className={isBenchmarking ? 'animate-spin' : ''} />
                   <span>{isBenchmarking ? 'Refreshing...' : 'Refresh'}</span>
@@ -191,7 +191,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
               </div>
 
               {/* Metric Cards Grid */}
-              <div className="grid grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div className={`p-2.5 rounded-lg border ${
                   isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-200'
                 }`}>
@@ -227,7 +227,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                 }`}>
                   <div className="flex items-center justify-between text-neutral-400 text-[10.5px]">
                     <span>Last Exit</span>
-                    <Clock size={12} className="text-blue-500" />
+                    <Clock size={12} className="text-red-500" />
                   </div>
                   <div className="text-base font-bold text-neutral-800 dark:text-white mt-1">
                     {telemetry?.lastExit ?? '—'}
@@ -242,7 +242,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                 }`}>
                   <div className="flex items-center justify-between text-neutral-400 text-[10.5px]">
                     <span>Last Run</span>
-                    <Cpu size={12} className="text-purple-500" />
+                    <Cpu size={12} className="text-red-500" />
                   </div>
                   <div className="text-base font-bold text-neutral-800 dark:text-white mt-1">
                     {telemetry?.lastAt ?? '—'}
