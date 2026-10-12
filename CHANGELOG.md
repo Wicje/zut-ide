@@ -5,6 +5,20 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-12 — landing relaunch + waitlist)
+- Landing relaunched dark Cursor-style ("Where sentences become software"):
+  hero with overlapping product screenshots, alternating feature rows, wall of
+  love, changelog, team block, full footer; light/dark toggle (stored, OS-aware,
+  no flash); gradient headline; staggered card entrances; hero 3D tilt; cursor
+  spotlight on cards; scroll progress bar; recognition favicon.
+- Waitlist capture on hero + final CTA: email validation, loading/success states,
+  duplicate handling; inserts to `waitlist` via anon key (insert-only RLS).
+- `supabase/waitlist.sql`: one-run setup — table, RLS, vault-stored Sendliberty
+  key, trigger sending a plain-text welcome email (Gmail-routed, no domain).
+  Email failures can never block a signup.
+- Landing deployed to Vercel production (static, no build):
+  https://landing-two-beta-xy9r9089if.vercel.app
+
 ### Added (2026-10-10 — Zut pilot batch)
 - Zut identity: product renamed everywhere (tab, manifest, PWA, docs),
   Cursor/Anysphere branding purged, red Cursor-style accent across all of

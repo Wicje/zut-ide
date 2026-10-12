@@ -72,6 +72,26 @@ The app runs fine with no configuration — try it before touching Supabase.
 npm run build && npm run preview
 ```
 
+## Landing page + waitlist (live)
+
+The marketing site in `landing/` is a dependency-free static page (dark Cursor-style,
+light/dark toggle, staggered entrances, cursor spotlight, scroll progress) that sells
+the IDE with screenshots of the actual product. Hero + final CTA carry a waitlist form:
+
+- Signups POST to the `waitlist` table via the public anon key (insert-only RLS).
+- A Postgres trigger (`supabase/waitlist.sql`) sends a plain-text welcome email through
+  [Sendliberty](https://sendliberty.com) (Gmail-routed, no domain needed). The API key
+  lives in the vault, never in code; email failures can never block a signup.
+
+Setup (one SQL run, no CLI):
+
+1. Open the Supabase dashboard → SQL Editor, paste `supabase/waitlist.sql`, press Run.
+   (Fill the two placeholders first: your `sl_…` key and sending Gmail — or run as-is
+   and set them later; signups save either way.)
+2. Preview locally: `npx serve landing` (or open `landing/index.html` directly).
+3. Deploy: `npx vercel deploy --cwd landing --prod` (static, no build step).
+   Live: https://landing-two-beta-xy9r9089if.vercel.app
+
 ## Keyboard shortcuts
 
 | Keys | Action |
@@ -325,7 +345,10 @@ broker/
 runtime/server.mjs       # self-hostable compute service (/build + /run, native esbuild + python3/go)
 cloud/server.mjs         # zut-cloud: builds + runs + headless agent turns
 scripts/file-bridge.mjs  # syncs the project to disk for the opencode agent
+landing/               # static marketing site (Cursor-style, light/dark, waitlist
+                       # forms, product screenshots); deploys to Vercel with no build
 supabase/schema.sql      # tables + RLS + share RPCs + OAuth connections
+supabase/waitlist.sql    # waitlist table + insert-only RLS + Sendliberty welcome trigger
 supabase/functions/
   _shared/               # auth, OAuth state, GitHub, Vercel helpers
   oauth-github-start, oauth-github-callback

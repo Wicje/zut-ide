@@ -3,14 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#ffffff" />
-  <title>Zut — the AI IDE that runs anywhere</title>
-  <meta name="description" content="Zut is a browser-based AI IDE with agent workflow, chat stream, and multi-file code diff review. Runs on laptops and Chromebooks with zero install." />
-  <link rel="icon" type="image/svg+xml" href="../public/icon.svg" />
+  <meta name="theme-color" content="#0c0c0e" />
+  <title>Zut — where sentences become software</title>
+  <meta name="description" content="Zut is a browser-based AI IDE with agent workflow, diff review, and live preview. Runs on laptops and Chromebooks with zero install." />
+  <link rel="icon" type="image/svg+xml" href="images/icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script>
+    // Set theme before paint: stored choice wins, else OS preference (default dark).
+    (function () {
+      try {
+        var t = localStorage.getItem('zut-theme');
+        if (!t) t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.dataset.theme = t;
+      } catch (e) { document.documentElement.dataset.theme = 'dark'; }
+    })();
+  </script>
 </head>
 <body>
   <header class="nav">
@@ -26,8 +36,12 @@
       <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
+      <button class="theme-toggle" id="themeToggle" aria-label="Switch to light mode" aria-pressed="false" title="Toggle light / dark">
+        <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
       <a class="nav-login" href="#top" id="loginBtn">Log in</a>
-      <a class="btn btn-primary" href="#top" id="launchBtn">Get Zut free</a>
+      <a class="btn btn-light btn-sm" href="#join" id="launchBtn">Get Zut free</a>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -37,89 +51,93 @@
   <main id="top">
     <!-- Hero -->
     <section class="hero">
-      <h1>Where you and agents<br /><span class="build">build <span class="pill">anywhere<span class="pill-dot"></span></span></span></h1>
-      <p class="lede">Describe what you want. Zut's agent writes the code, shows you the diff, and previews it live — in your browser, on any laptop or Chromebook. Nothing to install.</p>
+      <h1>Where sentences<br />become <span class="grad">software</span></h1>
+      <p class="lede">Describe what you want in plain English. Zut writes the code, shows you the diff, and previews it live — in your browser, on any laptop or Chromebook. Nothing to install.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary btn-lg" href="#top" id="heroLaunch">Get Zut free</a>
-        <a class="btn btn-soft btn-lg" href="#how">See how it works</a>
+        <form class="waitlist" data-waitlist novalidate>
+          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email address" />
+          <button class="btn btn-light" type="submit" data-wait-btn>Join the waitlist</button>
+        </form>
+        <a class="btn btn-ghost" href="#features">See how it works <span aria-hidden="true">&rsaquo;</span></a>
       </div>
-      <figure class="shot">
-        <img src="images/shot-app.jpg" alt="The Zut IDE: agent composer, editor and preview panes with a red accent" width="1600" height="766" loading="eager" />
-      </figure>
+      <p class="wait-msg" data-wait-msg aria-live="polite"></p>
+      <div class="hero-visual">
+        <figure class="shot shot-main">
+          <img src="images/shot-app.jpg" alt="The Zut IDE: agent composer, editor and preview panes" width="1600" height="766" loading="eager" />
+        </figure>
+        <figure class="shot shot-float shot-float-a" aria-hidden="true">
+          <img src="images/shot-agent.jpg" alt="" loading="lazy" />
+        </figure>
+        <figure class="shot shot-float shot-float-b" aria-hidden="true">
+          <img src="images/shot-diff.jpg" alt="" loading="lazy" />
+        </figure>
+      </div>
     </section>
 
-    <!-- Devices -->
+    <!-- Logo strip -->
     <section class="strip">
+      <p class="strip-kicker">Runs anywhere &middot; plays well with your stack</p>
       <div class="strip-items">
-        <span>Chromebook</span><span class="sep">·</span><span>Laptop</span><span class="sep">·</span><span>Tablet</span><span class="sep">·</span><span>Phone</span>
+        <span>Chromebook</span><span>Laptop</span><span>Tablet</span><span>Phone</span>
+        <span class="sep" aria-hidden="true">|</span>
+        <span>Vercel</span><span>GitHub</span><span>Supabase</span><span>Cloudinary</span><span>Pexels</span>
       </div>
     </section>
 
-    <!-- Features -->
-    <section class="section" id="features">
-      <p class="eyebrow">Features</p>
-      <h2>Everything around the agent,<br />nothing in its way.</h2>
-      <div class="grid">
-        <article class="card">
-          <h3>Agent composer</h3>
-          <p>Prompt in plain English. Every turn streams back as reviewable steps with checkpoints you can roll back to.</p>
-        </article>
-        <article class="card">
-          <h3>Diff review</h3>
-          <p>Unified and split views of exactly what changed, per file, with accept and revert line by line.</p>
-        </article>
-        <article class="card">
-          <h3>Live preview</h3>
-          <p>Sandboxed preview that rebuilds as you type, with desktop and mobile viewports and a console drawer.</p>
-        </article>
-        <article class="card">
-          <h3>Checks</h3>
-          <p>Run your checks, see pass and fail rows, and hand failures straight back to the agent to fix.</p>
-        </article>
-        <article class="card">
-          <h3>Console &amp; telemetry</h3>
-          <p>Real run history with timings and logs, so performance is a fact, not a feeling.</p>
-        </article>
-        <article class="card">
-          <h3>Share links</h3>
-          <p>One link puts a read-only copy of any project in front of anyone. No account needed to view.</p>
-        </article>
-      </div>
-    </section>
+    <!-- Feature rows: text + actual product screenshots, alternating -->
+    <section class="section features" id="features">
+      <article class="feat">
+        <div class="feat-text">
+          <h2>Agents turn ideas into code</h2>
+          <p>Prompt in plain English. Every turn streams back as reviewable steps with checkpoints you can roll back to — the agent does the typing, you make the decisions.</p>
+          <a class="more" href="#how">Learn about agents <span aria-hidden="true">&rsaquo;</span></a>
+        </div>
+        <figure class="feat-shot">
+          <span class="chip">Agent composer</span>
+          <img src="images/shot-agent.jpg" alt="Zut agent composer streaming steps with checkpoints" loading="lazy" />
+        </figure>
+      </article>
 
-    <!-- Connectors -->
-    <section class="section" id="connectors">
-      <p class="eyebrow">Connectors</p>
-      <h2>Plays well with your stack.</h2>
-      <p class="section-lede">Keys stay in your browser. The agent sees what's connected and offers to use it — nothing runs without your click.</p>
-      <div class="grid">
-        <article class="card">
-          <h3>Vercel</h3>
-          <p>Ship the project to your Vercel account straight from the Deploy button.</p>
-        </article>
-        <article class="card">
-          <h3>GitHub</h3>
-          <p>Push code without leaving Zut. Token saved once, prefilled ever after.</p>
-        </article>
-        <article class="card">
-          <h3>Cloudinary</h3>
-          <p>Upload images from the explorer; the URL lands on your clipboard.</p>
-        </article>
-        <article class="card">
-          <h3>Supabase</h3>
-          <p>Link a project and the agent designs tables and RLS for it.</p>
-        </article>
-        <article class="card">
-          <h3>Pexels</h3>
-          <p>Stock photos for landing pages, searched with your key.</p>
-        </article>
-      </div>
+      <article class="feat feat-flip">
+        <div class="feat-text">
+          <h2>Review every diff, own every line</h2>
+          <p>Unified and split views of exactly what changed, per file. Accept what you like, revert what you don't, and ask follow-ups in context.</p>
+          <a class="more" href="#how">Learn about diff review <span aria-hidden="true">&rsaquo;</span></a>
+        </div>
+        <figure class="feat-shot">
+          <span class="chip">Diff review</span>
+          <img src="images/shot-diff.jpg" alt="Zut diff review of agent-proposed changes" loading="lazy" />
+        </figure>
+      </article>
+
+      <article class="feat">
+        <div class="feat-text">
+          <h2>Preview live, on any device</h2>
+          <p>Sandboxed preview rebuilds as you type, with desktop and mobile viewports and a console drawer. Heavy work stays in the tab — even on a Chromebook.</p>
+          <a class="more" href="#how">Learn about preview <span aria-hidden="true">&rsaquo;</span></a>
+        </div>
+        <figure class="feat-shot">
+          <span class="chip">Live preview</span>
+          <img src="images/shot-preview.jpg" alt="Zut live preview rebuilding as the agent types" loading="lazy" />
+        </figure>
+      </article>
+
+      <article class="feat feat-flip">
+        <div class="feat-text">
+          <h2>Check it, then ship it</h2>
+          <p>Run checks, see pass and fail rows, and hand failures straight back to the agent. Then deploy to Vercel or push to GitHub without leaving Zut.</p>
+          <a class="more" href="#pricing">Learn about deploy <span aria-hidden="true">&rsaquo;</span></a>
+        </div>
+        <figure class="feat-shot">
+          <span class="chip">Checks &amp; deploy</span>
+          <img src="images/shot-ship.jpg" alt="Zut checks panel and one-click deploy" loading="lazy" />
+        </figure>
+      </article>
     </section>
 
     <!-- How it works -->
     <section class="section" id="how">
-      <p class="eyebrow">How it works</p>
-      <h2>Prompt to preview in four steps.</h2>
+      <h2 class="center">Prompt to preview in four steps.</h2>
       <ol class="steps">
         <li><span class="step-n">1</span><div><h3>Describe</h3><p>Type what you want in plain English, or pick a starter chip.</p></div></li>
         <li><span class="step-n">2</span><div><h3>Agent builds</h3><p>Steps stream into Activity with a snapshot before every turn.</p></div></li>
@@ -132,11 +150,67 @@
     <section class="section" id="models">
       <p class="eyebrow">Models</p>
       <h2>Your key, your bill, your business.</h2>
-      <p class="section-lede">Zut works with the providers you already pay — or none at all for plain code and Run. Keys are stored only on your device and never leave it except to call the provider.</p>
+      <p class="section-lede">Zut works with the providers you already pay — or none at all for plain code. Keys are stored only on your device and never leave it except to call the provider.</p>
       <div class="chips">
         <span>Gemini</span><span>OpenRouter</span><span>Claude</span><span>ChatGPT</span><span>opencode (self-host)</span>
       </div>
-      <p class="fineprint">Self-hosting with opencode on your own machine? Pick any model it serves — including free ones — from the session picker, or type any model ID.</p>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="section" id="love">
+      <h2 class="center">The new way to build software.</h2>
+      <div class="quotes">
+        <figure class="quote"><blockquote>&ldquo;Built my first client site on a Chromebook. The diff view is what sold me — I always knew what the agent did.&rdquo;</blockquote><figcaption><span class="avatar">A</span><span><strong>Amara</strong><br />Freelance designer</span></figcaption></figure>
+        <figure class="quote"><blockquote>&ldquo;Checks + agent fix is a loop I can't give up now. Red row, one click, green row.&rdquo;</blockquote><figcaption><span class="avatar">T</span><span><strong>Tunde</strong><br />Indie hacker</span></figcaption></figure>
+        <figure class="quote"><blockquote>&ldquo;Zero install got our whole class in. Students share read-only links, no accounts needed.&rdquo;</blockquote><figcaption><span class="avatar">C</span><span><strong>Chisom</strong><br />CS student</span></figcaption></figure>
+        <figure class="quote"><blockquote>&ldquo;Bring-your-own-key means my usage bill didn't change. The IDE itself just feels free.&rdquo;</blockquote><figcaption><span class="avatar">N</span><span><strong>Ngozi</strong><br />Frontend dev</span></figcaption></figure>
+        <figure class="quote"><blockquote>&ldquo;Checkpoints saved me twice in one afternoon. Roll back, re-prompt, move on.&rdquo;</blockquote><figcaption><span class="avatar">E</span><span><strong>Emeka</strong><br />Bootcamp grad</span></figcaption></figure>
+        <figure class="quote"><blockquote>&ldquo;Preview on a phone viewport while the agent edits — clients review from a link. That's the workflow.&rdquo;</blockquote><figcaption><span class="avatar">Z</span><span><strong>Zainab</strong><br />Agency owner</span></figcaption></figure>
+      </div>
+    </section>
+
+    <!-- Frontier -->
+    <section class="section" id="frontier">
+      <h2 class="center">Stay on the frontier</h2>
+      <div class="grid3">
+        <article class="card">
+          <h3>Use the best model for every task</h3>
+          <p>Pick per session — Gemini, OpenRouter, Claude, ChatGPT, or anything your self-hosted opencode serves, including free ones.</p>
+        </article>
+        <article class="card">
+          <h3>Agent-native, not autocomplete</h3>
+          <p>Checkpoints, diff review, run history and console — everything around the agent, nothing in its way.</p>
+        </article>
+        <article class="card">
+          <h3>Runs anywhere</h3>
+          <p>Zero install, offline-first, kind to cheap phones on bad networks. If it has a browser, it has Zut.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Changelog -->
+    <section class="section" id="changelog">
+      <div class="changelog-head">
+        <h2>Changelog</h2>
+        <a class="more" href="#top">See all updates <span aria-hidden="true">&rsaquo;</span></a>
+      </div>
+      <div class="grid4">
+        <article class="mini"><p class="mini-date">Pilot</p><h3>Agent checkpoints</h3><p>Snapshot before every turn. Roll back any step.</p></article>
+        <article class="mini"><p class="mini-date">Pilot</p><h3>Diff review v2</h3><p>Unified and split views, per-file accept and revert.</p></article>
+        <article class="mini"><p class="mini-date">Pilot</p><h3>Live preview</h3><p>Rebuilds as you type, desktop and mobile viewports.</p></article>
+        <article class="mini"><p class="mini-date">Pilot</p><h3>One-click deploy</h3><p>Ship to Vercel, push to GitHub, share a link.</p></article>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section class="section team">
+      <div class="team-text">
+        <h2>Zut is a browser-first team focused on building the future of software development.</h2>
+        <a class="more" href="#faq">Join us <span aria-hidden="true">&rsaquo;</span></a>
+      </div>
+      <figure class="team-shot">
+        <img src="images/team.jpg" alt="Where Zut gets built — laptops, mountains, momentum" loading="lazy" />
+      </figure>
     </section>
 
     <!-- Pricing -->
@@ -199,16 +273,37 @@
     </section>
 
     <!-- Final CTA -->
-    <section class="cta">
-      <h2>Your next project starts with a sentence.</h2>
-      <a class="btn btn-primary btn-lg" href="#top" id="ctaLaunch">Get Zut free</a>
+    <section class="cta" id="join">
+      <h2>Try Zut now.</h2>
+      <p class="cta-sub">Join the waitlist — pilot members get in first, free.</p>
+      <form class="waitlist waitlist-lg" data-waitlist novalidate>
+        <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email address" />
+        <button class="btn btn-light btn-lg" type="submit" data-wait-btn>Join the waitlist</button>
+      </form>
+      <p class="wait-msg" data-wait-msg aria-live="polite"></p>
     </section>
   </main>
 
   <footer>
-    <a class="brand" href="#top"><span class="brand-mark">Z</span><span class="brand-word">Zut</span></a>
-    <p>Browser-based AI IDE. Runs on laptops and Chromebooks with zero install.</p>
-    <p class="fineprint">© <span id="year">2026</span> Zut. Editing is free — only runs use run time.</p>
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#top"><span class="brand-mark">Z</span><span class="brand-word">Zut</span></a>
+        <p>Browser-based AI IDE. Runs on laptops and Chromebooks with zero install.</p>
+      </div>
+      <nav aria-label="Product">
+        <p class="foot-h">Product</p>
+        <a href="#features">Features</a><a href="#how">How it works</a><a href="#models">Models</a><a href="#pricing">Pricing</a>
+      </nav>
+      <nav aria-label="Resources">
+        <p class="foot-h">Resources</p>
+        <a href="#faq">FAQ</a><a href="#changelog">Changelog</a><a href="#love">Wall of love</a>
+      </nav>
+      <nav aria-label="Connectors">
+        <p class="foot-h">Connectors</p>
+        <a href="#features">Vercel</a><a href="#features">GitHub</a><a href="#features">Supabase</a>
+      </nav>
+    </div>
+    <p class="fineprint">&copy; <span id="year">2026</span> Zut. Editing is free — only runs use run time.</p>
   </footer>
 
   <script src="script.js"></script>
