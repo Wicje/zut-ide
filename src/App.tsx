@@ -16,6 +16,8 @@ import { ImportModal } from './components/ImportModal';
 import { LoginAndAccountModal } from './components/LoginAndAccountModal';
 import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { WaitlistGate } from './components/WaitlistGate';
+import { WAITLIST_KEY, hasJoinedWaitlist } from './lib/waitlist';
 import type {
   AgentStep,
   DiffViewMode,
@@ -142,6 +144,21 @@ function blankSession(id: string, title: string, model: string): SessionData {
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>('light');
+  // Join-first: /app is gated until the landing waitlist flag exists.
+  // Localhost and ?nowait bypass inside hasJoinedWaitlist().
+  const [waitlistOk, setWaitlistOk] = useState<boolean>(() => hasJoinedWaitlist());
+  useEffect(() => {
+    const sync = () => setWaitlistOk(hasJoinedWaitlist());
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === WAITLIST_KEY) sync();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('diff');
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified');
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
@@ -1957,6 +1974,11 @@ export default function App() {
         onImport={handleImport}
         theme={theme}
       />
+
+      {/* Join-first gate: blocks /app until waitlist join */}
+      {!waitlistOk && (
+        <WaitlistGate theme={theme} onJoined={() => setWaitlistOk(true)} />
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (

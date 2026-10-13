@@ -18,7 +18,9 @@ export default defineConfig({
         // esbuild-wasm exceeds workbox's 2MB default — never exclude it.
         maximumFileSizeToCacheInBytes: 15_000_000,
         globPatterns: ['**/*.{js,css,html,wasm,woff,woff2,ttf,png,svg,ico}'],
-        navigateFallback: 'index.html',
+        // App shell lives at /app/index.html — / is the landing page.
+        // Without this the SW would serve the landing for offline app navigations.
+        navigateFallback: 'app/index.html',
         runtimeCaching: [
           {
             // React/Vue starters pull packages from esm.sh at runtime.

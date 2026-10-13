@@ -13,6 +13,7 @@
     "dev:all": "npm run dev & npm run cloud",
     "dev:server": "npm run cloud",
     "build": "tsc -b && vite build",
+    "build:vercel": "npm run build && node scripts/assemble-vercel.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run"
