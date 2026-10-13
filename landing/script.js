@@ -63,58 +63,12 @@
     });
   }
 
-  // Join-first routing: / is landing, /app/ is the IDE (single Vercel deploy).
-  // Dev still prefers the Vite server on :5173 when reachable.
+  // Closed waitlist: no links to /app anywhere. The nav CTA scrolls to
+  // the join form; success messages never offer a launch link.
   var WAIT_KEY = 'zut:waitlist-joined';
-  var APP_PATH = '/app/';
-  var DEV_PORT = '5173';
-  function hasJoined() {
-    try { return !!localStorage.getItem(WAIT_KEY); } catch (e) { return false; }
-  }
   function markJoined(email) {
     try { localStorage.setItem(WAIT_KEY, JSON.stringify({ email: email, at: Date.now() })); } catch (e) {}
-    var lb = document.getElementById('launchBtn');
-    if (lb) lb.textContent = 'Launch IDE \u2192';
   }
-  // If returning joiner lands here, flip the CTA immediately.
-  if (hasJoined()) {
-    var _lb = document.getElementById('launchBtn');
-    if (_lb) _lb.textContent = 'Launch IDE \u2192';
-  }
-  function goApp() {
-    var isLocal = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
-    if (isLocal) {
-      var devUrl = window.location.protocol + '//' + window.location.hostname + ':' + DEV_PORT + '/';
-      fetch(devUrl, { mode: 'no-cors', signal: AbortSignal.timeout(1200) })
-        .then(function () { window.location.href = devUrl; })
-        .catch(function () { window.location.href = APP_PATH; });
-    } else {
-      window.location.href = APP_PATH;
-    }
-  }
-  function scrollToJoin() {
-    var join = document.getElementById('join');
-    if (join) {
-      join.scrollIntoView({ behavior: 'smooth' });
-      var inp = join.querySelector('input[type="email"]');
-      if (inp) setTimeout(function () { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 450);
-    } else {
-      document.getElementById('top').scrollIntoView({ behavior: 'smooth' });
-    }
-  }
-  function wireLaunch(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('click', function (e) {
-      e.preventDefault();
-      // Log in always goes to the IDE (its gate will ask to join if needed).
-      if (el.id === 'loginBtn') { goApp(); return; }
-      // Get Zut: join first, launch after.
-      if (!hasJoined()) { scrollToJoin(); return; }
-      goApp();
-    });
-  }
-  ['launchBtn', 'loginBtn', 'heroLaunch', 'ctaLaunch'].forEach(wireLaunch);
 
   // Waitlist capture: plain PostgREST insert, no SDK needed.
   // Requires the `waitlist` table + anon-insert policy (see supabase/waitlist.sql).
@@ -131,17 +85,6 @@
       function say(text, cls) {
         if (msg) msg.textContent = text;
         if (msg) msg.className = 'wait-msg ' + (cls || '');
-      }
-      function sayLaunch(text, cls) {
-        if (!msg) return;
-        msg.className = 'wait-msg ' + (cls || '');
-        msg.innerHTML = '';
-        msg.appendChild(document.createTextNode(text + ' '));
-        var a = document.createElement('a');
-        a.href = APP_PATH;
-        a.textContent = 'Launch IDE \u2192';
-        a.setAttribute('data-launch', '');
-        msg.appendChild(a);
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         say('Enter a valid email to join.', 'err');
@@ -167,10 +110,10 @@
           if (res.status === 201 || res.status === 204) {
             form.reset();
             markJoined(email);
-            sayLaunch('You are on the list. Watch your inbox.', 'ok');
+            say('You are on the list. Watch your inbox.', 'ok');
           } else if (res.status === 409) {
             markJoined(email);
-            sayLaunch('You are already on the list. Watch your inbox.', 'ok');
+            say('You are already on the list. Watch your inbox.', 'ok');
           } else {
             say('Could not join right now — please try again.', 'err');
           }

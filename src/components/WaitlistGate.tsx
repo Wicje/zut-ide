@@ -6,12 +6,13 @@ interface WaitlistGateProps {
   theme?: 'light' | 'dark';
 }
 
-// Full-screen join-first gate for /app. Rendered only when
-// hasJoinedWaitlist() is false. Joining sets the localStorage flag
-// (same key the landing page sets) and calls onJoined.
+// Closed-waitlist lock for /app. Rendered whenever hasJoinedWaitlist() is
+// false (always, while IDE_OPEN is false). Joining records the flag for
+// launch day but never unlocks — onJoined only fires once IDE_OPEN flips.
 export function WaitlistGate({ onJoined, theme = 'dark' }: WaitlistGateProps) {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const isDark = theme !== 'light';
 
@@ -21,14 +22,16 @@ export function WaitlistGate({ onJoined, theme = 'dark' }: WaitlistGateProps) {
     setMsg(null);
     try {
       const r = await joinWaitlist(email);
+      setDone(true);
       setMsg({
         text:
           r === 'exists'
-            ? 'You are already on the list — welcome back.'
-            : 'You are on the list. Watch your inbox.',
+            ? 'You are already on the list — we will email you at launch.'
+            : 'You are on the list. Watch your inbox — we will email you at launch.',
         ok: true,
       });
-      setTimeout(onJoined, 600);
+      // NOTE: intentionally no onJoined() here while closed.
+      void onJoined;
     } catch (err) {
       setMsg({ text: (err as Error).message, ok: false });
     } finally {
@@ -50,15 +53,15 @@ export function WaitlistGate({ onJoined, theme = 'dark' }: WaitlistGateProps) {
             Z
           </span>
           <div>
-            <p className="font-bold leading-none">Join Zut first</p>
+            <p className="font-bold leading-none">Zut is in private waitlist</p>
             <p className={`text-xs mt-1 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-              Pilot members get in first, free.
+              Join the list — pilot members get in first, free.
             </p>
           </div>
         </div>
         <p className={`text-sm mb-4 ${isDark ? 'text-neutral-300' : 'text-neutral-600'}`}>
-          The IDE opens after you join the waitlist. Same email works on the
-          landing page — no double signup needed.
+          The IDE is closed while we market the launch. Joining saves your
+          spot — we email you when your access opens.
         </p>
         <form onSubmit={submit} className="flex flex-col gap-2.5">
           <input
@@ -76,10 +79,10 @@ export function WaitlistGate({ onJoined, theme = 'dark' }: WaitlistGateProps) {
           />
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || done}
             className="w-full rounded-xl bg-white text-black text-sm font-semibold py-2.5 hover:bg-neutral-200 transition-colors disabled:opacity-70 cursor-pointer"
           >
-            {busy ? 'Joining…' : 'Join the waitlist'}
+            {done ? 'You are on the list ✓' : busy ? 'Joining…' : 'Join the waitlist'}
           </button>
         </form>
         {msg && (

@@ -1,8 +1,13 @@
-// Join-first gate: the IDE at /app requires a waitlist join recorded by
-// the landing page at / (localStorage flag set on successful signup).
-// Local dev bypasses the gate so `npm run dev` never blocks.
+// Closed waitlist: the IDE at /app stays locked for everyone until launch.
+// Flip IDE_OPEN to true on launch day — hasJoinedWaitlist() then honours
+// the landing-page flag again. Local dev bypasses the gate so `npm run dev`
+// never blocks.
 
 export const WAITLIST_KEY = 'zut:waitlist-joined';
+
+// Launch switch. false = marketing phase, nobody gets into /app.
+// true = open phase, joiners get into /app.
+export const IDE_OPEN = false;
 
 // Same project the landing page posts to (public anon insert-only).
 // Env wins when configured; hardcoded fallback keeps Vercel working
@@ -28,6 +33,8 @@ export function hasJoinedWaitlist(): boolean {
     if (host === 'localhost' || host === '127.0.0.1') return true;
     const q = new URLSearchParams(window.location.search);
     if (q.has('nowait') || q.has('skip_waitlist')) return true;
+    // Closed phase: joining records the flag for launch day, but unlocks nothing.
+    if (!IDE_OPEN) return false;
     return !!localStorage.getItem(WAITLIST_KEY);
   } catch {
     return false;
