@@ -58,3 +58,31 @@ export function termOpen(files: FileMap, target: string): { path: string | null;
   if (!hit) return { path: null, lines: [`No such file: ${target}`] };
   return { path: hit, lines: [`Opened ${hit} in the editor.`] };
 }
+
+export type RemoteShellState =
+  | { mode: 'off' }
+  | { mode: 'demo'; detail: string }
+  | { mode: 'live'; expiresInSec: number };
+
+/** One honest status line: demo broker mints tokens but exposes no shell. */
+export function termRemoteStatus(s: RemoteShellState): string {
+  if (s.mode === 'off') return 'Remote shell: off (no broker configured).';
+  if (s.mode === 'demo') return `Remote shell: broker connected, demo mode — ${s.detail}`;
+  return `Remote shell: live gateway token (${s.expiresInSec}s) — open via Cells gateway.`;
+}
+
+/** Tab-completion over commands + workspace paths. */
+export function completeToken(fragment: string, candidates: string[]): string | null {
+  if (!fragment) return null;
+  const hits = candidates.filter((c) => c.startsWith(fragment) && c !== fragment).sort();
+  if (hits.length === 0) return null;
+  if (hits.length === 1) return hits[0];
+  // Longest common prefix of all hits.
+  let prefix = hits[0];
+  for (const h of hits.slice(1)) {
+    let i = 0;
+    while (i < prefix.length && prefix[i] === h[i]) i += 1;
+    prefix = prefix.slice(0, i);
+  }
+  return prefix.length > fragment.length ? prefix : null;
+}

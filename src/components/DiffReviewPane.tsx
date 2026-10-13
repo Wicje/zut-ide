@@ -44,6 +44,8 @@ interface DiffReviewPaneProps {
     telemetry?: import('./TerminalDrawer').RunTelemetry | null;
     onRefreshTelemetry?: () => void;
     eventLogs?: string[];
+    completions?: string[];
+    remoteLine?: string | null;
   };
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
@@ -571,6 +573,8 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
         telemetry={terminal?.telemetry}
         onRefreshTelemetry={terminal?.onRefreshTelemetry}
         eventLogs={terminal?.eventLogs}
+        completions={terminal?.completions}
+        remoteLine={terminal?.remoteLine}
       />
     </div>
   );

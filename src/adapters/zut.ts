@@ -160,12 +160,12 @@ export async function brokerPreview(workspaceId = 'default'): Promise<{ url: str
   }
 }
 
-export async function terminalToken(workspaceId = 'default'): Promise<{ token: string; expiresInSec: number }> {
+export async function terminalToken(workspaceId = 'default'): Promise<{ token: string; expiresInSec: number; gatewayUrl?: string }> {
   const res = await authed('/api/broker/terminal-token', {
     method: 'POST',
     body: JSON.stringify({ workspaceId }),
   });
-  return asJson<{ token: string; expiresInSec: number }>(res);
+  return asJson<{ token: string; expiresInSec: number; gatewayUrl?: string }>(res);
 }
 
 // ---- cloud agent turn (opencode on the server; diffs applied by caller) ----

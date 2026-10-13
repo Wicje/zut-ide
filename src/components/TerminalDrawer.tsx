@@ -33,6 +33,10 @@ interface TerminalDrawerProps {
   onRefreshTelemetry?: () => void;
   /** Real event log lines. */
   eventLogs?: string[];
+  /** Tab-completion candidates (commands + workspace paths). */
+  completions?: string[];
+  /** Honest remote-shell status line (null = hide). */
+  remoteLine?: string | null;
 }
 
 export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
@@ -44,6 +48,8 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
   telemetry,
   onRefreshTelemetry,
   eventLogs,
+  completions,
+  remoteLine,
 }) => {
   const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState<'benchmarks' | 'terminal' | 'logs'>('benchmarks');
@@ -53,6 +59,9 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
   );
   const [termInput, setTermInput] = useState('');
   const [busy, setBusy] = useState(false);
+  // Command recall (↑/↓) — session-local, newest last.
+  const [history, setHistory] = useState<string[]>([]);
+  const [histIdx, setHistIdx] = useState<number | null>(null);
 
   const runBenchmark = () => {
     if (!onRefreshTelemetry) return;
@@ -68,6 +77,8 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
     const cmd = termInput.trim();
     if (!cmd || busy) return;
     setTermInput('');
+    setHistory((prev) => [...prev.slice(-99), cmd]);
+    setHistIdx(null);
     if (cmd.toLowerCase() === 'clear') {
       setTerminalLogs([]);
       return;
@@ -261,6 +272,11 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
 
           {activeTab === 'terminal' && (
             <div className="h-full flex flex-col justify-between font-code text-[11.5px]">
+              {remoteLine && (
+                <div className="text-[10.5px] text-neutral-400 border-b border-neutral-200/50 dark:border-neutral-800 pb-1 mb-1">
+                  {remoteLine}
+                </div>
+              )}
               <div className="space-y-0.5 overflow-y-auto max-h-28">
                 {terminalLogs.map((log, i) => (
                   <div
@@ -283,7 +299,43 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                 <input
                   type="text"
                   value={termInput}
-                  onChange={(e) => setTermInput(e.target.value)}
+                  onChange={(e) => {
+                    setTermInput(e.target.value);
+                    setHistIdx(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      if (history.length === 0) return;
+                      const next = histIdx === null ? history.length - 1 : Math.max(0, histIdx - 1);
+                      setHistIdx(next);
+                      setTermInput(history[next] ?? '');
+                    } else if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      if (histIdx === null) return;
+                      const next = histIdx + 1;
+                      if (next >= history.length) {
+                        setHistIdx(null);
+                        setTermInput('');
+                      } else {
+                        setHistIdx(next);
+                        setTermInput(history[next] ?? '');
+                      }
+                    } else if (e.key === 'Tab' && completions && completions.length > 0) {
+                      e.preventDefault();
+                      const parts = termInput.split(/\s+/);
+                      const frag = parts[parts.length - 1] ?? '';
+                      if (!frag) return;
+                      // Lazy to avoid pulling terminal core into the initial chunk.
+                      void import('../lib/terminal').then(({ completeToken }) => {
+                        const done = completeToken(frag, completions);
+                        if (done) {
+                          parts[parts.length - 1] = done;
+                          setTermInput(parts.join(' '));
+                        }
+                      });
+                    }
+                  }}
                   placeholder="run [entry], ls, cat, open, status, help…"
                   className="flex-1 bg-transparent focus:outline-none text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 max-sm:text-base"
                 />

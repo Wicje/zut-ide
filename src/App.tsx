@@ -21,7 +21,6 @@ import { LoginAndAccountModal } from './components/LoginAndAccountModal';
 import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { WaitlistGate } from './components/WaitlistGate';
-import { WAITLIST_KEY, hasJoinedWaitlist } from './lib/waitlist';
 import { redactSecrets } from './lib/secrets';
 import type {
   AgentStep,
@@ -67,6 +66,8 @@ import {
   deployStatic,
 } from './adapters/zut';
 import { geminiTurn, getGeminiKey, setGeminiKey } from './adapters/gemini';
+import { useWaitlistGate } from './hooks/useWaitlistGate';
+import { useRemoteShell } from './hooks/useRemoteShell';
 import { useMediaQuery } from './lib/useMediaQuery';
 import { getProviderKey, setProviderKey, clearProviderKey, getVercelToken, setVercelToken, clearVercelToken, type DirectProvider } from './adapters/providers';
 import { getConnectorKey } from './lib/connectors';
@@ -150,23 +151,12 @@ function blankSession(id: string, title: string, model: string): SessionData {
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>('light');
   // Join-first: /app is gated until the landing waitlist flag exists.
-  // Localhost and ?nowait bypass inside hasJoinedWaitlist().
-  const [waitlistOk, setWaitlistOk] = useState<boolean>(() => hasJoinedWaitlist());
-  useEffect(() => {
-    const sync = () => setWaitlistOk(hasJoinedWaitlist());
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === WAITLIST_KEY) sync();
-    };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', sync);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', sync);
-    };
-  }, []);
+  const [waitlistOk, setWaitlistOk] = useWaitlistGate();
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('diff');
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified');
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  // Honest remote-shell line for the terminal tab (probed on open, never faked).
+  const remoteLine = useRemoteShell(isTerminalOpen);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isPRModalOpen, setIsPRModalOpen] = useState(false);
@@ -767,6 +757,11 @@ export default function App() {
       lastAt: new Date(runs[0].at).toLocaleTimeString([], { hour12: false }),
     };
   }, [runs]);
+
+  const termCompletions = useMemo(
+    () => ['run', 'status', 'ls', 'cat', 'open', 'help', 'clear', ...Object.keys(files).sort()],
+    [files],
+  );
 
   const testRows: TestCase[] = useMemo(
     () =>
@@ -1559,6 +1554,8 @@ export default function App() {
                 telemetry,
                 onRefreshTelemetry: () => {},
                 eventLogs: events,
+                completions: termCompletions,
+                remoteLine,
               }}
             />
           )}

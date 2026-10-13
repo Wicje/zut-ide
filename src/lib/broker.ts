@@ -86,7 +86,7 @@ export async function brokerRun(
   }
 }
 
-export async function brokerTerminalToken(workspaceId: string, userToken: string): Promise<{ token: string; expiresInSec: number }> {
+export async function brokerTerminalToken(workspaceId: string, userToken: string): Promise<{ token: string; expiresInSec: number; gatewayUrl?: string }> {
   if (!brokerUrl) throw new Error('REMOTE_UNREACHABLE:Remote runner is not configured.')
   const res = await fetch(`${brokerUrl}/api/broker/terminal-token`, {
     method: 'POST',
@@ -95,7 +95,7 @@ export async function brokerTerminalToken(workspaceId: string, userToken: string
   })
   const body = await parseJson(res)
   if (!res.ok) throw toUserError(res.status, body)
-  return body as { token: string; expiresInSec: number }
+  return body as { token: string; expiresInSec: number; gatewayUrl?: string }
 }
 
 export async function brokerPreview(workspaceId: string, userToken: string): Promise<{ url: string; access: 'private-token' | 'public' }> {

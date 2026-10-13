@@ -65,6 +65,59 @@ export function defaultPushMessage(repo: string): string {
   return `chore: sync ${repo} from Zut`;
 }
 
+export interface BranchInfo {
+  name: string;
+  protected: boolean;
+}
+
+export interface CommitInfo {
+  sha: string;
+  shortSha: string;
+  message: string;
+  author: string;
+  date: string;
+  url: string;
+}
+
+/** Real branch list for the push dialog picker (100 max, by design). */
+export async function listBranches(owner: string, repo: string, token: string): Promise<BranchInfo[]> {
+  const rows = await gh<Array<{ name: string; protected?: boolean }>>(
+    `/repos/${owner}/${repo}/branches?per_page=100`,
+    token,
+  );
+  return rows.map((b) => ({ name: b.name, protected: b.protected ?? false }));
+}
+
+/** Real commit history for the push dialog (newest first, 20 max). */
+export async function listCommits(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+  limit = 10,
+): Promise<CommitInfo[]> {
+  const n = Math.min(Math.max(limit, 1), 20);
+  const rows = await gh<Array<{
+    sha: string;
+    html_url?: string;
+    commit: { message: string; author?: { name?: string; date?: string } };
+  }>>(`/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=${n}`, token);
+  return rows.map((c) => ({
+    sha: c.sha,
+    shortSha: c.sha.slice(0, 7),
+    message: c.commit.message.split('\n')[0].slice(0, 120),
+    author: c.commit.author?.name ?? 'unknown',
+    date: c.commit.author?.date?.slice(0, 10) ?? '',
+    url: c.html_url ?? `https://github.com/${owner}/${repo}/commit/${c.sha}`,
+  }));
+}
+
+/** Resolve `owner` for a token without exposing anything else. */
+export async function githubLogin(token: string): Promise<string> {
+  const me = await gh<{ login: string }>('/user', token);
+  return me.login;
+}
+
 export async function pushToGithub(
   repo: string,
   isPrivate: boolean,
@@ -161,11 +214,22 @@ export async function pushToGithub(
   });
   if (branchExisted) {
     // Fast-forward only: fails loudly if the branch moved (never force-pushes).
-    await gh(`/repos/${owner}/${repoName}/git/refs/heads/${branch}`, token, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sha: commit.sha }),
-    });
+    try {
+      await gh(`/repos/${owner}/${repoName}/git/refs/heads/${branch}`, token, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sha: commit.sha }),
+      });
+    } catch (e) {
+      // GitHub answers 422 when the ref no longer points at our base commit.
+      // Anything else (network, auth) is reported as-is — never misdiagnosed.
+      if (/reference|422|update failed|cannot be|not a fast-forward/i.test((e as Error).message)) {
+        throw new Error(
+          `Branch "${branch}" moved on GitHub since you started — nothing was overwritten. Pick a new branch name and push again.`,
+        );
+      }
+      throw e;
+    }
   } else {
     await gh(`/repos/${owner}/${repoName}/git/refs`, token, {
       method: 'POST',

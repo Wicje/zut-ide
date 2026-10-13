@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCmd, termCat, termHelp, termLs, termOpen, termStatus } from './terminal'
+import { completeToken, parseCmd, termCat, termHelp, termLs, termOpen, termRemoteStatus, termStatus } from './terminal'
 
 const FILES = { 'index.html': '<h1>hi</h1>', 'script.js': 'a\nb\nc', 'img.png': 'data:image/png;base64,AAAA' }
 
@@ -31,5 +31,18 @@ describe('terminal core', () => {
   it('reports status and help', () => {
     expect(termStatus({ files: FILES, projectName: 'demo', kind: 'web', runs: 2, broker: false })).toHaveLength(3)
     expect(termHelp()[0]).toMatch(/Commands:/)
+  })
+
+  it('describes remote shell state honestly', () => {
+    expect(termRemoteStatus({ mode: 'off' })).toMatch(/off/)
+    expect(termRemoteStatus({ mode: 'demo', detail: 'no gateway' })).toMatch(/demo mode/)
+    expect(termRemoteStatus({ mode: 'live', expiresInSec: 60 })).toMatch(/live gateway/)
+  })
+
+  it('completes tokens to longest common prefix', () => {
+    expect(completeToken('sc', ['script.js', 'script.ts', 'status'])).toBe('script.')
+    expect(completeToken('sta', ['status'])).toBe('status')
+    expect(completeToken('zzz', ['status'])).toBeNull()
+    expect(completeToken('', ['status'])).toBeNull()
   })
 })
