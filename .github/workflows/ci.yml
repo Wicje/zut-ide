@@ -34,6 +34,9 @@ jobs:
           node --check broker/lib.mjs
           node --check runtime/server.mjs
           node --check scripts/file-bridge.mjs
+          node --check scripts/assemble-vercel.mjs
+          node --check scripts/check-bundle.mjs
+          node --check scripts/health-check.mjs
           node --check cloud/server.mjs
 
       - name: UI contract (no deleted shadcn layer)
@@ -49,3 +52,11 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Single-deploy assembly + bundle budget
+        run: npm run build:vercel && npm run check:bundle
+
+      - name: E2E (landing + gate + shell)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e

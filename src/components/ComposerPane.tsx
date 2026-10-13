@@ -847,7 +847,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             onChange={(e) => setFollowUpText(e.target.value)}
             disabled={isGenerating}
             placeholder={isGenerating ? 'Synthesizing code...' : 'Send follow-up or type @'}
-            className={`flex-1 px-2 text-[12.5px] bg-transparent focus:outline-none placeholder-neutral-400 ${
+            className={`flex-1 px-2 text-[12.5px] max-sm:text-base bg-transparent focus:outline-none placeholder-neutral-400 ${
               isDark ? 'text-white' : 'text-neutral-800'
             }`}
           />

@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ComposerPane } from './components/ComposerPane';
 import { DiffReviewPane } from './components/DiffReviewPane';
-import { CodeEditorPane } from './components/CodeEditorPane';
+// Monaco is the heaviest shell dependency — split it off the initial chunk
+// so first paint (gate/sidebar/composer) never waits for the editor.
+const CodeEditorPane = lazy(() =>
+  import('./components/CodeEditorPane').then((m) => ({ default: m.CodeEditorPane })),
+);
 import { LiveAppPreviewPane } from './components/LiveAppPreviewPane';
 import { TestExplorerPane } from './components/TestExplorerPane';
 import { VideoPreviewModal } from './components/VideoPreviewModal';
@@ -18,6 +22,7 @@ import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { WaitlistGate } from './components/WaitlistGate';
 import { WAITLIST_KEY, hasJoinedWaitlist } from './lib/waitlist';
+import { redactSecrets } from './lib/secrets';
 import type {
   AgentStep,
   DiffViewMode,
@@ -172,7 +177,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
-  const [mobileTab, setMobileTab] = useState<'files' | 'agent' | 'code'>('agent');
+  const [mobileTab, setMobileTab] = useState<'files' | 'agent' | 'code' | 'preview'>('agent');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [wallpaperOn, setWallpaperOn] = useState<boolean>(() => {
     try {
@@ -479,7 +484,7 @@ export default function App() {
     function onMessage(e: MessageEvent) {
       const data = e.data as { source?: string; type?: string; payload?: { level?: string; message?: string } };
       if (data && data.source === CONSOLE_SOURCE && data.type === 'console') {
-        setConsoleLines((prev) => [...prev.slice(-199), `[${data.payload?.level ?? 'log'}] ${data.payload?.message ?? ''}`]);
+        setConsoleLines((prev) => [...prev.slice(-199), redactSecrets(`[${data.payload?.level ?? 'log'}] ${data.payload?.message ?? ''}`)]);
       }
     }
     window.addEventListener('message', onMessage);
@@ -527,7 +532,7 @@ export default function App() {
   }, [files, kind]);
 
   function recordRun(label: string, exitCode: number | null, durationMs: number, output: string) {
-    const rec: RunRecord = { id: `run-${Date.now()}`, label, exitCode, durationMs, at: Date.now(), output };
+    const rec: RunRecord = { id: `run-${Date.now()}`, label, exitCode, durationMs, at: Date.now(), output: redactSecrets(output) };
     setRuns((prev) => [rec, ...prev].slice(0, 20));
     logEvent('RUN', `${label} → exit ${exitCode ?? '?'} in ${durationMs}ms`);
     return rec;
@@ -544,7 +549,7 @@ export default function App() {
       lines.push(`exit ${result.exitCode ?? '?'} in ${result.durationMs}ms`);
       if (result.truncated) lines.push('(output truncated at 256KB)');
       recordRun(`run ${entry}`, result.exitCode, result.durationMs, result.stdout.slice(0, 2000));
-      return lines;
+      return lines.map(redactSecrets);
     } catch (e) {
       return [`error: ${(e as Error).message}`];
     }
@@ -777,27 +782,35 @@ export default function App() {
   );
 
   async function handleTerminalCommand(cmd: string): Promise<string[]> {
-    const [verb, ...rest] = cmd.trim().split(/\s+/);
+    const { parseCmd, termCat, termHelp, termLs, termOpen, termStatus } = await import('./lib/terminal');
+    const { verb, args } = parseCmd(cmd);
+    const ctx = { files: filesRef.current, projectName, kind, runs: runs.length, broker: brokerEnabled() };
     if (verb === 'run') {
       const k = detectProjectKind(filesRef.current);
       if (k === 'web') {
         await rebuildPreview(filesRef.current);
-        return srcDoc || filesRef.current['index.html'] !== undefined
+        return (srcDoc || filesRef.current['index.html'] !== undefined
           ? ['Preview rebuilt — open the Preview pane.']
-          : ['No index.html — nothing to preview.'];
+          : ['No index.html — nothing to preview.']
+        ).map(redactSecrets);
       }
-      const entry = rest[0] ?? findProgramEntry(filesRef.current, k);
-      return executeEntry(entry);
+      const entry = args[0] ?? findProgramEntry(filesRef.current, k);
+      return (await executeEntry(entry)).map(redactSecrets);
     }
-    if (verb === 'status') {
-      return [
-        `Project ${projectName} (${kind}, ${Object.keys(filesRef.current).length} files)`,
-        `${runs.length} runs recorded this session`,
-        brokerEnabled() ? 'Broker: connected' : 'Broker: not configured (VITE_BROKER_URL)',
-      ];
+    if (verb === 'status') return termStatus(ctx).map(redactSecrets);
+    if (verb === 'ls') return termLs(ctx.files, args[0] ?? '').map(redactSecrets);
+    if (verb === 'cat') return termCat(ctx.files, args[0] ?? '').map(redactSecrets);
+    if (verb === 'open') {
+      const r = termOpen(ctx.files, args[0] ?? '');
+      if (r.path) {
+        setActiveFilePath(r.path);
+        setRightPaneMode('editor');
+        if (isMobile) setMobileTab('code');
+      }
+      return r.lines.map(redactSecrets);
     }
-    if (verb === 'help') return ['Commands: run [entry], status, help'];
-    return [`unknown command: ${verb}. Try run, status, help.`];
+    if (verb === 'help') return termHelp().map(redactSecrets);
+    return [`unknown command: ${verb || '?'}. Try run, status, ls, cat, open, help.`].map(redactSecrets);
   }
 
   async function handleMagicLink(email: string): Promise<string> {
@@ -1216,6 +1229,8 @@ export default function App() {
 
         <span className="text-white/20 text-xs">|</span>
 
+        {/* Pane switch lives in the big mobile switcher — hide here on phones */}
+        {!isMobile && (
         <div className="flex items-center gap-1">
           <button
             onClick={() => setRightPaneMode('diff')}
@@ -1250,8 +1265,9 @@ export default function App() {
             Checks
           </button>
         </div>
+        )}
 
-        <span className="text-white/20 text-xs">|</span>
+        {!isMobile && <span className="text-white/20 text-xs">|</span>}
 
         <button
           onClick={toggleTheme}
@@ -1476,9 +1492,44 @@ export default function App() {
         {/* Right Column: Dynamic Pane Selection (flex-1) */}
         <div
           className={`flex-1 overflow-hidden flex flex-col ${
-            isMobile ? (mobileTab === 'code' ? 'w-full h-full' : 'hidden') : 'h-full'
+            isMobile ? (mobileTab === 'code' || mobileTab === 'preview' ? 'w-full h-full' : 'hidden') : 'h-full'
           }`}
         >
+          {/* Mobile pane switcher: big touch targets, replaces the tiny top-bar pills */}
+          {isMobile && (mobileTab === 'code' || mobileTab === 'preview') && (
+            <div
+              className={`shrink-0 grid grid-cols-4 gap-1 p-1.5 border-b ${
+                isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7] bg-[#f4f4f6]'
+              }`}
+              role="tablist"
+              aria-label="Right pane mode"
+            >
+              {(
+                [
+                  { id: 'diff', label: 'Review' },
+                  { id: 'editor', label: 'Code' },
+                  { id: 'preview', label: 'Preview' },
+                  { id: 'tests', label: 'Checks' },
+                ] as const
+              ).map(({ id, label }) => (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={rightPaneMode === id}
+                  onClick={() => setRightPaneMode(id)}
+                  className={`min-h-[44px] rounded-lg text-[13px] font-semibold transition-colors cursor-pointer ${
+                    rightPaneMode === id
+                      ? 'bg-red-600 text-white'
+                      : isDark
+                      ? 'bg-white/5 text-neutral-300'
+                      : 'bg-black/5 text-neutral-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {rightPaneMode === 'diff' && (
             <DiffReviewPane
               files={activeFiles}
@@ -1504,7 +1555,7 @@ export default function App() {
               theme={theme}
               terminal={{
                 onCommand: handleTerminalCommand,
-                initialLogs: ['Connected. Type `run [entry]`, `status`, or `help`.'],
+                initialLogs: ['Connected. Type `run [entry]`, `ls`, `cat <file>`, `open <file>`, `status`, or `help`.'],
                 telemetry,
                 onRefreshTelemetry: () => {},
                 eventLogs: events,
@@ -1513,6 +1564,13 @@ export default function App() {
           )}
 
           {rightPaneMode === 'editor' && (
+            <Suspense
+              fallback={
+                <div className="flex-1 flex items-center justify-center text-xs text-neutral-400">
+                  Loading editor…
+                </div>
+              }
+            >
             <CodeEditorPane
               files={projectFiles}
               activeFileId={activeFilePath}
@@ -1617,6 +1675,7 @@ export default function App() {
               }}
               theme={theme}
             />
+            </Suspense>
           )}
 
           {rightPaneMode === 'preview' && (
@@ -1662,27 +1721,32 @@ export default function App() {
         {/* Mobile bottom nav: one pane at a time on small screens */}
         {isMobile && (
           <div
-            className={`shrink-0 h-14 px-2 flex items-center justify-around border-t ${
+            className={`shrink-0 min-h-[60px] px-2 pt-1 flex items-center justify-around border-t ${
               isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7] bg-[#f4f4f6]'
             }`}
+            style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom, 0px))' }}
           >
             {(
               [
                 { id: 'files', label: 'Files', Icon: Folder },
                 { id: 'agent', label: 'Agent', Icon: MessagesSquare },
                 { id: 'code', label: 'Code', Icon: Code },
+                { id: 'preview', label: 'Preview', Icon: Maximize2 },
               ] as const
             ).map(({ id, label, Icon }) => (
               <button
                 key={id}
-                onClick={() => setMobileTab(id)}
-                className={`flex flex-col items-center gap-0.5 px-6 py-1.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+                onClick={() => {
+                  if (id === 'preview') setRightPaneMode('preview');
+                  setMobileTab(id);
+                }}
+                className={`flex flex-col items-center gap-0.5 min-w-[64px] min-h-[48px] justify-center px-4 py-1.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
                   mobileTab === id
                     ? 'text-red-500'
                     : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
                 }`}
               >
-                <Icon size={18} />
+                <Icon size={20} />
                 <span>{label}</span>
               </button>
             ))}
@@ -1913,6 +1977,12 @@ export default function App() {
         onShare={() => setShowShare(true)}
         onImportUrl={() => setShowImport(true)}
         onPushGithub={() => setShowGithub(true)}
+        workspaceFiles={files}
+        onOpenFile={(p) => {
+          setActiveFilePath(p);
+          setRightPaneMode('editor');
+          if (isMobile) setMobileTab('code');
+        }}
         theme={theme}
       />
 
@@ -1920,6 +1990,7 @@ export default function App() {
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
         snapshots={listSnapshots()}
+        activeFile={activeFilePath}
         onRestore={restoreSnapshot}
         theme={theme}
       />

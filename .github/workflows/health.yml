@@ -1,0 +1,20 @@
+name: Health
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Probe production
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          RUNTIME_URL: ${{ secrets.VITE_RUNTIME_URL }}
+          CLOUD_URL: ${{ secrets.VITE_CLOUD_URL }}
+        run: node scripts/health-check.mjs

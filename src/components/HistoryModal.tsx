@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, History, RotateCcw } from 'lucide-react';
 import type { Snapshot } from '../adapters/zut';
 
@@ -8,6 +8,8 @@ interface HistoryModalProps {
   snapshots: Snapshot[];
   onRestore: (id: string) => void;
   theme?: 'light' | 'dark';
+  /** P2: when set, offers a per-file filter for this path. */
+  activeFile?: string | null;
 }
 
 function ago(ts: number): string {
@@ -26,9 +28,22 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   snapshots,
   onRestore,
   theme = 'light',
+  activeFile = null,
 }) => {
   const isDark = theme === 'dark';
+  const [onlyFile, setOnlyFile] = useState(false);
   if (!isOpen) return null;
+
+  // A snapshot "touches" the file when its content differs from the
+  // previous snapshot in list order (first entry always counts).
+  const touched = (idx: number): boolean => {
+    if (!activeFile) return true;
+    const cur = snapshots[idx]?.files?.[activeFile] ?? null;
+    if (idx === 0) return cur !== null;
+    const prev = snapshots[idx - 1]?.files?.[activeFile] ?? null;
+    return cur !== prev;
+  };
+  const visible = snapshots.filter((_, i) => !onlyFile || !activeFile || touched(i));
 
   return (
     <div
@@ -56,12 +71,29 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
         </div>
 
         <div className="p-3 space-y-1.5 max-h-[50vh] overflow-y-auto text-xs">
+          {activeFile && (
+            <button
+              onClick={() => setOnlyFile((v) => !v)}
+              className={`w-full text-left px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer ${
+                onlyFile
+                  ? 'border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-400'
+                  : 'border-neutral-200 dark:border-neutral-700 text-neutral-500'
+              }`}
+            >
+              {onlyFile ? `● Showing versions touching ${activeFile}` : `○ Show only versions touching ${activeFile}`}
+            </button>
+          )}
+          {visible.length === 0 && (
+            <p className="px-2 py-4 text-center text-neutral-500">
+              No snapshots touch this file yet.
+            </p>
+          )}
           {snapshots.length === 0 && (
             <p className="px-2 py-4 text-center text-neutral-500">
               No snapshots yet — they land automatically before agent turns and restores.
             </p>
           )}
-          {snapshots.map((s) => (
+          {visible.map((s) => (
             <div
               key={s.id}
               className="flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 px-2.5 py-2"

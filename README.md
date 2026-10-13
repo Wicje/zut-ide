@@ -17,7 +17,8 @@ When you want it, bring your own key or use the cloud agent.
   Checks; every pane and modal follows one token system (see `DESIGN.md`).
 - **Web projects**: JS/TS files can `import`/`export` across files. `.ts`/`.tsx` is compiled in
   the browser with **esbuild-wasm**.
-- **Python + Go**: *New ▾ → Languages* includes `main.py` and `main.go` starters. Programs execute on the remote runtime (`POST /run`) so weak devices never compile locally. Stdin is built into the Output panel.
+- **Any language**: no language menu — describe what you want and the agent writes
+  the code (`main.py`, `main.go`, anything). Programs execute on the remote runtime (`POST /run`) so weak devices never compile locally. Stdin is built into the Output panel.
 - **Framework templates**: *New ▾* includes starter projects for **React** and **Vue** (which run
   live in the preview — React/vue packages are pulled from the esm.sh CDN and `.vue` single-file
   components are compiled in-browser with `@vue/compiler-sfc`). Server frameworks (Next.js / Express / NestJS)

@@ -44,6 +44,9 @@ interface CommandPaletteModalProps {
   onPushGithub?: () => void;
   theme?: 'light' | 'dark';
   sessions?: Array<{ id: string; title: string }>;
+  /** P2 global search: workspace files (name + content). */
+  workspaceFiles?: Record<string, string>;
+  onOpenFile?: (path: string) => void;
 }
 
 export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
@@ -64,11 +67,60 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onPushGithub,
   theme = 'light',
   sessions,
+  workspaceFiles,
+  onOpenFile,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const isDark = theme === 'dark';
+
+  // P2: file results — name matches first, then content matches (capped).
+  const fileItems: CommandPaletteItem[] = (() => {
+    const q = query.trim().toLowerCase();
+    if (!onOpenFile || !workspaceFiles || q.length < 2) return [];
+    const names = Object.keys(workspaceFiles).sort();
+    const nameHits = names.filter((p) => p.toLowerCase().includes(q)).slice(0, 5);
+    const contentHits: Array<{ path: string; snippet: string }> = [];
+    if (contentHits.length < 8) {
+      for (const p of names) {
+        if (contentHits.length >= 8) break;
+        if (nameHits.includes(p)) continue;
+        const content = workspaceFiles[p];
+        if (content.length > 200_000 || content.startsWith('data:')) continue;
+        const idx = content.toLowerCase().indexOf(q);
+        if (idx >= 0) {
+          const snippet = content
+            .slice(Math.max(0, idx - 30), idx + 60)
+            .replace(/\s+/g, ' ')
+            .trim();
+          contentHits.push({ path: p, snippet });
+        }
+      }
+    }
+    return [
+      ...nameHits.map((p) => ({
+        id: `file-${p}`,
+        title: `Open ${p}`,
+        category: 'Files',
+        icon: <FileCode size={14} className="text-red-500" />,
+        action: () => {
+          onOpenFile(p);
+          onClose();
+        },
+      })),
+      ...contentHits.map(({ path: p, snippet }) => ({
+        id: `grep-${p}`,
+        title: `${p}: ${snippet}`,
+        category: 'Files',
+        icon: <FileCode size={14} className="text-neutral-400" />,
+        action: () => {
+          onOpenFile(p);
+          onClose();
+        },
+      })),
+    ];
+  })();
 
   const items: CommandPaletteItem[] = [
     {
@@ -208,6 +260,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         onClose();
       },
     })),
+    ...fileItems,
   ];
 
   const filteredItems = items.filter(
@@ -266,8 +319,8 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command or search sessions..."
-            className="flex-1 bg-transparent text-sm focus:outline-none placeholder-neutral-400"
+            placeholder="Type a command, file name, or code search..."
+            className="flex-1 bg-transparent text-sm max-sm:text-base focus:outline-none placeholder-neutral-400"
             autoFocus
           />
           <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/50 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-300">

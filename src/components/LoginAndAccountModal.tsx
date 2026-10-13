@@ -19,6 +19,7 @@ import {
   clearConnectorKey,
   isConnectorSet,
 } from '../lib/connectors';
+import { revokeAllLocalKeys } from '../lib/secrets';
 import {
   X,
   Check,
@@ -633,6 +634,32 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Danger zone: one escape hatch for shared devices */}
+            <div className="p-2.5 rounded-lg border border-red-500/30 bg-red-500/5 flex items-center justify-between gap-2">
+              <div>
+                <div className="font-medium text-[12px]">Remove all keys from this device</div>
+                <div className="text-[10px] text-neutral-400">AI keys, deploy tokens and connectors — sign-in stays</div>
+              </div>
+              <button
+                className="shrink-0 px-2.5 py-1.5 rounded-md border border-red-500/40 text-red-600 dark:text-red-400 text-[11px] font-semibold hover:bg-red-500/10 cursor-pointer"
+                onClick={() => {
+                  revokeAllLocalKeys();
+                  setGhSaved(false);
+                  setPxSaved(false);
+                  setClSaved(false);
+                  setSbSaved(false);
+                  setKeyInput('');
+                  onClearGeminiKey?.();
+                  onClearProviderKey?.('openrouter');
+                  onClearProviderKey?.('anthropic');
+                  onClearProviderKey?.('chatgpt');
+                  onClearDeployKey?.();
+                }}
+              >
+                Remove all
+              </button>
             </div>
 
             {/* Bottom Actions */}

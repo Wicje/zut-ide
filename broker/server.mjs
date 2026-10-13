@@ -136,14 +136,29 @@ function rateOk(key, perMin) {
   if (arr.length >= perMin) { hits.set(key, arr); return false }
   arr.push(now); hits.set(key, arr); return true
 }
-const daily = new Map() // uid:date -> count
-function dailyCount(uid) {
-  const k = `${uid}:${new Date().toISOString().slice(0, 10)}`
-  return daily.get(k) ?? 0
+const daily = new Map() // uid:date -> count (memory cache; disk is source of truth)
+function safeUid(uid) { return String(uid ?? 'anon').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64) || 'anon' }
+function usageFile(uid) {
+  return path.join(DATA_ROOT, '.usage', `broker-${safeUid(uid)}-${new Date().toISOString().slice(0, 10)}.count`)
 }
-function bumpDaily(uid) {
+async function dailyCount(uid) {
   const k = `${uid}:${new Date().toISOString().slice(0, 10)}`
-  daily.set(k, dailyCount(uid) + 1)
+  const hit = daily.get(k)
+  if (hit !== undefined) return hit
+  try {
+    const n = Number(await fs.readFile(usageFile(uid), 'utf8')) || 0
+    daily.set(k, n)
+    return n
+  } catch { return 0 }
+}
+async function bumpDaily(uid) {
+  const k = `${uid}:${new Date().toISOString().slice(0, 10)}`
+  const n = (await dailyCount(uid)) + 1
+  daily.set(k, n)
+  try {
+    await fs.mkdir(path.join(DATA_ROOT, '.usage'), { recursive: true })
+    await fs.writeFile(usageFile(uid), String(n))
+  } catch { /* non-fatal: memory cap still enforced this session */ }
 }
 
 // ---- demo BaaS store (file-backed; Mudbase collections replace this later) ----
@@ -380,7 +395,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/broker/run') {
       if (!rateOk(`run:${uid}`, RATE_RUN_MIN)) { send(res, req, 429, { error: 'Too many runs. Slow down.' }); return }
-      if (dailyCount(uid) >= DAILY_RUN_CAP) { send(res, req, 402, { error: 'Run time used up for today — try again tomorrow or ask for a higher quota.' }); return }
+      if ((await dailyCount(uid)) >= DAILY_RUN_CAP) { send(res, req, 402, { error: 'Run time used up for today — try again tomorrow or ask for a higher quota.' }); return }
       const body = await readJson(req)
       const workspaceId = safeSeg(body.workspaceId ?? 'default') ?? 'default'
       void workspaceId
@@ -400,7 +415,7 @@ const server = http.createServer(async (req, res) => {
           const { sessionId, reused } = await d.ensureSession({ externalId: `${uid}:${workspaceId}` })
           const sync = await d.syncFiles({ sessionId, files: body.files ?? {}, hashStore: hashStoreFor(uid, workspaceId) })
           const result = await d.exec({ sessionId, command, stdin: body.stdin ?? '' })
-          bumpDaily(uid)
+          await bumpDaily(uid)
           console.log(`[zut-broker] run ok uid=${String(uid).slice(0, 8)} cell=${String(sessionId).slice(0, 8)} reused=${reused} sync=+${sync.uploaded} entry=${entry} exit=${result.exitCode} ${result.durationMs}ms`)
           send(res, req, 200, result); return
         } catch (e) {
@@ -410,7 +425,7 @@ const server = http.createServer(async (req, res) => {
       }
       const result = await runProgram(body.files ?? {}, body.entry, body.stdin ?? '')
       if (result.error) { send(res, req, result.status ?? 400, { error: result.error }); return }
-      bumpDaily(uid)
+      await bumpDaily(uid)
       console.log(`[zut-broker] run ok uid=${String(uid).slice(0, 8)} entry=${body.entry} exit=${result.exitCode} ${result.durationMs}ms`)
       send(res, req, 200, result); return
     }

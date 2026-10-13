@@ -49,7 +49,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<'benchmarks' | 'terminal' | 'logs'>('benchmarks');
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>(
-    () => initialLogs ?? ['Connected. Type `run [entry]`, `status`, `clear`, or `help`.'],
+    () => initialLogs ?? ['Connected. Type `run [entry]`, `ls`, `cat <file>`, `open <file>`, `status`, or `help`.'],
   );
   const [termInput, setTermInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -68,6 +68,10 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
     const cmd = termInput.trim();
     if (!cmd || busy) return;
     setTermInput('');
+    if (cmd.toLowerCase() === 'clear') {
+      setTerminalLogs([]);
+      return;
+    }
     setTerminalLogs((prev) => [...prev.slice(-200), `❯ ${cmd}`]);
     if (!onCommand) {
       setTerminalLogs((prev) => [...prev.slice(-200), 'Terminal is not connected to a runner.']);
@@ -280,8 +284,8 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                   type="text"
                   value={termInput}
                   onChange={(e) => setTermInput(e.target.value)}
-                  placeholder="run [entry], status, clear, help…"
-                  className="flex-1 bg-transparent focus:outline-none text-neutral-800 dark:text-neutral-100 placeholder-neutral-400"
+                  placeholder="run [entry], ls, cat, open, status, help…"
+                  className="flex-1 bg-transparent focus:outline-none text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 max-sm:text-base"
                 />
               </form>
             </div>
