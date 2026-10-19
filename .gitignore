@@ -1,8 +1,10 @@
 node_modules/
 dist/
 .env
-.env.local
+.env.*
+!.env.example
 cloud/cloud.env
+cloud/*.env
 .DS_Store
 *.log
 supabase/.temp/

@@ -128,7 +128,7 @@ red = primary action (and error states). Do not add new accent hues without upda
 
 - Friendly + plain: "Click Run to see your page here.", "No output yet."
 - Errors say what + where: `Build error (line x:y)` with a clickable jump.
-- Programs without a runner say what to do: "Python/Go need the remote runner (set VITE_RUNTIME_URL to your broker)."
+- Programs without a runner say what to do: "Python/Go need the remote runner (set VITE_BROKER_URL to your broker)."
 - Quota says plain words: "Run time used up for today — try again tomorrow or ask for a higher quota." Never `402`, `Small-hours`, `allowance`.
 - Infra words (`VITE_*`, Cells, externalId, session ids, callback URLs, meter logs) never surface in UI.
 

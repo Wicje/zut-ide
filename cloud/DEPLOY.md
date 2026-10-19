@@ -6,7 +6,8 @@ Target: `https://cloud.onenetwork.ng/dashboard` → one Ubuntu VPS → one `dock
 Short-term alternative: Render.com Web Service from `cloud/Dockerfile` (no Caddy —
 Render terminates TLS). Use Starter 2GB for days, then suspend. Free 512MB will
 OOM on esbuild + opencode. Set `CORS_ORIGIN` to your frontend, health check
-`/health`, and use its URL as `VITE_RUNTIME_URL` / `VITE_CLOUD_URL`.
+`/health`, and use its URL as `VITE_CLOUD_URL` (builds + cloud agent). Off-device
+Python/Go runs need the separate broker (`VITE_BROKER_URL`).
 `PORT` already respects Render's injected `$PORT`. Disk is ephemeral unless you
 pay for a Disk — fine for days because the browser FileMap is source of truth.
 

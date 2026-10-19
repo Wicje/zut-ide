@@ -1,11 +1,12 @@
 // P1 observability: probe the public front door plus any configured
 // backends. Env (all optional; missing targets are skipped, not failed):
 //   APP_URL      production site (default: http://127.0.0.1:4173)
-//   RUNTIME_URL  broker/runtime base (VITE_RUNTIME_URL)
+//   BROKER_URL   run broker base (VITE_BROKER_URL)
+//   RUNTIME_URL  legacy alias for BROKER_URL (VITE_RUNTIME_URL)
 //   CLOUD_URL    zut-cloud base (VITE_CLOUD_URL)
 const targets = [
   ['app', `${process.env.APP_URL ?? 'http://127.0.0.1:4173'}/`, null],
-  ['broker', process.env.RUNTIME_URL, '/health'],
+  ['broker', process.env.BROKER_URL || process.env.RUNTIME_URL, '/health'],
   ['cloud', process.env.CLOUD_URL, '/health'],
 ];
 

@@ -40,6 +40,21 @@ import {
   buildDiffFiles,
 } from './adapters/filemap';
 import { parseEdits, stripEditBlocks } from './adapters/aiEdits';
+import {
+  isLocalRepoSupported,
+  pickLocalRepo,
+  ensurePermission,
+  hasPermission,
+  readLocalTree,
+  syncLocalTree,
+  saveLocalTree,
+  deleteLocalFile,
+  rememberRepo,
+  recallRepo,
+  forgetRepo,
+  type LocalRepo,
+  type WorkspaceSourceKind,
+} from './adapters/localRepo';
 import { initRunner, bundleProject, buildSrcdoc, formatBuildErrors, CONSOLE_SOURCE } from './adapters/preview';
 import {
   brokerEnabled,
@@ -68,7 +83,22 @@ import {
 import { geminiTurn, getGeminiKey, setGeminiKey } from './adapters/gemini';
 import { useWaitlistGate } from './hooks/useWaitlistGate';
 import { useRemoteShell } from './hooks/useRemoteShell';
+import { useWallpaper } from './hooks/useWallpaper';
+import { usePaneWidths, SIDEBAR_WIDTH, COMPOSER_WIDTH } from './hooks/usePaneWidths';
 import { useMediaQuery } from './lib/useMediaQuery';
+import {
+  STARTER,
+  GEMINI_MODELS,
+  CLOUD_LABEL,
+  OPENCODE_LABEL,
+  PROVIDER_LABELS,
+  labelToGeminiId,
+  timeAgo,
+  stamp,
+  blankSession,
+  type RunRecord,
+  type ChatMsg,
+} from './lib/appModel';
 import { getProviderKey, setProviderKey, clearProviderKey, getVercelToken, setVercelToken, clearVercelToken, type DirectProvider } from './adapters/providers';
 import { getConnectorKey } from './lib/connectors';
 import lightWallpaperImg from './assets/images/macos_mountain_wallpaper_1791421916911.jpg';
@@ -87,66 +117,6 @@ import {
   Image,
   PanelLeftOpen,
 } from 'lucide-react';
-
-const STARTER: FileMap = {};
-
-const GEMINI_MODELS = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-];
-const CLOUD_LABEL = 'Cloud agent';
-const OPENCODE_LABEL = 'opencode (self-host)';
-const PROVIDER_LABELS = [
-  { id: 'openrouter' as const, label: 'OpenRouter' },
-  { id: 'anthropic' as const, label: 'Claude' },
-  { id: 'chatgpt' as const, label: 'ChatGPT' },
-];
-
-function labelToGeminiId(label: string): string {
-  return GEMINI_MODELS.find((m) => m.label === label)?.id ?? GEMINI_MODELS[0].id;
-}
-
-function timeAgo(ts: number): string {
-  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-function stamp(): string {
-  return new Date().toLocaleTimeString([], { hour12: false });
-}
-
-interface RunRecord {
-  id: string;
-  label: string;
-  exitCode: number | null;
-  durationMs: number;
-  at: number;
-  output: string;
-}
-
-interface ChatMsg {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-function blankSession(id: string, title: string, model: string): SessionData {
-  return {
-    id,
-    title,
-    prompt: '',
-    steps: [],
-    response: '',
-    summary: '',
-    diffStats: { additions: 0, deletions: 0, filesCount: 0 },
-    files: [],
-    model,
-  };
-}
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>('light');
@@ -169,89 +139,17 @@ export default function App() {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [mobileTab, setMobileTab] = useState<'files' | 'agent' | 'code' | 'preview'>('agent');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [wallpaperOn, setWallpaperOn] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('zut:wallpaper') !== 'off';
-    } catch {
-      return true;
-    }
-  });
-  const toggleWallpaper = () => {
-    setWallpaperOn((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem('zut:wallpaper', next ? 'on' : 'off');
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
-  const [wallpaperChoice, setWallpaperChoice] = useState<'auto' | 'light' | 'dark' | 'custom'>(() => {
-    try {
-      const c = localStorage.getItem('zut:wallpaper-choice');
-      return c === 'light' || c === 'dark' || c === 'custom' ? c : 'auto';
-    } catch {
-      return 'auto';
-    }
-  });
-  const [customWallpaper, setCustomWallpaper] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('zut:wallpaper-custom');
-    } catch {
-      return null;
-    }
-  });
-  const [wallpaperMenuOpen, setWallpaperMenuOpen] = useState(false);
-  const chooseWallpaper = (c: 'auto' | 'light' | 'dark' | 'custom') => {
-    setWallpaperChoice(c);
-    try {
-      localStorage.setItem('zut:wallpaper-choice', c);
-    } catch {
-      /* ignore */
-    }
-    setWallpaperMenuOpen(false);
-  };
-  const handleWallpaperUpload = (fl: FileList | null) => {
-    const f = fl?.[0];
-    if (!f) return;
-    if (!f.type.startsWith('image/')) {
-      showToast('Pick an image file.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const url = String(reader.result ?? '');
-      if (!url) return;
-      try {
-        localStorage.setItem('zut:wallpaper-custom', url);
-      } catch {
-        showToast('Image too large to keep — try a smaller one.');
-        return;
-      }
-      setCustomWallpaper(url);
-      chooseWallpaper('custom');
-      showToast('Wallpaper updated.');
-    };
-    reader.readAsDataURL(f);
-  };
-
-  // Tablet/narrow defaults: slimmer rails so the 3-column shell still fits.
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1100) {
-      setSidebarWidth(180);
-      setComposerWidth(320);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Resizable Split-Pane Dimensions (Feature 1)
-  const [sidebarWidth, setSidebarWidth] = useState(210);
-  const [composerWidth, setComposerWidth] = useState(380);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [isResizingComposer, setIsResizingComposer] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
+  const {
+    containerRef,
+    sidebarWidth,
+    composerWidth,
+    isResizingSidebar,
+    isResizingComposer,
+    setSidebarWidth,
+    setComposerWidth,
+    setIsResizingSidebar,
+    setIsResizingComposer,
+  } = usePaneWidths();
 
   // ---- Real user (Supabase session; signed out by default) ----
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
@@ -312,10 +210,19 @@ export default function App() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const filesRef = useRef(files);
   filesRef.current = files;
+  // Local repo opened via the File System Access API (null = device/cloud).
+  const localRepoRef = useRef<LocalRepo | null>(null);
+  // What we last wrote to disk; the sync effect diffs against this.
+  const localBaselineRef = useRef<FileMap>({});
+
+  const [workspaceSource, setWorkspaceSource] = useState<WorkspaceSourceKind>('device');
 
   useEffect(() => {
+    // A local repo is the source of truth; never duplicate its files (which
+    // may include .env secrets) into the device draft.
+    if (workspaceSource === 'local') return;
     saveDraft(projectName, files);
-  }, [projectName, files]);
+  }, [projectName, files, workspaceSource]);
 
   // Baseline snapshot so "modified" dots and diffs have something to compare.
   useEffect(() => {
@@ -465,9 +372,124 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3200);
   };
 
+  const {
+    wallpaperOn,
+    wallpaperChoice,
+    customWallpaper,
+    wallpaperMenuOpen,
+    setWallpaperMenuOpen,
+    toggleWallpaper,
+    chooseWallpaper,
+    handleWallpaperUpload,
+  } = useWallpaper(showToast);
+
   const logEvent = (tag: string, msg: string) => {
     setEvents((prev) => [...prev.slice(-199), `[${stamp()}] [${tag}] ${msg}`]);
   };
+
+  // ---- Local repo (File System Access API) ----
+  async function loadLocalRepo(repo: LocalRepo, quiet = false): Promise<void> {
+    const tree = await readLocalTree(repo.root);
+    const count = Object.keys(tree.files).length;
+    if (count === 0) {
+      showToast('That folder has no readable code files.');
+      return;
+    }
+    takeSnapshot(filesRef.current);
+    localRepoRef.current = repo;
+    localBaselineRef.current = { ...tree.files };
+    setFiles({ ...tree.files });
+    setProjectName(repo.name);
+    setProjectId(null);
+    setShareLink(null);
+    setWorkspaceSource('local');
+    setSavedTo('local');
+    setActiveFilePath((prev) =>
+      prev && tree.files[prev] !== undefined ? prev : Object.keys(tree.files).sort()[0] ?? 'index.html',
+    );
+    await rememberRepo(repo.root);
+    logEvent('LOCAL', `${repo.name} (${count} files${tree.skipped.length ? `, ${tree.skipped.length} skipped` : ''})`);
+    if (!quiet) {
+      showToast(
+        `Opened ${repo.name} — ${count} files from disk${tree.skipped.length ? `, ${tree.skipped.length} skipped` : ''}.`,
+      );
+    }
+  }
+
+  async function openLocalRepo(): Promise<void> {
+    try {
+      const repo = await pickLocalRepo();
+      if (!repo) return;
+      const granted = await ensurePermission(repo.root, 'readwrite');
+      if (!granted) {
+        showToast('Read/write permission is required to open this folder.');
+        return;
+      }
+      await loadLocalRepo(repo);
+    } catch (e) {
+      showToast(`Could not open folder: ${(e as Error).message}`);
+    }
+  }
+
+  function closeLocalRepo(): void {
+    localRepoRef.current = null;
+    localBaselineRef.current = {};
+    setWorkspaceSource('device');
+    setSavedTo('device');
+    void forgetRepo();
+    showToast('Closed the folder — this workspace is back on this device.');
+  }
+
+  function deleteFromDisk(paths: string[]): void {
+    const repo = localRepoRef.current;
+    if (!repo || workspaceSource !== 'local') return;
+    for (const path of paths) {
+      void deleteLocalFile(repo.root, path)
+        .then(() => {
+          delete localBaselineRef.current[path];
+        })
+        .catch(() => {});
+    }
+  }
+
+  // Reconnect the last folder on reload, but only when permission is already
+  // granted — never open a permission prompt without a user gesture.
+  useEffect(() => {
+    if (!isLocalRepoSupported()) return;
+    let cancelled = false;
+    void (async () => {
+      const handle = await recallRepo();
+      if (!handle || cancelled) return;
+      if (!(await hasPermission(handle, 'readwrite'))) return;
+      try {
+        await loadLocalRepo({ root: handle, name: handle.name }, true);
+        if (!cancelled) showToast(`Reconnected ${handle.name}.`);
+      } catch {
+        /* fall back to the device draft */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounced write-back for an open local repo. Deletes are explicit only.
+  useEffect(() => {
+    const repo = localRepoRef.current;
+    if (workspaceSource !== 'local' || !repo) return;
+    const timer = setTimeout(() => {
+      void syncLocalTree(repo.root, localBaselineRef.current, filesRef.current)
+        .then(({ written }) => {
+          if (written > 0) {
+            localBaselineRef.current = { ...filesRef.current };
+            setSavedTo('local');
+          }
+        })
+        .catch((e: unknown) => showToast(`Disk sync failed: ${(e as Error).message}`));
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [files, workspaceSource]);
 
   // Preview console harness -> console drawer lines.
   useEffect(() => {
@@ -581,6 +603,7 @@ export default function App() {
         for (const [p, c] of Object.entries(r.updated)) base[p] = c;
         for (const [p, c] of Object.entries(r.created)) base[p] = c;
         for (const p of r.deleted) delete base[p];
+        if (r.deleted.length) deleteFromDisk(r.deleted);
         reply = r.reply;
         changedPaths = [...Object.keys(r.updated), ...Object.keys(r.created), ...r.deleted];
       } else if (modelLabel === OPENCODE_LABEL) {
@@ -599,6 +622,7 @@ export default function App() {
         for (const [p, c] of Object.entries(r.updated)) base[p] = c;
         for (const [p, c] of Object.entries(r.created)) base[p] = c;
         for (const p of r.deleted) delete base[p];
+        if (r.deleted.length) deleteFromDisk(r.deleted);
         reply = r.reply;
         changedPaths = [...Object.keys(r.updated), ...Object.keys(r.created), ...r.deleted];
       } else if (PROVIDER_LABELS.some((p) => p.label === modelLabel)) {
@@ -872,40 +896,6 @@ export default function App() {
     showToast('Recording… stop sharing to finish the clip.');
     return done;
   }
-
-  // Mouse drag handlers for resizable dividers
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const relativeX = e.clientX - rect.left;
-
-      if (isResizingSidebar) {
-        const newWidth = Math.min(Math.max(relativeX, 160), 320);
-        setSidebarWidth(newWidth);
-      } else if (isResizingComposer) {
-        const newComposerWidth = Math.min(Math.max(relativeX - sidebarWidth, 260), 540);
-        setComposerWidth(newComposerWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isResizingSidebar || isResizingComposer) {
-        setIsResizingSidebar(false);
-        setIsResizingComposer(false);
-      }
-    };
-
-    if (isResizingSidebar || isResizingComposer) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizingSidebar, isResizingComposer, sidebarWidth]);
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -1416,7 +1406,7 @@ export default function App() {
         {/* Feature 1: Draggable Resizer 1 (Between Sidebar & Composer) */}
         <div
           onMouseDown={() => setIsResizingSidebar(true)}
-          onDoubleClick={() => setSidebarWidth(210)}
+          onDoubleClick={() => setSidebarWidth(SIDEBAR_WIDTH.reset)}
           className={`w-1 shrink-0 h-full cursor-col-resize transition-colors relative z-20 hover:bg-red-500/50 ${
             isMobile || sidebarCollapsed ? 'hidden' : isResizingSidebar ? 'bg-red-600' : isDark ? 'bg-neutral-800' : 'bg-neutral-200'
           }`}
@@ -1477,7 +1467,7 @@ export default function App() {
         {/* Feature 1: Draggable Resizer 2 (Between Composer & Right Pane) */}
         <div
           onMouseDown={() => setIsResizingComposer(true)}
-          onDoubleClick={() => setComposerWidth(380)}
+          onDoubleClick={() => setComposerWidth(COMPOSER_WIDTH.reset)}
           className={`w-1 shrink-0 h-full cursor-col-resize transition-colors relative z-20 hover:bg-red-500/50 ${
             isMobile ? 'hidden' : isResizingComposer ? 'bg-red-600' : isDark ? 'bg-neutral-800' : 'bg-neutral-200'
           }`}

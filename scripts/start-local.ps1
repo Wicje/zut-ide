@@ -51,7 +51,7 @@ $env:ZUT_MUDBASE_API_KEY = $mbKey
 $env:ZUT_MUDBASE_PROJECT_ID = $mbProject
 $env:PORT = '8788'
 $env:HOST = '127.0.0.1'
-$env:ZUT_RUNTIME_TOKEN = Get-DotEnvValue 'VITE_RUNTIME_TOKEN'
+$env:ZUT_RUNTIME_TOKEN = Get-DotEnvValue 'ZUT_RUNTIME_TOKEN'
 $runtimeId = Start-Hidden $node @('runtime/server.mjs') $repo 'runtime'
 
 # 3. File bridge :4331 (token from .env.local).

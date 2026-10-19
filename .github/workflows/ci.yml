@@ -29,6 +29,7 @@ jobs:
 
       - name: Syntax-check server scripts
         run: |
+          node --check server/security.mjs
           node --check broker/server.mjs
           node --check broker/cells.mjs
           node --check broker/lib.mjs

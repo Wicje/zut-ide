@@ -28,9 +28,9 @@
 //
 // /mudbase/* is a least-privilege proxy: the browser never holds the Mudbase
 // key, responses are normalized to one stable shape, and every call is logged
-// for metering. Point the IDE at it with VITE_MUDBASE_PROXY_URL.
+// for metering. Callers that need it reach the proxy directly.
 //
-// Point the IDE at it with VITE_RUNTIME_URL (and VITE_RUNTIME_TOKEN if set).
+// Point the IDE at it with VITE_BROKER_URL (and ZUT_RUNTIME_TOKEN if set).
 
 import http from 'node:http'
 import { spawn } from 'node:child_process'
@@ -38,6 +38,19 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { build } from 'esbuild'
+import {
+  assertSafeExposure,
+  clientKey,
+  corsHeadersFor,
+  createRateLimiter,
+  createSemaphore,
+  isLoopbackHost,
+  killProcessTree,
+  parseOrigins,
+  safeRelativePath,
+  safeTokenEqual,
+  sandboxEnv,
+} from '../server/security.mjs'
 
 const PORT = Number(process.env.PORT ?? process.env.ZUT_RUNTIME_PORT ?? 8787)
 const HOST = process.env.HOST ?? '127.0.0.1'
@@ -46,21 +59,27 @@ const MAX_BODY = Number(process.env.ZUT_RUNTIME_MAX_BODY ?? 8 * 1024 * 1024)
 const RUN_TIMEOUT_MS = Number(process.env.ZUT_RUN_TIMEOUT_MS ?? 8000)
 const RUN_MAX_OUTPUT = Number(process.env.ZUT_RUN_MAX_OUTPUT ?? 256 * 1024)
 const RUN_MAX_FILES = Number(process.env.ZUT_RUN_MAX_FILES ?? 100)
-const VERSION = '0.2.0'
+const RUN_CONCURRENCY = Number(process.env.ZUT_RUN_CONCURRENCY ?? 4)
+const RUN_RATE_MIN = Number(process.env.ZUT_RATE_RUN_MIN ?? 30)
+const BUILD_RATE_MIN = Number(process.env.ZUT_RATE_BUILD_MIN ?? 60)
+const TRUST_PROXY = process.env.ZUT_TRUST_PROXY === '1'
+const VERSION = '0.3.0'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-}
+// Safe default: loopback gets a permissive CORS for local dev; an exposed
+// service must name its frontend explicitly or browsers will not be allowed.
+const CORS = parseOrigins(process.env.CORS_ORIGIN ?? (isLoopbackHost(HOST) ? '*' : ''))
+const allowRun = createRateLimiter({ limit: RUN_RATE_MIN })
+const allowBuild = createRateLimiter({ limit: BUILD_RATE_MIN })
+const runGate = createSemaphore(RUN_CONCURRENCY)
+const buildGate = createSemaphore(Math.max(1, Math.floor(RUN_CONCURRENCY / 2)))
 
-function send(res, status, body) {
+function send(res, req, status, body) {
   const payload = JSON.stringify(body)
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(payload),
-    ...CORS,
+    'X-Content-Type-Options': 'nosniff',
+    ...corsHeadersFor(req, CORS),
   })
   res.end(payload)
 }
@@ -86,7 +105,7 @@ function readBody(req) {
 function authorized(req) {
   if (!TOKEN) return true
   const header = req.headers.authorization ?? ''
-  return header === `Bearer ${TOKEN}`
+  return safeTokenEqual(header, `Bearer ${TOKEN}`)
 }
 
 // --- Virtual file system helpers (mirrors src/lib/runner.ts) ---
@@ -252,16 +271,9 @@ async function bundleProject(files) {
   return { js, css, referenced: refs, meta }
 }
 
-function cleanRelPath(p) {
-  const clean = path.normalize(String(p)).replace(/\\/g, '/')
-  if (clean.startsWith('/') || clean.split('/').includes('..') || clean === '' || clean === '.') return null
-  if (clean.includes('\0')) return null
-  return clean.replace(/^\.\//, '')
-}
-
 /** Execute a Python/Go entry in an isolated temp dir with timeout + output caps. */
 async function runProgram(files, entry, stdin = '') {
-  const rel = cleanRelPath(entry)
+  const rel = safeRelativePath(entry)
   if (!rel) return { error: `Unsafe entry path: ${entry}`, status: 400 }
   const kind = rel.endsWith('.py') ? 'python' : rel.endsWith('.go') ? 'go' : null
   if (!kind) return { error: 'Only .py and .go entries are supported (main.py / main.go).', status: 400 }
@@ -269,14 +281,16 @@ async function runProgram(files, entry, stdin = '') {
   const names = Object.keys(files)
   if (names.length > RUN_MAX_FILES) return { error: `Too many files (limit ${RUN_MAX_FILES}).`, status: 400 }
   if (!(rel in files)) return { error: `Entry file "${rel}" not found.`, status: 400 }
-  for (const n of names) if (!cleanRelPath(n)) return { error: `Unsafe path: ${n}`, status: 400 }
+  for (const n of names) if (!safeRelativePath(n)) return { error: `Unsafe path: ${n}`, status: 400 }
 
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'zut-run-'))
   try {
     for (const [name, content] of Object.entries(files)) {
       // Only materialize code-adjacent files; skip web cruft if present.
       if (name === 'index.html') continue
-      const full = path.join(dir, cleanRelPath(name))
+      const safe = safeRelativePath(name)
+      if (!safe) continue
+      const full = path.join(dir, safe)
       await fs.mkdir(path.dirname(full), { recursive: true })
       await fs.writeFile(full, String(content ?? ''), 'utf8')
     }
@@ -284,10 +298,21 @@ async function runProgram(files, entry, stdin = '') {
     const args = kind === 'python' ? [rel] : ['run', rel]
     const started = Date.now()
     const result = await new Promise((resolve) => {
-      const child = spawn(cmd, args, { cwd: dir, timeout: RUN_TIMEOUT_MS })
+      const child = spawn(cmd, args, {
+        cwd: dir,
+        detached: process.platform !== 'win32',
+        env: sandboxEnv(dir),
+        timeout: RUN_TIMEOUT_MS,
+      })
       let stdout = ''
       let stderr = ''
       let truncated = false
+      let settled = false
+      const finish = (value) => {
+        if (settled) return
+        settled = true
+        resolve(value)
+      }
       const push = (buf, isErr) => {
         let s = buf.toString('utf8')
         const room = RUN_MAX_OUTPUT - (stdout.length + stderr.length)
@@ -297,16 +322,16 @@ async function runProgram(files, entry, stdin = '') {
       }
       child.stdout?.on('data', (d) => push(d, false))
       child.stderr?.on('data', (d) => push(d, true))
-      child.on('error', (e) => resolve({ stdout, stderr: stderr + `\n[${cmd} not available: ${e.message}]`, exitCode: 127, truncated, durationMs: Date.now() - started }))
-      const kill = setTimeout(() => { try { child.kill('SIGKILL') } catch {} }, RUN_TIMEOUT_MS + 1000)
+      child.on('error', (e) => finish({ stdout, stderr: stderr + `\n[${cmd} not available: ${e.message}]`, exitCode: 127, truncated, durationMs: Date.now() - started }))
+      const kill = setTimeout(() => killProcessTree(child), RUN_TIMEOUT_MS + 1000)
       if (stdin) { try { child.stdin?.write(String(stdin).slice(0, 64 * 1024)); child.stdin?.end() } catch {} }
       else { try { child.stdin?.end() } catch {} }
       child.on('close', (code, signal) => {
         clearTimeout(kill)
         if (signal === 'SIGTERM' || signal === 'SIGKILL') {
-          resolve({ stdout, stderr: stderr + `\n[timeout after ${RUN_TIMEOUT_MS}ms]`, exitCode: 124, truncated: true, durationMs: Date.now() - started })
+          finish({ stdout, stderr: stderr + `\n[timeout after ${RUN_TIMEOUT_MS}ms]`, exitCode: 124, truncated: true, durationMs: Date.now() - started })
         } else {
-          resolve({ stdout, stderr, exitCode: code ?? 1, truncated, durationMs: Date.now() - started })
+          finish({ stdout, stderr, exitCode: code ?? 1, truncated, durationMs: Date.now() - started })
         }
       })
     })
@@ -493,50 +518,68 @@ async function handleMudbase(req, url) {
   throw err
 }
 
+assertSafeExposure({
+  service: 'zut-runtime',
+  host: HOST,
+  token: TOKEN,
+  allowInsecure: process.env.ZUT_ALLOW_INSECURE_EXPOSURE === '1',
+})
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+  const key = clientKey(req, TRUST_PROXY)
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS)
+    res.writeHead(204, corsHeadersFor(req, CORS))
     res.end()
     return
   }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    send(res, 200, { ok: true, service: 'zut-runtime', version: VERSION, mudbase: mudbaseConfigured(), runners: ['web', 'python', 'go'] })
+    send(res, req, 200, { ok: true, service: 'zut-runtime', version: VERSION, auth: Boolean(TOKEN), mudbase: mudbaseConfigured(), runners: ['web', 'python', 'go'] })
     return
   }
 
   // Public capability flag — reveals nothing sensitive.
   if (req.method === 'GET' && url.pathname === '/mudbase/status') {
-    send(res, 200, { configured: mudbaseConfigured() })
+    send(res, req, 200, { configured: mudbaseConfigured() })
     return
   }
 
   if (url.pathname === '/mudbase' || url.pathname.startsWith('/mudbase/')) {
     if (!authorized(req)) {
-      send(res, 401, { error: 'Unauthorized' })
+      send(res, req, 401, { error: 'Unauthorized' })
       return
     }
     if (!mudbaseConfigured()) {
-      send(res, 503, { error: 'Mudbase is not configured on this runtime.' })
+      send(res, req, 503, { error: 'Mudbase is not configured on this runtime.' })
       return
     }
     try {
       const t0 = Date.now()
       const result = await handleMudbase(req, url)
       console.log(`[zut-runtime] mudbase ${req.method} ${url.pathname} ok ${Date.now() - t0}ms`)
-      send(res, 200, result)
+      send(res, req, 200, result)
     } catch (e) {
       const status = typeof e?.status === 'number' && e.status >= 400 && e.status < 500 ? e.status : 502
-      send(res, status, { error: e?.message ?? 'Mudbase request failed' })
+      send(res, req, status, { error: e?.message ?? 'Mudbase request failed' })
     }
     return
   }
 
   if (req.method === 'POST' && url.pathname === '/build') {
     if (!authorized(req)) {
-      send(res, 401, { error: 'Unauthorized' })
+      send(res, req, 401, { error: 'Unauthorized' })
+      return
+    }
+    if (!allowBuild(key)) {
+      send(res, req, 429, { error: 'Too many builds. Slow down.' })
+      return
+    }
+    try {
+      await buildGate.acquire()
+    } catch (e) {
+      send(res, req, e.status ?? 429, { error: e.message })
       return
     }
     try {
@@ -545,20 +588,32 @@ const server = http.createServer(async (req, res) => {
       try {
         body = raw ? JSON.parse(raw) : {}
       } catch {
-        send(res, 400, { error: 'Request body must be valid JSON.' })
+        send(res, req, 400, { error: 'Request body must be valid JSON.' })
         return
       }
       const result = await bundleProject(body.files)
-      send(res, 200, result)
+      send(res, req, 200, result)
     } catch (e) {
-      send(res, 400, { error: e?.message ?? 'Build failed' })
+      send(res, req, e?.status ?? 400, { error: e?.message ?? 'Build failed' })
+    } finally {
+      buildGate.release()
     }
     return
   }
 
   if (req.method === 'POST' && url.pathname === '/run') {
     if (!authorized(req)) {
-      send(res, 401, { error: 'Unauthorized' })
+      send(res, req, 401, { error: 'Unauthorized' })
+      return
+    }
+    if (!allowRun(key)) {
+      send(res, req, 429, { error: 'Too many runs. Slow down.' })
+      return
+    }
+    try {
+      await runGate.acquire()
+    } catch (e) {
+      send(res, req, e.status ?? 429, { error: e.message })
       return
     }
     try {
@@ -567,27 +622,29 @@ const server = http.createServer(async (req, res) => {
       try {
         body = raw ? JSON.parse(raw) : {}
       } catch {
-        send(res, 400, { error: 'Request body must be valid JSON.' })
+        send(res, req, 400, { error: 'Request body must be valid JSON.' })
         return
       }
       const result = await runProgram(body.files, body.entry, body.stdin ?? '')
       if (result.error) {
-        send(res, result.status ?? 400, { error: result.error })
+        send(res, req, result.status ?? 400, { error: result.error })
         return
       }
-      send(res, 200, result)
+      send(res, req, 200, result)
     } catch (e) {
-      send(res, 400, { error: e?.message ?? 'Run failed' })
+      send(res, req, e?.status ?? 400, { error: e?.message ?? 'Run failed' })
+    } finally {
+      runGate.release()
     }
     return
   }
 
-  send(res, 404, { error: 'Not found' })
+  send(res, req, 404, { error: 'Not found' })
 })
 
 server.listen(PORT, HOST, () => {
   console.log(`zut-runtime listening on http://${HOST}:${PORT}  (auth ${TOKEN ? 'on' : 'off'}, mudbase ${mudbaseConfigured() ? 'on' : 'off'})`)
-  if (!['127.0.0.1', 'localhost', '::1'].includes(HOST) && !TOKEN) {
-    console.warn('[zut-runtime] WARNING: bound to a non-local interface with auth OFF — anyone on the network can build and deploy. Set ZUT_RUNTIME_TOKEN.')
+  if (!isLoopbackHost(HOST) && !process.env.CORS_ORIGIN) {
+    console.warn('[zut-runtime] WARNING: no CORS_ORIGIN set on a non-local bind — browser calls will be blocked.')
   }
 })

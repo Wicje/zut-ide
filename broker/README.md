@@ -8,13 +8,15 @@ user's token + workspace id; service keys stay here.
 ZUT_BROKER_DEV_ALLOW_ANON=1 npm run broker  # → http://127.0.0.1:8787
 ```
 
-Point the IDE at it: `VITE_RUNTIME_URL=http://127.0.0.1:8787`.
+Point the IDE at it: `VITE_BROKER_URL=http://127.0.0.1:8787`.
 
 ## Env
 
 | Var | Default | Notes |
 |---|---|---|
 | `PORT` / `ZUT_BROKER_PORT` | 8787 | |
+| `HOST` | `127.0.0.1` | binding to a public interface requires auth (see Security) |
+| `CORS_ORIGIN` | `*` on loopback, unset when public | exact frontend origin(s), comma-separated, or `*` |
 | `DATA_ROOT` | `./broker-data` | demo BaaS store (Mudbase collections replace this) |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | — | user-token verify (60s cache); else `ZUT_BROKER_DEV_ALLOW_ANON=1` for demo |
 | `CELLS_API_KEY` | — | absent = local demo runs; set = live Cells path |
@@ -25,7 +27,23 @@ Point the IDE at it: `VITE_RUNTIME_URL=http://127.0.0.1:8787`.
 | `CELLS_MAX_OUTPUT` | `262144` | stdout+stderr cap |
 | `CELLS_ENDPOINT_*` | see `cells.mjs` | per-path overrides — no code change to fix a 404 |
 | `ZUT_DAILY_RUN_CAP` | `50` | payer decides |
-| `ZUT_RATE_RUN_MIN` | `20` | |
+| `ZUT_RATE_RUN_MIN` | `20` | per-user runs per minute |
+| `ZUT_RUN_MAX_FILES` | `100` | files per run |
+| `ZUT_ALLOW_INSECURE_EXPOSURE` | — | `1` only for throwaway hosts: permits an exposed bind without real auth |
+
+## Security
+
+The broker executes submitted Python/Go in a temp dir. Harden it:
+
+- **Never expose it unauthenticated.** Binding `HOST` to anything but loopback
+  now refuses to start unless a real auth backend is configured. `*=1` dev-anon
+  is rejected on public interfaces.
+- **Set `CORS_ORIGIN`** to your exact frontend host when public; the `*` default
+  is loopback-only.
+- Submitted programs run with a **scrubbed environment** (no server secrets) and
+  their whole process group is killed on timeout.
+- Keep runs inside Cells (set `CELLS_API_KEY`) for real isolation; the local
+  demo runner is for development.
 
 ## Smoke (demo, no keys)
 
@@ -52,7 +70,7 @@ below. Users then Install it from the browser menu (PWA).
 ```bash
 VITE_SUPABASE_URL=https://YOUR_REF.supabase.co \
 VITE_SUPABASE_ANON_KEY=eyJ... \
-VITE_RUNTIME_URL=https://broker.yourdomain.com \
+VITE_BROKER_URL=https://broker.yourdomain.com \
 npm run build
 ```
 

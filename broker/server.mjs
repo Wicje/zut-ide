@@ -24,6 +24,15 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { cellsConfig, cellsConfigured, createCellsDriver } from './cells.mjs'
+import {
+  assertSafeExposure,
+  corsHeadersFor,
+  isLoopbackHost,
+  killProcessTree,
+  parseOrigins,
+  safeRelativePath,
+  sandboxEnv,
+} from '../server/security.mjs'
 
 const PORT = Number(process.env.PORT ?? process.env.ZUT_BROKER_PORT ?? 8787)
 const HOST = process.env.HOST ?? '127.0.0.1'
@@ -31,6 +40,7 @@ const DATA_ROOT = path.resolve(process.env.DATA_ROOT ?? './broker-data')
 const MAX_BODY = Number(process.env.ZUT_MAX_BODY ?? 8 * 1024 * 1024)
 const RUN_TIMEOUT_MS = Number(process.env.ZUT_RUN_TIMEOUT_MS ?? 8000)
 const RUN_MAX_OUTPUT = Number(process.env.ZUT_RUN_MAX_OUTPUT ?? 256 * 1024)
+const RUN_MAX_FILES = Number(process.env.ZUT_RUN_MAX_FILES ?? 100)
 const DAILY_RUN_CAP = Number(process.env.ZUT_DAILY_RUN_CAP ?? 50)
 const RATE_RUN_MIN = Number(process.env.ZUT_RATE_RUN_MIN ?? 20)
 const DEV_ALLOW_ANON = (process.env.ZUT_BROKER_DEV_ALLOW_ANON ?? '') === '1'
@@ -38,29 +48,20 @@ const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').replace(/\/+$/, '')
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? ''
 const MUDBASE_URL = (process.env.MUDBASE_URL ?? 'https://api.mudbase.dev').replace(/\/+$/, '')
 const CELLS_CONFIGURED = Boolean(process.env.CELLS_API_KEY)
-const VERSION = '0.1.0'
+const VERSION = '0.2.0'
 
-// CORS allowlist: '*' for local demo only. In production set CORS_ORIGIN to
-// your exact frontend host(s), comma-separated — otherwise any website can
-// spend your users' quotas with their own tokens.
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
-const CORS_ALLOW = new Set(CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean))
-
-function corsFor(req) {
-  const origin = req.headers.origin
-  const allow = CORS_ORIGIN === '*' || (origin && CORS_ALLOW.has(origin)) ? (origin ?? '*') : 'null'
-  return {
-    'Access-Control-Allow-Origin': allow,
-    Vary: 'Origin',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400',
-  }
-}
+// CORS allowlist: permissive only on loopback. An exposed broker must name
+// its frontend host(s), otherwise browser callers get no allow-origin.
+const CORS = parseOrigins(process.env.CORS_ORIGIN ?? (isLoopbackHost(HOST) ? '*' : ''))
 
 function send(res, req, status, body) {
   const payload = JSON.stringify(body)
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(payload), ...corsFor(req) })
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': Buffer.byteLength(payload),
+    'X-Content-Type-Options': 'nosniff',
+    ...corsHeadersFor(req, CORS),
+  })
   res.end(payload)
 }
 
@@ -87,9 +88,17 @@ async function readJson(req) {
 // ---- auth: 60s cache. Supabase JWT first, then Mudbase user token
 // (GET /api/auth/session) when MUDBASE_URL is set. Either way the uid is
 // the verified subject — never a browser-supplied id.
+const AUTH_CACHE_MAX = 2_000
 const authCache = new Map()
+function cacheAuth(token, entry) {
+  if (authCache.size >= AUTH_CACHE_MAX) authCache.clear()
+  authCache.set(token, entry)
+}
 async function verifyMudbase(token) {
-  const r = await fetch(`${MUDBASE_URL}/api/auth/session`, { headers: { Authorization: `Bearer ${token}` } })
+  const r = await fetch(`${MUDBASE_URL}/api/auth/session`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5_000),
+  })
   if (!r.ok) return null
   const j = await r.json().catch(() => null)
   const user = j?.user ?? j
@@ -104,23 +113,26 @@ async function verifyUser(req) {
   const cached = authCache.get(token)
   if (cached && cached.exp > Date.now()) return cached.uid
   if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` } })
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    })
     if (!r.ok) { const e = new Error('Invalid or expired session. Sign in again.'); e.status = 401; throw e }
     const j = await r.json()
     if (!j?.id) { const e = new Error('Invalid session.'); e.status = 401; throw e }
-    authCache.set(token, { uid: j.id, exp: Date.now() + 60_000 })
+    cacheAuth(token, { uid: j.id, exp: Date.now() + 60_000 })
     return j.id
   }
   if (process.env.MUDBASE_AUTH !== '0') {
     const uid = await verifyMudbase(token).catch(() => null)
     if (uid) {
-      authCache.set(token, { uid, exp: Date.now() + 60_000 })
+      cacheAuth(token, { uid, exp: Date.now() + 60_000 })
       return uid
     }
   }
   if (DEV_ALLOW_ANON) {
     const uid = 'dev-user'
-    authCache.set(token, { uid, exp: Date.now() + 60_000 })
+    cacheAuth(token, { uid, exp: Date.now() + 60_000 })
     return uid
   }
   const e = new Error('Broker auth not configured (set SUPABASE_URL/ANON_KEY, MUDBASE_URL, or ZUT_BROKER_DEV_ALLOW_ANON=1 for local demo).')
@@ -200,25 +212,24 @@ async function findShared(token) {
 }
 
 // ---- program execution (demo local; Cells exec replaces internals later) ----
-function cleanRelPath(p) {
-  const clean = path.normalize(String(p)).replace(/\\/g, '/')
-  if (clean.startsWith('/') || clean.split('/').includes('..') || clean === '' || clean === '.') return null
-  if (clean.includes('\0')) return null
-  return clean.replace(/^\.\//, '')
-}
 async function runProgram(files, entry, stdin = '') {
-  const rel = cleanRelPath(entry)
+  const rel = safeRelativePath(entry)
   if (!rel) return { error: `Unsafe entry path: ${entry}`, status: 400 }
   const kind = rel.endsWith('.py') ? 'python' : rel.endsWith('.go') ? 'go' : null
   if (!kind) return { error: 'Only .py and .go entries are supported (main.py / main.go).', status: 400 }
+  if (!files || typeof files !== 'object') return { error: 'Request must include a `files` object.', status: 400 }
+  const names = Object.keys(files)
+  if (names.length > RUN_MAX_FILES) return { error: `Too many files (limit ${RUN_MAX_FILES}).`, status: 400 }
   if (!(rel in files)) return { error: `Entry file "${rel}" not found.`, status: 400 }
+  for (const n of names) if (!safeRelativePath(n)) return { error: `Unsafe path: ${n}`, status: 400 }
+
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'zut-broker-'))
   try {
     for (const [name, content] of Object.entries(files)) {
       if (name === 'index.html') continue
-      const c = cleanRelPath(name)
-      if (!c) continue
-      const full = path.join(dir, c)
+      const safe = safeRelativePath(name)
+      if (!safe) continue
+      const full = path.join(dir, safe)
       await fs.mkdir(path.dirname(full), { recursive: true })
       await fs.writeFile(full, String(content ?? ''), 'utf8')
     }
@@ -226,10 +237,21 @@ async function runProgram(files, entry, stdin = '') {
     const args = kind === 'python' ? [rel] : ['run', rel]
     const started = Date.now()
     return await new Promise((resolve) => {
-      const child = spawn(cmd, args, { cwd: dir, timeout: RUN_TIMEOUT_MS })
+      const child = spawn(cmd, args, {
+        cwd: dir,
+        detached: process.platform !== 'win32',
+        env: sandboxEnv(dir),
+        timeout: RUN_TIMEOUT_MS,
+      })
       let stdout = ''
       let stderr = ''
       let truncated = false
+      let settled = false
+      const finish = (value) => {
+        if (settled) return
+        settled = true
+        resolve(value)
+      }
       const push = (buf, isErr) => {
         let s = buf.toString('utf8')
         const room = RUN_MAX_OUTPUT - (stdout.length + stderr.length)
@@ -239,14 +261,14 @@ async function runProgram(files, entry, stdin = '') {
       }
       child.stdout?.on('data', (d) => push(d, false))
       child.stderr?.on('data', (d) => push(d, true))
-      child.on('error', (e) => resolve({ stdout, stderr: stderr + `\n[${cmd} not available: ${e.message}]`, exitCode: 127, truncated, durationMs: Date.now() - started }))
-      const kill = setTimeout(() => { try { child.kill('SIGKILL') } catch {} }, RUN_TIMEOUT_MS + 1000)
+      child.on('error', (e) => finish({ stdout, stderr: stderr + `\n[${cmd} not available: ${e.message}]`, exitCode: 127, truncated, durationMs: Date.now() - started }))
+      const kill = setTimeout(() => killProcessTree(child), RUN_TIMEOUT_MS + 1000)
       if (stdin) { try { child.stdin?.write(String(stdin).slice(0, 64 * 1024)); child.stdin?.end() } catch {} }
       else { try { child.stdin?.end() } catch {} }
       child.on('close', (code, signal) => {
         clearTimeout(kill)
-        if (signal === 'SIGTERM' || signal === 'SIGKILL') resolve({ stdout, stderr: stderr + `\n[timeout after ${RUN_TIMEOUT_MS}ms]`, exitCode: 124, truncated: true, durationMs: Date.now() - started })
-        else resolve({ stdout, stderr, exitCode: code ?? 1, truncated, durationMs: Date.now() - started })
+        if (signal === 'SIGTERM' || signal === 'SIGKILL') finish({ stdout, stderr: stderr + `\n[timeout after ${RUN_TIMEOUT_MS}ms]`, exitCode: 124, truncated: true, durationMs: Date.now() - started })
+        else finish({ stdout, stderr, exitCode: code ?? 1, truncated, durationMs: Date.now() - started })
       })
     })
   } finally {
@@ -284,7 +306,7 @@ function commandForEntry(entry) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
-  if (req.method === 'OPTIONS') { res.writeHead(204, corsFor(req)); res.end(); return }
+  if (req.method === 'OPTIONS') { res.writeHead(204, corsHeadersFor(req, CORS)); res.end(); return }
 
   if (req.method === 'GET' && url.pathname === '/health') {
     send(res, req, 200, { ok: true, service: 'zut-broker', version: VERSION, cells: CELLS_CONFIGURED, runners: ['python', 'go'], auth: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) || process.env.MUDBASE_AUTH !== '0' || DEV_ALLOW_ANON, mudbase: process.env.MUDBASE_AUTH !== '0' })
@@ -401,7 +423,7 @@ const server = http.createServer(async (req, res) => {
       void workspaceId
       if (body.files && typeof body.files === 'object') {
         for (const p of Object.keys(body.files)) {
-          if (!cleanRelPath(p) && p !== 'index.html') { send(res, req, 400, { error: `Unsafe path: ${p}` }); return }
+          if (!safeRelativePath(p)) { send(res, req, 400, { error: `Unsafe path: ${p}` }); return }
         }
       }
       if (cellsConfigured()) {
@@ -436,8 +458,17 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
+assertSafeExposure({
+  service: 'zut-broker',
+  host: HOST,
+  token: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) || process.env.MUDBASE_AUTH !== '0',
+  devAllowAnon: DEV_ALLOW_ANON,
+  allowInsecure: process.env.ZUT_ALLOW_INSECURE_EXPOSURE === '1',
+})
+
 await fs.mkdir(DATA_ROOT, { recursive: true })
 server.listen(PORT, HOST, () => {
   console.log(`zut-broker v${VERSION} on http://${HOST}:${PORT} (data ${DATA_ROOT}, cells ${CELLS_CONFIGURED ? 'on' : 'demo-local'}, dev-anon ${DEV_ALLOW_ANON ? 'on' : 'off'})`)
   if (!SUPABASE_URL && !DEV_ALLOW_ANON) console.warn('[zut-broker] WARNING: no SUPABASE_URL — protected routes will 503 until auth is configured.')
+  if (!isLoopbackHost(HOST) && CORS.allowAny) console.warn('[zut-broker] WARNING: CORS_ORIGIN=* on a non-local bind — set exact frontend origins.')
 })

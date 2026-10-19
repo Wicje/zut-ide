@@ -4,6 +4,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { FileMap } from './filemap';
 import type { SessionData } from '../types';
+import { resolveBrokerUrl, type BrokerEnv } from '../lib/brokerUrl';
 
 export interface StoredProject {
   id: string;
@@ -28,7 +29,7 @@ export interface AgentTurnResult {
   deleted: string[];
 }
 
-const brokerUrl = (import.meta.env.VITE_BROKER_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
+const brokerUrl = resolveBrokerUrl(import.meta.env as unknown as BrokerEnv);
 const cloudUrl = (import.meta.env.VITE_CLOUD_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;

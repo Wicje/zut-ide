@@ -101,59 +101,37 @@ Setup (one SQL run, no CLI):
 | `Ctrl/⌘ + S` | Save (device, or cloud when signed in) |
 | `Ctrl/⌘ + K` | Toggle AI assistant (optional) |
 
-## Optional: remote runtime (build + run on a server, not the phone)
+## Optional: run broker (runs + terminal + preview off-device)
 
-By default web projects are bundled in the browser with esbuild-wasm. On low-end
-machines (phones, &lt;2GB Chromebooks) you can move that work to a server instead.
-Python/Go **always** need the server — they never execute on-device:
+Web projects bundle in the browser (or on `zut-cloud` when configured).
+Python/Go **always** need the broker — they never execute on-device:
 
 ```bash
-npm run runtime            # → http://localhost:8787  (PORT to change)
+npm run broker             # → http://localhost:8787  (PORT to change)
 ```
 
 Then point the IDE at it:
 
 ```bash
 # .env.local
-VITE_RUNTIME_URL=http://localhost:8787
+VITE_BROKER_URL=http://localhost:8787
 ```
 
-When `VITE_RUNTIME_URL` is set, the browser POSTs the project's files to
-`/build` (web) or `/run` (Python/Go with optional stdin) and renders the result.
-If the service is unreachable (or the project uses `.vue` files, which still need
-the browser compiler), web falls back to the in-browser runner automatically;
-programs show a "needs runtime" hint instead of failing silently. Run the service with
-`ZUT_RUNTIME_TOKEN=...` and set `VITE_RUNTIME_TOKEN` to require a shared secret.
+The browser calls the broker's `/api/broker/*` routes with the signed-in user's
+token; the broker holds service keys and enforces quotas. The legacy
+`VITE_RUNTIME_URL` name is still accepted as an alias. If the broker is
+unreachable, programs show a "needs runtime" hint instead of failing silently.
 Tune with `ZUT_RUN_TIMEOUT_MS` (default 8000) and `ZUT_RUN_MAX_OUTPUT` (default 256KB).
+
+The standalone `npm run runtime` service (`/build` + `/run`) is still available
+for server-to-server use. When you expose it, set `ZUT_RUNTIME_TOKEN`; that token
+is server-to-server only and is never shipped to the browser.
 
 Short-term host: Render.com works for a few days — deploy `cloud/Dockerfile` as a
 Web Service (Starter 2GB, health check `/health`), set `CORS_ORIGIN` to your
-frontend, then use its URL as `VITE_RUNTIME_URL` / `VITE_CLOUD_URL`. See
+frontend, then use its URL as `VITE_CLOUD_URL` (builds + cloud agent). Python/Go
+runs still need the separate broker (`npm run broker`, `VITE_BROKER_URL`). See
 [cloud/DEPLOY.md](cloud/DEPLOY.md) for VPS vs Render notes.
-
-## Optional: serverless backend (Mudbase, key never in the browser)
-
-The **Deploy → Serverless** tab ships a project file as a Mudbase function with a
-live endpoint. Recommended setup — the key lives on your server:
-
-```bash
-ZUT_MUDBASE_API_KEY=... ZUT_MUDBASE_PROJECT_ID=... npm run runtime
-```
-
-```bash
-# .env.local
-VITE_RUNTIME_URL=http://localhost:8787
-VITE_MUDBASE_PROXY_URL=http://localhost:8787/mudbase
-```
-
-Every proxy call is logged with timing (`mudbase METHOD /path ok Nms`) — the raw
-material for metering paid deploys later.
-
-Personal/local use only: skip the proxy and put a **functions-scoped** key in
-the browser bundle. Mint it at [mudbase.dev/console](https://www.mudbase.dev/console)
-(Settings → API Keys) with ONLY `functions` create/read/update/delete on one
-project, then **revoke any full-access key**. Never commit a real key — and note
-that minting keys needs org-level login; an API key cannot mint new keys.
 
 ## Optional: Supabase (accounts, cloud save, sharing)
 
@@ -224,7 +202,7 @@ server only; the browser never sees them.
 
 ## How running code works
 
-Project kind is detected from files (`src/lib/projectKind.ts`):
+Project kind is detected from files (`src/adapters/filemap.ts`):
 - `index.html` present → **web**. Steps 1-4 below.
 - else `main.py` / `app.py` → **Python**; `main.go` / `go.mod` → **Go**. Step 5.
 
@@ -264,33 +242,34 @@ provider's tab shows an amber dot and a key prompt.
 
 **2. Self-host the agent (the AI edits your files).** This runs the [opencode](https://opencode.ai)
 agent on a server so it can read/write the project with real tools, while the phone or Chromebook only
-renders the browser UI. Run all three server-side pieces on the same machine:
+renders the browser UI. Start the pieces you need on the same machine:
 
 ```bash
-npm run dev:server   # runtime + file bridge + opencode agent
+npm run dev:server   # zut-cloud: builds + cloud agent
+npm run broker       # optional: off-device Python/Go runs
+npm run dev:bridge   # optional: opencode file bridge
+npm run dev:opencode # optional: opencode agent
 ```
 
-or individually: `npm run runtime`, `npm run dev:bridge`, `npm run dev:opencode`.
 Point the browser at them:
 
 ```bash
 # .env.local
-VITE_RUNTIME_URL=https://runtime.example.com
+VITE_BROKER_URL=https://broker.example.com
 VITE_OPENCODE_URL=https://agent.example.com
 VITE_OPENCODE_BRIDGE_URL=https://bridge.example.com
 ```
 
-When exposing these to a network, set a shared secret so only your IDE can call them:
+When exposing the bridge to a network, set a shared secret so only your IDE can call it:
 
 ```bash
-ZUT_RUNTIME_TOKEN=$(openssl rand -hex 32) \
-ZUT_BRIDGE_TOKEN=$(openssl rand -hex 32) \
-npm run dev:server
+ZUT_BRIDGE_TOKEN=$(openssl rand -hex 32) npm run dev:bridge
 ```
 
-and put the matching values in `VITE_RUNTIME_TOKEN` / `VITE_OPENCODE_BRIDGE_TOKEN`. The bridge binds
+and put the matching value in `VITE_OPENCODE_BRIDGE_TOKEN`. The bridge binds
 `127.0.0.1` by default; set `ZUT_BRIDGE_HOST=0.0.0.0` behind a TLS reverse proxy (and always keep the
-token set when you do).
+token set when you do). The broker does not use a static browser token: every request carries the
+signed-in user's token, which the broker verifies.
 
 ## Notes & limitations
 
@@ -308,7 +287,7 @@ token set when you do).
 - **AI** is optional and works two ways: bring your own key (OpenRouter/Anthropic/OpenAI/Gemini, stored in this
   browser, billed by that provider) or sign in to use the zut cloud proxy. The self-hosted agent
   option runs opencode on a server. Coding, running, and deploying all work with no AI.
-- **Programs** (Python/Go) run through the broker (`VITE_RUNTIME_URL` → `npm run broker`); without it they show a hint instead of running. Staged status (`Waking…/Starting…`) + Cancel, 60s browser wait cap, plain-words quota (`402` → "run time used up"). Service keys stay on the broker; the browser sends only the user token. See `broker/README.md` for env + smoke test.
+- **Programs** (Python/Go) run through the broker (`VITE_BROKER_URL` → `npm run broker`); without it they show a hint instead of running. Staged status (`Waking…/Starting…`) + Cancel, 60s browser wait cap, plain-words quota (`402` → "run time used up"). Service keys stay on the broker; the browser sends only the user token. See `broker/README.md` for env + smoke test.
 - Importing some dynamic pages may fail if the site blocks cross-origin fetches or requires JS
   rendering. CodePen, raw GitHub, and plain HTML/CSS/JS pages work best.
 
@@ -335,9 +314,8 @@ src/
   adapters/              # UI-facing backends: zut (broker + Supabase + drafts),
                          # preview (esbuild bundle), filemap, aiEdits, gemini,
                          # providers, github, mudauth, importer, opencode
-  data/mockData.ts       # legacy fixtures (not used live)
-  lib/ hooks/ store/     # preserved backend: broker/runtime/cloud clients, usage,
-                         # limits, persistence, templates, composers (untouched by port)
+  lib/                   # app model + broker URL + connectors/secrets/terminal
+  hooks/                 # waitlist gate, remote shell, wallpaper, pane widths
 broker/
   server.mjs             # thin broker (npm run broker): BaaS routes + run/terminal/preview
   cells.mjs              # ONLY file that speaks Cells (env-driven, VERIFY markers)
