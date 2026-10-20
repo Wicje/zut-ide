@@ -27,7 +27,8 @@ When you want it, bring your own key or use the cloud agent.
   and unhandled promise rejections are streamed into a console panel. Python/Go output (stdout/stderr + exit code) renders in the same Output panel as terminal text.
 - **Persistence**: works out of the box with zero backend (localStorage draft). Optionally connect
   **Supabase** for accounts, cloud save, a project library, and read-only share links.
-- **Save to disk**: download any project as a ZIP.
+- **Save to disk**: open a folder (File System Access) or a `zut host`
+  workspace; device drafts stay in this browser until you do.
 
 ## Feature highlights
 
@@ -36,8 +37,9 @@ When you want it, bring your own key or use the cloud agent.
   fonts, JSON, and code files from your device.
 - **Multi-viewport preview** — on desktop, switch the result between phone (375px) / tablet (768px) /
   full width to test responsive layouts without leaving the IDE.
-- **Import from URL** — *New ▾ → Import from URL* accepts an HTML page, a CodePen, or a raw GitHub file,
-  and scaffolds a project from it.
+- **Import from URL** — *New ▾ → Import from URL* accepts a GitHub repo (or
+  `/tree/<ref>/<path>`), an HTML page, a CodePen, or a raw GitHub file, and
+  scaffolds a project from it.
 - **One-click deploy** — the *Deploy* button publishes the project to a live
   Vercel URL through your own Vercel token (saved once in account settings,
   validated and stored server-side). Signed-in users only; never anonymous.
@@ -66,6 +68,49 @@ npm run dev        # → http://localhost:5173
 
 The app runs fine with no configuration — try it before touching Supabase.
 "New project" → pick a template, edit, watch the preview, open the console.
+
+## Real workspace: local folder or host
+
+Two ways to work on real files, both read/write from day one:
+
+- **Open folder** (sidebar, `Ctrl/⌘ + O`): uses the File System Access API in
+  Chrome, Edge, or ChromeOS. Edits autosave to disk, external edits reload on
+  interval, and deleting/renaming a file is confirmed in the IDE first.
+  `.env*` and generated folders are skipped. Lockfiles are synced.
+- **Host workspace** (sidebar → Connect host): run the host on the machine that
+  owns the files, then open the same workspace from any browser. Edits autosave
+  to the host, external edits reload, and the Terminal/Debug drawers get a real
+  pty + Node debugger. Lockfiles are synced; `.env*` and generated folders are
+  skipped.
+
+```bash
+npm run host        # → http://localhost:8790
+```
+
+The host serves the workspace API, allow-listed git routes, a real pty, and a
+Node CDP debugger over WebSocket. For a LAN/VPS bind, set a token or it refuses
+to start:
+
+```bash
+ZUT_HOST_TOKEN=$(openssl rand -hex 32) \
+ZUT_WORKSPACE=$HOME/projects/my-app \
+ZUT_HOST_MODE=hosted \
+CORS_ORIGIN=https://your-ide.example \
+HOST=0.0.0.0 npm run host
+```
+
+Use the IDE's "Connect host" dialog for the URL + token (stored in this
+browser). `CORS_ORIGIN` must include the IDE's origin whenever the host is
+reached from a non-loopback page. Browsers also block an `https://` IDE from
+calling an `http://` host, so put the host behind TLS for remote use.
+
+Prefer the dialog for anything beyond loopback: `VITE_*` values are baked into
+the public browser bundle, so **never set `VITE_ZUT_HOST_TOKEN` for an exposed
+host** — that publishes the token to every visitor. `VITE_ZUT_HOST_URL` alone is
+fine when the token is entered per browser. `ZUT_TERMINAL_JAIL=1` (hosted
+default) pins the shell to the workspace with a minimal env; self-hosted
+full-shell mode is the default on loopback. The host token is a shared secret,
+not a user identity — run one host per person/workspace.
 
 ## Production build
 
@@ -98,8 +143,10 @@ Setup (one SQL run, no CLI):
 | Keys | Action |
 | --- | --- |
 | `Ctrl/⌘ + Enter` | Run (preview for web, execute for Python/Go) |
-| `Ctrl/⌘ + S` | Save (device, or cloud when signed in) |
+| `Ctrl/⌘ + S` | Save (device, cloud, local folder, or host) |
+| `Ctrl/⌘ + O` | Open a local folder (Chromium browsers) |
 | `Ctrl/⌘ + K` | Toggle AI assistant (optional) |
+| `F9` | Toggle a breakpoint on the current line (with a connected host) |
 
 ## Optional: run broker (runs + terminal + preview off-device)
 
@@ -146,7 +193,7 @@ runs still need the separate broker (`npm run broker`, `VITE_BROKER_URL`). See
    ```
 
 4. Optionally disable sign-ups in **Authentication → Providers → Email → "Allow new users to sign up"**
-   if you want to hand-pick student accounts.
+   if you want to hand-pick accounts.
 
 How saving works:
 
@@ -155,50 +202,34 @@ How saving works:
 - **Share** on a cloud project generates a read-only link `…#/p/<token>`. Viewers open a sandboxed,
   read-only copy — they can't edit or see your account.
 
-## Optional: deploy the backend (GitHub push, Vercel deploy, AI assistant)
+## Optional: Vercel deploy (Supabase Edge Function)
 
-These features run through Supabase Edge Functions. OAuth tokens and your Anthropic API key live on the
-server only; the browser never sees them.
+GitHub push and the AI assistant need no backend: the GitHub PAT and provider
+key are entered in the IDE and stored in this browser only. Vercel deploy is the
+one feature backed by a Supabase Edge Function — the function verifies the
+signed-in user's JWT and stores the Vercel token in `zut_connections`.
 
-1. Make sure Supabase is configured (previous section) and `supabase` CLI is installed
-   (`npm i -g supabase`).
-2. Sign in and link the project:
-   `supabase login` then `supabase link --project-ref YOUR_REF`.
-3. Create an OAuth app in the provider dashboard so users can "Connect" their account:
-
-   - **GitHub**: github.com → Settings → Developer settings → OAuth Apps → *New OAuth App*.
-     Set the callback URL to
-     `https://YOUR_REF.functions.supabase.co/oauth-github-callback`.
-     You may prefer *Classic* OAuth (the `repo` scope creates and writes repos).
-   - **Vercel**: vercel.com → Account → Settings → *OAuth Apps*. Set the callback URL to
-     `https://YOUR_REF.functions.supabase.co/oauth-vercel-callback`, and enable scopes for
-     deployments + project write.
-4. Deploy the functions:
+1. Configure Supabase (previous section) and apply `supabase/schema_zut.sql`,
+   which creates `zut_connections`.
+2. Install and link the CLI:
+   `npm i -g supabase`, then `supabase login` and
+   `supabase link --project-ref YOUR_REF`.
+3. Deploy just the deploy function:
 
    ```bash
-   supabase functions deploy --project-ref YOUR_REF
-   supabase functions deploy connections oauth-github-start oauth-github-callback \
-     oauth-vercel-start oauth-vercel-callback github-push vercel-deploy claude \
-     --project-ref YOUR_REF
+   supabase functions deploy vercel-deploy --project-ref YOUR_REF
    ```
 
-5. Set the secrets (function env vars):
+4. No extra secrets are needed: Supabase provides `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the function. Paste a
+   Vercel token in **Deploy → Vercel**; it is validated, stored server-side, and
+   reused for later deploys.
+5. The app finds the function from `VITE_SUPABASE_URL`. Reload, sign in, and
+   open **Deploy → Vercel**.
 
-   ```bash
-   supabase secrets set --project-ref YOUR_REF \
-     GITHUB_CLIENT_ID=... \
-     GITHUB_CLIENT_SECRET=... \
-     VERCEL_CLIENT_ID=... \
-     VERCEL_CLIENT_SECRET=... \
-     OAUTH_STATE_SECRET=$(openssl rand -hex 32) \
-     ANTHROPIC_API_KEY=...
-   ```
-
-   Optional extras: `GITHUB_OAUTH_SCOPES` (default `repo`), `VERCEL_OAUTH_SCOPES`,
-   `ANTHROPIC_MODEL` (default `claude-sonnet-4-5`), `ANTHROPIC_MAX_TOKENS`.
-
-6. The app finds the functions automatically from `VITE_SUPABASE_URL`. Reload the IDE, sign in,
-   open **Deploy** (GitHub / Vercel) or **✨ AI**.
+The other functions in `supabase/functions` (`oauth-*`, `github-push`,
+`connections`, `claude`) are legacy: the current client does not call them and
+they can be left undeployed.
 
 ## How running code works
 
@@ -278,12 +309,11 @@ signed-in user's token, which the broker verifies.
 - External imports (`import x from 'https://...'`) are allowed but subject to the CDN's CORS.
 - A project is single-user; no real-time collaboration (yet).
 - Monaco is bundled locally (no CDN at runtime), so the first load is a bit heavier but works offline.
-- **Deploy** uses Netlify's public create-a-site API (no account needed). Sites are public and use a
-  random subdomain; it's a great "check out my project" link but not for hosting real apps long-term.
-- **GitHub / Vercel** links require the Edge Functions above. Vercel deploys are inlined static builds
-  (or `npm run build` when a `package.json` with a build script / Vite is present); for heavy apps
-  prefer linking the pushed GitHub repo inside Vercel instead. OAuth uses a popup — allow popups for
-  the site.
+- **Deploy → Vercel** uses the `vercel-deploy` Edge Function above and requires sign-in. Deploys are
+  inlined static builds (or `npm run build` when a `package.json` with a build script / Vite is
+  present); for heavy apps prefer linking the pushed GitHub repo inside Vercel instead.
+- **GitHub push** uses a PAT entered in the IDE (stored in this browser) and updates the selected
+  branch. It never deletes remote files that are absent locally; remove them on GitHub if needed.
 - **AI** is optional and works two ways: bring your own key (OpenRouter/Anthropic/OpenAI/Gemini, stored in this
   browser, billed by that provider) or sign in to use the zut cloud proxy. The self-hosted agent
   option runs opencode on a server. Coding, running, and deploying all work with no AI.
@@ -310,30 +340,39 @@ src/
   components/CodeLine.tsx + SplitDiffViewer.tsx # unified + side-by-side diff rows
   components/*Modal.tsx  # CommandPalette, NewAgent, VideoPreview, PR, PRReviewStudio,
                          # VercelDeploy, History, Share, GitHubPush, Import,
-                         # LoginAndAccount, Rules
+                         # LoginAndAccount, Rules, Host, HostGit
+  components/DebugPanel.tsx # call stack / scopes / breakpoints for the host debugger
   adapters/              # UI-facing backends: zut (broker + Supabase + drafts),
                          # preview (esbuild bundle), filemap, aiEdits, gemini,
-                         # providers, github, mudauth, importer, opencode
-  lib/                   # app model + broker URL + connectors/secrets/terminal
+                         # providers, github, githubRepo (repo import),
+                         # localRepo (File System Access), mudauth, importer,
+                         # opencode
+  lib/                   # app model + broker URL + host client + debug client +
+                         # connectors/secrets/terminal
   hooks/                 # waitlist gate, remote shell, wallpaper, pane widths
 broker/
   server.mjs             # thin broker (npm run broker): BaaS routes + run/terminal/preview
   cells.mjs              # ONLY file that speaks Cells (env-driven, VERIFY markers)
   lib.mjs                # pure guards (segments, paths, hash diff, batching)
   README.md              # env table, curl smoke, go-live checklist
+host/                    # zut host (npm run host): workspace files, git, pty, debugger
+  server.mjs             # HTTP + WebSocket entry (selfhost/hosted modes)
+  files.mjs              # bounded text read/write + change stamp, symlink-safe
+  git.mjs                # allow-listed git argv (status/diff/log/commit/checkout)
+  debug.mjs              # Node inspector (CDP) bridge for the Debug drawer
+  lib.mjs                # pure path/ignore/git-status helpers
 runtime/server.mjs       # self-hostable compute service (/build + /run, native esbuild + python3/go)
 cloud/server.mjs         # zut-cloud: builds + runs + headless agent turns
 scripts/file-bridge.mjs  # syncs the project to disk for the opencode agent
 landing/               # static marketing site (Cursor-style, light/dark, waitlist
                        # forms, product screenshots); deploys to Vercel with no build
-supabase/schema.sql      # tables + RLS + share RPCs + OAuth connections
+supabase/schema.sql      # tables + RLS + share RPCs
+supabase/schema_zut.sql  # zut tables + RLS + zut_connections (Vercel token)
 supabase/waitlist.sql    # waitlist table + insert-only RLS + Sendliberty welcome trigger
 supabase/functions/
-  _shared/               # auth, OAuth state, GitHub, Vercel helpers
-  oauth-github-start, oauth-github-callback
-  oauth-vercel-start, oauth-vercel-callback
-  github-push            # create repo + push files (Git Data API)
-  vercel-deploy          # create deployment from project files
+  _shared/               # auth, GitHub, Vercel helpers
+  vercel-deploy          # create deployment from project files (the only one used)
+  oauth-*, github-push, connections, claude  # legacy, not called by the client
   claude                 # Anthropic proxy (server-side key, streaming)
   connections            # list / disconnect linked accounts
 ```

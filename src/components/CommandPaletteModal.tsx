@@ -42,6 +42,7 @@ interface CommandPaletteModalProps {
   onShare?: () => void;
   onImportUrl?: () => void;
   onPushGithub?: () => void;
+  onOpenHostGit?: () => void;
   theme?: 'light' | 'dark';
   sessions?: Array<{ id: string; title: string }>;
   /** P2 global search: workspace files (name + content). */
@@ -65,6 +66,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onShare,
   onImportUrl,
   onPushGithub,
+  onOpenHostGit,
   theme = 'light',
   sessions,
   workspaceFiles,
@@ -182,6 +184,16 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       icon: <Globe size={14} className="text-emerald-500" />,
       action: () => {
         if (onImportUrl) onImportUrl();
+        onClose();
+      },
+    },
+    {
+      id: 'host-git',
+      title: 'Host git: status, commit, branches',
+      category: 'Source Control',
+      icon: <GitCommit size={14} className="text-emerald-500" />,
+      action: () => {
+        if (onOpenHostGit) onOpenHostGit();
         onClose();
       },
     },

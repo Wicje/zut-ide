@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Editor, { type OnMount } from '@monaco-editor/react';
+import Editor, { type OnMount, type Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import {
   Upload,
@@ -53,6 +53,9 @@ interface CodeEditorPaneProps {
   /** Save location + last build time for the status bar. */
   saveState?: string | null;
   buildMs?: number | null;
+  /** Node debugger breakpoints (file path + 1-based line). */
+  breakpoints?: Array<{ path: string; line: number }>;
+  onToggleBreakpoint?: (path: string, line: number) => void;
   theme?: 'light' | 'dark';
 }
 
@@ -73,6 +76,8 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
   onRenameFile,
   onDeleteFile,
   onDuplicateFile,
+  breakpoints,
+  onToggleBreakpoint,
   theme = 'light',
 }) => {
   const uploadRef = useRef<HTMLInputElement | null>(null);
@@ -102,6 +107,13 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
 
   const activeFile = files.find((f) => f.id === activeFileId) || files[0];
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
+  const decorationsRef = useRef<string[]>([]);
+  const [editorReady, setEditorReady] = useState(false);
+  const activeFileRef = useRef<string>('');
+  activeFileRef.current = activeFile?.id ?? '';
+  const toggleBreakpointRef = useRef(onToggleBreakpoint);
+  toggleBreakpointRef.current = onToggleBreakpoint;
 
   // Keyboard shortcut inside editor (⌘K toggles the inline prompt).
   // NOTE: hooks must stay above the empty-state early return — same order every render.
@@ -116,6 +128,27 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Paint breakpoints for the active file.
+  useEffect(() => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!ed || !monaco || !editorReady) return;
+    const path = activeFile?.id;
+    const decorations = (breakpoints ?? [])
+      .filter((b) => b.path === path)
+      .map((b) => ({
+        range: new monaco.Range(b.line, 1, b.line, 1),
+        options: {
+          glyphMarginClassName: 'zut-breakpoint',
+          stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+        },
+      }));
+    decorationsRef.current = ed.deltaDecorations(decorationsRef.current, decorations);
+    return () => {
+      decorationsRef.current = ed.deltaDecorations(decorationsRef.current, []);
+    };
+  }, [breakpoints, activeFile?.id, editorReady]);
 
   if (!activeFile) {
     return (
@@ -166,10 +199,24 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
     );
   }
 
-  const handleMount: OnMount = (editor) => {
+  const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+    setEditorReady(true);
     editor.onDidChangeCursorPosition((e) => {
       setCursor({ line: e.position.lineNumber, col: e.position.column });
+    });
+    // Click the glyph margin (left of the line numbers) to toggle a breakpoint.
+    editor.onMouseDown((e) => {
+      if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+      const line = e.target.position?.lineNumber;
+      const path = activeFileRef.current;
+      if (line && path) toggleBreakpointRef.current?.(path, line);
+    });
+    editor.addCommand(monaco.KeyCode.F9, () => {
+      const path = activeFileRef.current;
+      const line = editor.getPosition()?.lineNumber;
+      if (path && line) toggleBreakpointRef.current?.(path, line);
     });
   };
 
@@ -584,6 +631,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                   options={{
                     fontSize: 12,
                     lineHeight: 20,
+                    glyphMargin: true,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
                     minimap: { enabled: true },
                     wordWrap: 'on',

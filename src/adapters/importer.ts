@@ -1,6 +1,7 @@
-// Import a project from a URL: raw file, GitHub blob/raw, CodePen, or page.
-// Merges into the workspace (caller checkpoints first).
+// Import a project from a URL: GitHub repo, raw file, GitHub blob/raw,
+// CodePen, or page. Merges into the workspace (caller checkpoints first).
 import type { FileMap } from './filemap';
+import { importGithubRepo, parseRepoUrl } from './githubRepo';
 
 export interface ImportResult {
   name: string;
@@ -82,14 +83,22 @@ function extractHtmlProject(pageUrl: string, html: string): ImportResult {
   return { name: 'imported-page', files };
 }
 
-export async function importFromUrl(url: string): Promise<ImportResult> {
+export async function importFromUrl(
+  url: string,
+  opts: { githubToken?: string | null } = {},
+): Promise<ImportResult> {
   const clean = url.trim();
-  if (!/^https?:\/\//i.test(clean)) throw new Error('Enter a full http(s) URL.');
   if (/codepen\.io\/[^/]+\/(?:pen|full|details)\//.test(clean)) return importCodePen(clean);
   if (/raw\.githubusercontent\.com\//.test(clean)) return importRawFile(clean);
   if (/github\.com\/[^/]+\/[^/]+\/blob\//.test(clean)) {
     return importRawFile(clean.replace('github.com/', 'raw.githubusercontent.com/').replace('/blob/', '/'));
   }
+  // Repo root or /tree/<ref>: import every file, not one raw blob.
+  if (parseRepoUrl(clean)) {
+    const repo = await importGithubRepo(clean, opts.githubToken ?? null);
+    return { name: repo.name, files: repo.files };
+  }
+  if (!/^https?:\/\//i.test(clean)) throw new Error('Enter a full http(s) URL or a GitHub owner/repo.');
 
   let res: Response;
   try {

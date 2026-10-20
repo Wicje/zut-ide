@@ -46,6 +46,15 @@ interface DiffReviewPaneProps {
     eventLogs?: string[];
     completions?: string[];
     remoteLine?: string | null;
+    host?: import('../lib/host').HostConfig | null;
+    onConnectHost?: () => void;
+    debug?: {
+      host: import('../lib/host').HostConfig | null;
+      files: string[];
+      activeFilePath: string;
+      breakpoints: import('../lib/debugClient').DebugBreakpoint[];
+      onOpenFile?: (path: string) => void;
+    };
   };
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
@@ -575,6 +584,9 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
         eventLogs={terminal?.eventLogs}
         completions={terminal?.completions}
         remoteLine={terminal?.remoteLine}
+        host={terminal?.host}
+        onConnectHost={terminal?.onConnectHost}
+        debug={terminal?.debug}
       />
     </div>
   );

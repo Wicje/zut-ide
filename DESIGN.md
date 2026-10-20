@@ -101,15 +101,31 @@ red = primary action (and error states). Do not add new accent hues without upda
 - **New Agent:** one submit = fresh instance (starter files, cleared sessions /
   runs / console, detached cloud link), pre-wipe snapshot kept in History.
   Never silent destructive actions: every reset announces via toast.
-- **Save model:** autosave to device draft (localStorage); cloud project when
-  signed in. Editor status bar names it (`Saved · cloud/device`). ZIP only on
-  explicit click; History snapshots are the safety net.
-- **Deploy:** Vercel flow modal (build logs → live URL → push-to-GitHub),
-  Netlify one-click (`deployStatic`), GitHub push modal (token, private toggle).
+- **Save model:** autosave to the active source — device draft (localStorage),
+  a local folder (File System Access), a `zut host` workspace, or a cloud
+  project. Editor status bar names it (`Saved · cloud/device/disk/host`).
+  History snapshots are the safety net.
+- **Real files:** "Open folder" (Chromium) and "Open host" (any browser) are
+  read/write from day one. External edits reload (local and host); rename/delete
+  announce and confirm. `.env*` and generated folders stay out of drafts and AI
+  context; lockfiles are synced.
+- **Host:** one `zut host` process serves text workspace sync, allow-listed git
+  argv, a full-shell pty, and a Node CDP debugger. Selfhost defaults to a full
+  shell on loopback; hosted/jailed mode pins cwd and strips the env. The token is
+  a shared secret, not a user identity: one host per person/workspace, and never
+  bake it into a public `VITE_*` value.
+- **Debug:** Monaco glyph-margin breakpoints (F9 too), Debug tab with
+  continue/step, call stack, scopes, evaluate, and stdout/stderr. One Node
+  session per host; no client-side fake state.
+- **Deploy:** Vercel flow modal (build logs → live URL → push-to-GitHub) backed
+  by the `vercel-deploy` Edge Function, plus a direct GitHub push modal (token,
+  private toggle). Export is the workspace itself (local folder or host).
 - **Palette:** `Cmd/Ctrl+K` fuzzy commands (sessions, theme, panes, terminal,
   PR, deploy, account, history, share, import). Pointer cursor, muted icons.
 - **Console:** preview drawer streams console/errors; terminal drawer has
-  benchmarks / terminal / logs tabs. Level = dot + label + message.
+  benchmarks / terminal / debug / logs tabs. Without a host the terminal is an
+  honest command surface (`run`, `ls`, `cat`, …), never a fake shell. Level =
+  dot + label + message.
 - **Preview:** sandboxed iframe (`allow-scripts`, no `same-origin`), desktop /
   tablet / mobile widths, console drawer, inspect sends the element to Composer.
   Remote broker URL renders when the broker exposes one.

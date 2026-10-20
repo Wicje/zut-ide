@@ -17,6 +17,8 @@ import { HistoryModal } from './components/HistoryModal';
 import { ShareModal } from './components/ShareModal';
 import { GitHubPushModal } from './components/GitHubPushModal';
 import { ImportModal } from './components/ImportModal';
+import { HostModal } from './components/HostModal';
+import { HostGitModal } from './components/HostGitModal';
 import { LoginAndAccountModal } from './components/LoginAndAccountModal';
 import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
@@ -46,9 +48,11 @@ import {
   ensurePermission,
   hasPermission,
   readLocalTree,
+  readLocalStamp,
   syncLocalTree,
   saveLocalTree,
   deleteLocalFile,
+  diffFileMaps,
   rememberRepo,
   recallRepo,
   forgetRepo,
@@ -101,6 +105,13 @@ import {
 } from './lib/appModel';
 import { getProviderKey, setProviderKey, clearProviderKey, getVercelToken, setVercelToken, clearVercelToken, type DirectProvider } from './adapters/providers';
 import { getConnectorKey } from './lib/connectors';
+import {
+  getHostConfig,
+  hostWorkspaceStamp,
+  pullHostWorkspace,
+  pushHostWorkspace,
+  type HostConfig,
+} from './lib/host';
 import lightWallpaperImg from './assets/images/macos_mountain_wallpaper_1791421916911.jpg';
 import darkWallpaperImg from './assets/images/macos_dark_wallpaper_1791422419326.jpg';
 import {
@@ -118,6 +129,26 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 
+// Which workspace was open last, so a reload can reconnect it without
+// silently moving files between disk/host/device.
+const SOURCE_KEY = 'zut:workspace-source';
+
+function rememberSource(kind: WorkspaceSourceKind): void {
+  try {
+    localStorage.setItem(SOURCE_KEY, kind);
+  } catch {
+    /* private mode */
+  }
+}
+
+function savedSource(): string | null {
+  try {
+    return localStorage.getItem(SOURCE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>('light');
   // Join-first: /app is gated until the landing waitlist flag exists.
@@ -125,6 +156,11 @@ export default function App() {
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('diff');
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified');
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  // A `zut host` gives the terminal a real pty and (later) git/workspace.
+  const [hostConfig, setHostConfig] = useState<HostConfig | null>(() => getHostConfig());
+  const [isHostModalOpen, setIsHostModalOpen] = useState(false);
+  const [isHostGitModalOpen, setIsHostGitModalOpen] = useState(false);
+  const [breakpoints, setBreakpoints] = useState<Array<{ path: string; line: number }>>([]);
   // Honest remote-shell line for the terminal tab (probed on open, never faked).
   const remoteLine = useRemoteShell(isTerminalOpen);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -155,7 +191,7 @@ export default function App() {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [geminiKeySet, setGeminiKeySet] = useState(() => getGeminiKey() !== null);
-  const [netlifyKeySet, setNetlifyKeySet] = useState(() => getVercelToken() !== null);
+  const [deployKeySet, setDeployKeySet] = useState(() => getVercelToken() !== null);
   const [providerKeySet, setProviderKeySet] = useState<Record<string, boolean>>(() => ({
     openrouter: getProviderKey('openrouter') !== null,
     anthropic: getProviderKey('anthropic') !== null,
@@ -214,13 +250,20 @@ export default function App() {
   const localRepoRef = useRef<LocalRepo | null>(null);
   // What we last wrote to disk; the sync effect diffs against this.
   const localBaselineRef = useRef<FileMap>({});
+  // Cheap directory fingerprint for external-change detection.
+  const localStampRef = useRef('');
+  // Host workspace (zut host): what we last pushed, an in-flight guard, and a
+  // directory fingerprint so external edits can reload without fighting saves.
+  const hostBaselineRef = useRef<FileMap>({});
+  const hostSyncingRef = useRef(false);
+  const hostStampRef = useRef('');
 
   const [workspaceSource, setWorkspaceSource] = useState<WorkspaceSourceKind>('device');
 
   useEffect(() => {
-    // A local repo is the source of truth; never duplicate its files (which
-    // may include .env secrets) into the device draft.
-    if (workspaceSource === 'local') return;
+    // A local folder or host workspace is the source of truth; never duplicate
+    // its files (which may include .env secrets) into the device draft.
+    if (workspaceSource === 'local' || workspaceSource === 'host') return;
     saveDraft(projectName, files);
   }, [projectName, files, workspaceSource]);
 
@@ -352,7 +395,7 @@ export default function App() {
       cancelled = true;
     };
   }, [projectId]);
-  const [savedTo, setSavedTo] = useState<'device' | 'cloud'>('device');
+  const [savedTo, setSavedTo] = useState<'device' | 'local' | 'host' | 'cloud'>('device');
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -398,11 +441,13 @@ export default function App() {
     takeSnapshot(filesRef.current);
     localRepoRef.current = repo;
     localBaselineRef.current = { ...tree.files };
+    localStampRef.current = await readLocalStamp(repo.root);
     setFiles({ ...tree.files });
     setProjectName(repo.name);
     setProjectId(null);
     setShareLink(null);
     setWorkspaceSource('local');
+    rememberSource('local');
     setSavedTo('local');
     setActiveFilePath((prev) =>
       prev && tree.files[prev] !== undefined ? prev : Object.keys(tree.files).sort()[0] ?? 'index.html',
@@ -434,7 +479,9 @@ export default function App() {
   function closeLocalRepo(): void {
     localRepoRef.current = null;
     localBaselineRef.current = {};
+    localStampRef.current = '';
     setWorkspaceSource('device');
+    rememberSource('device');
     setSavedTo('device');
     void forgetRepo();
     showToast('Closed the folder — this workspace is back on this device.');
@@ -452,10 +499,100 @@ export default function App() {
     }
   }
 
+  // ---- Host workspace (`zut host`) ----
+  async function flushHost(show = false): Promise<void> {
+    if (!hostConfig || workspaceSource !== 'host' || hostSyncingRef.current) return;
+    hostSyncingRef.current = true;
+    let written = 0;
+    let removed = 0;
+    try {
+      for (;;) {
+        const next = filesRef.current;
+        const diff = diffFileMaps(hostBaselineRef.current, next);
+        const changed = { ...diff.created, ...diff.updated };
+        const hasChanges = Object.keys(changed).length > 0 || diff.deleted.length > 0;
+        if (hasChanges) {
+          const r = await pushHostWorkspace(hostConfig, changed, diff.deleted);
+          written += r.written;
+          removed += r.removed;
+          hostBaselineRef.current = { ...next };
+          if (r.stamp) hostStampRef.current = r.stamp;
+        }
+        if (filesRef.current === next) break;
+      }
+      setSavedTo('host');
+      if (show) showToast(`Saved to host${written ? ` (${written} file${written === 1 ? '' : 's'})` : ''}.`);
+      if (written || removed) logEvent('HOST', `${written} written, ${removed} removed`);
+    } catch (e) {
+      showToast(`Host save failed: ${(e as Error).message}`);
+    } finally {
+      hostSyncingRef.current = false;
+    }
+  }
+
+  async function openHostWorkspace(quiet = false): Promise<void> {
+    if (!hostConfig) {
+      if (!quiet) setIsHostModalOpen(true);
+      return;
+    }
+    try {
+      const space = await pullHostWorkspace(hostConfig);
+      hostStampRef.current = space.stamp;
+      const count = Object.keys(space.files).length;
+      if (quiet && count === 0) return;
+      takeSnapshot(filesRef.current);
+      localRepoRef.current = null;
+      localBaselineRef.current = {};
+      localStampRef.current = '';
+      void forgetRepo();
+      if (count > 0) {
+        setFiles({ ...space.files });
+        hostBaselineRef.current = { ...space.files };
+        setActiveFilePath((prev) =>
+          prev && space.files[prev] !== undefined ? prev : Object.keys(space.files).sort()[0] ?? 'index.html',
+        );
+      } else {
+        // Empty host: keep what's here and let autosave provision it.
+        hostBaselineRef.current = {};
+      }
+      let label = 'host';
+      try {
+        label = new URL(hostConfig.url).host;
+      } catch {
+        /* keep default */
+      }
+      setProjectName(label);
+      setProjectId(null);
+      setShareLink(null);
+      setWorkspaceSource('host');
+      rememberSource('host');
+      setSavedTo('host');
+      logEvent('HOST', `${hostConfig.url} (${count} files)`);
+      if (!quiet) {
+        showToast(
+          count > 0
+            ? `Opened host workspace — ${count} files${space.skipped.length ? `, ${space.skipped.length} skipped` : ''}.`
+            : 'Host workspace is empty — this project will sync on the next edit.',
+        );
+      }
+    } catch (e) {
+      showToast(`Could not open host workspace: ${(e as Error).message}`);
+    }
+  }
+
+  // Debounced push to the host workspace (text files only).
+  useEffect(() => {
+    if (workspaceSource !== 'host' || !hostConfig) return;
+    const timer = setTimeout(() => void flushHost(), 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files, workspaceSource, hostConfig]);
+
   // Reconnect the last folder on reload, but only when permission is already
   // granted — never open a permission prompt without a user gesture.
   useEffect(() => {
     if (!isLocalRepoSupported()) return;
+    if (savedSource() === 'host') return; // the host workspace wins on reload
     let cancelled = false;
     void (async () => {
       const handle = await recallRepo();
@@ -474,15 +611,57 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reconnect the host workspace on reload, but only when it actually has
+  // files — never push a device draft into an empty host by accident.
+  useEffect(() => {
+    if (savedSource() !== 'host' || !hostConfig) return;
+    void openHostWorkspace(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Watch the host for edits made outside the IDE (git pull, another editor).
+  // Only reload when this workspace has no pending local writes.
+  useEffect(() => {
+    if (workspaceSource !== 'host' || !hostConfig) return;
+    let busy = false;
+    const timer = setInterval(() => {
+      if (busy || hostSyncingRef.current) return;
+      busy = true;
+      void (async () => {
+        try {
+          const stamp = await hostWorkspaceStamp(hostConfig);
+          if (stamp === hostStampRef.current) return;
+          if (JSON.stringify(filesRef.current) !== JSON.stringify(hostBaselineRef.current)) return;
+          const space = await pullHostWorkspace(hostConfig);
+          takeSnapshot(filesRef.current);
+          hostBaselineRef.current = { ...space.files };
+          hostStampRef.current = space.stamp || stamp;
+          setFiles({ ...space.files });
+          setActiveFilePath((prev) =>
+            prev && space.files[prev] !== undefined ? prev : Object.keys(space.files).sort()[0] ?? 'index.html',
+          );
+          showToast('Reloaded changes from the host.');
+        } catch {
+          /* host asleep or transient network error */
+        } finally {
+          busy = false;
+        }
+      })();
+    }, 3000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceSource, hostConfig]);
+
   // Debounced write-back for an open local repo. Deletes are explicit only.
   useEffect(() => {
     const repo = localRepoRef.current;
     if (workspaceSource !== 'local' || !repo) return;
     const timer = setTimeout(() => {
       void syncLocalTree(repo.root, localBaselineRef.current, filesRef.current)
-        .then(({ written }) => {
+        .then(async ({ written }) => {
           if (written > 0) {
             localBaselineRef.current = { ...filesRef.current };
+            localStampRef.current = await readLocalStamp(repo.root).catch(() => '');
             setSavedTo('local');
           }
         })
@@ -490,6 +669,42 @@ export default function App() {
     }, 700);
     return () => clearTimeout(timer);
   }, [files, workspaceSource]);
+
+  // Watch the folder for external edits. We only reload when there are no
+  // pending local writes, so autosave never fights the filesystem.
+  useEffect(() => {
+    if (workspaceSource !== 'local') return;
+    const repo = localRepoRef.current;
+    if (!repo) return;
+    let busy = false;
+    const timer = setInterval(() => {
+      if (busy) return;
+      busy = true;
+      void (async () => {
+        try {
+          const stamp = await readLocalStamp(repo.root);
+          if (stamp === localStampRef.current) return;
+          const local = JSON.stringify(filesRef.current);
+          const base = JSON.stringify(localBaselineRef.current);
+          if (local !== base) return; // local edits still syncing; retry next tick
+          const tree = await readLocalTree(repo.root);
+          takeSnapshot(filesRef.current);
+          localBaselineRef.current = { ...tree.files };
+          localStampRef.current = stamp;
+          setFiles({ ...tree.files });
+          setActiveFilePath((prev) =>
+            prev && tree.files[prev] !== undefined ? prev : Object.keys(tree.files).sort()[0] ?? 'index.html',
+          );
+          showToast('Reloaded changes from disk.');
+        } catch {
+          /* permission revoked or transient read error */
+        } finally {
+          busy = false;
+        }
+      })();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [workspaceSource]);
 
   // Preview console harness -> console drawer lines.
   useEffect(() => {
@@ -908,6 +1123,10 @@ export default function App() {
         e.preventDefault();
         startNewProject();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        if (isLocalRepoSupported()) void openLocalRepo();
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         setDiffViewMode((prev) => (prev === 'unified' ? 'split' : 'unified'));
@@ -1015,6 +1234,27 @@ export default function App() {
   };
 
   const handleReset = () => {
+    if (workspaceSource === 'host' && hostConfig) {
+      void openHostWorkspace();
+      return;
+    }
+    const repo = localRepoRef.current;
+    if (workspaceSource === 'local' && repo) {
+      void readLocalTree(repo.root)
+        .then((tree) => {
+          takeSnapshot(filesRef.current);
+          setFiles({ ...tree.files });
+          localBaselineRef.current = { ...tree.files };
+          localStampRef.current = '';
+          void readLocalStamp(repo.root).then((s) => {
+            localStampRef.current = s;
+          });
+          setProjectName(repo.name);
+          showToast(`Reloaded ${repo.name} from disk (${Object.keys(tree.files).length} files).`);
+        })
+        .catch((e: unknown) => showToast(`Reload failed: ${(e as Error).message}`));
+      return;
+    }
     if (user && brokerEnabled()) {
       listProjects()
         .then((rows) => {
@@ -1092,6 +1332,15 @@ export default function App() {
   // sidebar, outgoing files were snapshotted, model carries over.
   function startNewProject() {
     takeSnapshot(filesRef.current);
+    // Detach any open folder: a new project must never write into the old repo.
+    localRepoRef.current = null;
+    localBaselineRef.current = {};
+    localStampRef.current = '';
+    hostBaselineRef.current = {};
+    hostStampRef.current = '';
+    void forgetRepo();
+    setWorkspaceSource('device');
+    rememberSource('device');
     const fresh = { ...STARTER };
     const newId = `session-${Date.now()}`;
     const newSession = blankSession(newId, 'New project', activeSession?.model ?? 'Gemini 2.5 Flash');
@@ -1120,7 +1369,7 @@ export default function App() {
 
   async function handleImport(url: string): Promise<{ name: string; files: number }> {
     const { importFromUrl } = await import('./adapters/importer');
-    const result = await importFromUrl(url);
+    const result = await importFromUrl(url, { githubToken: getConnectorKey('github') });
     takeSnapshot(filesRef.current);
     setFiles((prev) => ({ ...prev, ...result.files }));
     setProjectName(result.name);
@@ -1393,6 +1642,20 @@ export default function App() {
               }
             }}
             onNewAgent={startNewProject}
+            onOpenFolder={isLocalRepoSupported() ? () => void openLocalRepo() : undefined}
+            onCloneRepo={() => setShowImport(true)}
+            workspaceLabel={
+              workspaceSource === 'local'
+                ? projectName
+                : workspaceSource === 'host'
+                ? `host · ${projectName}`
+                : workspaceSource === 'cloud'
+                ? 'cloud'
+                : null
+            }
+            hostConnected={Boolean(hostConfig)}
+            onOpenHost={() => void openHostWorkspace()}
+            onOpenGit={() => setIsHostGitModalOpen(true)}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
             onOpenAccount={() => setIsLoginAccountOpen(true)}
             onOpenRules={() => setIsRulesModalOpen(true)}
@@ -1546,6 +1809,20 @@ export default function App() {
                 eventLogs: events,
                 completions: termCompletions,
                 remoteLine,
+                host: hostConfig,
+                onConnectHost: () => setIsHostModalOpen(true),
+                debug: {
+                  host: hostConfig,
+                  files: Object.keys(files),
+                  activeFilePath,
+                  breakpoints,
+                  onOpenFile: (path: string) => {
+                    if (files[path] === undefined) return;
+                    setActiveFilePath(path);
+                    setRightPaneMode('editor');
+                    if (isMobile) setMobileTab('code');
+                  },
+                },
               }}
             />
           )}
@@ -1569,7 +1846,24 @@ export default function App() {
                 void runAgentTurn(activeSessionId, `In ${fileId}: ${prompt}`);
               }}
               onUploadFiles={handleUploadFiles}
-              saveState={savedTo === 'cloud' ? 'Saved · cloud' : 'Saved · this device'}
+              breakpoints={breakpoints}
+              onToggleBreakpoint={(path, line) =>
+                setBreakpoints((prev) => {
+                  const exists = prev.some((b) => b.path === path && b.line === line);
+                  return exists
+                    ? prev.filter((b) => !(b.path === path && b.line === line))
+                    : [...prev, { path, line }];
+                })
+              }
+              saveState={
+                savedTo === 'cloud'
+                  ? 'Saved · cloud'
+                  : savedTo === 'local'
+                  ? 'Saved · disk'
+                  : savedTo === 'host'
+                  ? 'Saved · host'
+                  : 'Saved · this device'
+              }
               buildMs={buildMs}
               onSwitchToDiff={() => setRightPaneMode('diff')}
               onCreateFile={() => {
@@ -1631,6 +1925,8 @@ export default function App() {
                   delete next[oldId];
                   return next;
                 });
+                // The write-back creates the new path; remove the old one.
+                deleteFromDisk([oldId]);
                 if (activeFilePath === oldId) setActiveFilePath(clean);
                 showToast(`Renamed to ${clean.split('/').pop()}`);
               }}
@@ -1641,6 +1937,7 @@ export default function App() {
                   delete next[fileId];
                   return next;
                 });
+                deleteFromDisk([fileId]);
                 const rest = Object.keys(filesRef.current).filter((k) => k !== fileId).sort();
                 setActiveFilePath(rest[0] ?? 'index.html');
                 showToast(`Deleted ${fileId.split('/').pop()}`);
@@ -1917,15 +2214,15 @@ export default function App() {
           setProviderKeySet((prev) => ({ ...prev, [p]: false }));
           showToast('Provider key removed.');
         }}
-        deployKeySet={netlifyKeySet}
+        deployKeySet={deployKeySet}
         onSaveDeployKey={(key) => {
           setVercelToken(key);
-          setNetlifyKeySet(true);
+          setDeployKeySet(true);
           showToast('Vercel token saved in this browser.');
         }}
         onClearDeployKey={() => {
           clearVercelToken();
-          setNetlifyKeySet(false);
+          setDeployKeySet(false);
           showToast('Vercel token removed.');
         }}
         theme={theme}
@@ -1964,6 +2261,7 @@ export default function App() {
         onShare={() => setShowShare(true)}
         onImportUrl={() => setShowImport(true)}
         onPushGithub={() => setShowGithub(true)}
+        onOpenHostGit={() => setIsHostGitModalOpen(true)}
         workspaceFiles={files}
         onOpenFile={(p) => {
           setActiveFilePath(p);
@@ -2033,6 +2331,25 @@ export default function App() {
         theme={theme}
       />
 
+      <HostModal
+        isOpen={isHostModalOpen}
+        onClose={() => setIsHostModalOpen(false)}
+        onSaved={(config) => {
+          setHostConfig(config);
+          if (config) showToast('Host connected — open Terminal for a real shell.');
+          else showToast('Host disconnected.');
+        }}
+        theme={theme}
+      />
+
+      <HostGitModal
+        isOpen={isHostGitModalOpen}
+        onClose={() => setIsHostGitModalOpen(false)}
+        host={hostConfig}
+        onConnectHost={() => setIsHostModalOpen(true)}
+        theme={theme}
+      />
+
       {/* Join-first gate: blocks /app until waitlist join */}
       {!waitlistOk && (
         <WaitlistGate theme={theme} onJoined={() => setWaitlistOk(true)} />
@@ -2049,6 +2366,24 @@ export default function App() {
   );
 
   async function save(): Promise<void> {
+    if (workspaceSource === 'host' && hostConfig) {
+      await flushHost(true);
+      return;
+    }
+    const repo = localRepoRef.current;
+    if (workspaceSource === 'local' && repo) {
+      try {
+        const written = await saveLocalTree(repo.root, filesRef.current);
+        localBaselineRef.current = { ...filesRef.current };
+        localStampRef.current = await readLocalStamp(repo.root).catch(() => '');
+        setSavedTo('local');
+        logEvent('SAVE', `${repo.name} (${written} files on disk)`);
+        showToast(`Saved ${written} files to ${repo.name}.`);
+      } catch (e) {
+        showToast(`Save to disk failed: ${(e as Error).message}`);
+      }
+      return;
+    }
     if (!user || !brokerEnabled()) {
       saveDraft(projectName, filesRef.current);
       setSavedTo('device');

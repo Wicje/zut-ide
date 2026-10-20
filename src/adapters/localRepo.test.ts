@@ -14,10 +14,17 @@ describe('shouldIgnorePath', () => {
     expect(shouldIgnorePath('.venv/lib/python3.12/site.py')).toBe(true);
   });
 
+  it('skips env files', () => {
+    expect(shouldIgnorePath('.env')).toBe(true);
+    expect(shouldIgnorePath('.env.local')).toBe(true);
+    expect(shouldIgnorePath('config/.env.production')).toBe(true);
+    expect(shouldIgnorePath('.env.example')).toBe(true);
+  });
+
   it('keeps ordinary source paths', () => {
     expect(shouldIgnorePath('src/App.tsx')).toBe(false);
     expect(shouldIgnorePath('README.md')).toBe(false);
-    expect(shouldIgnorePath('.env')).toBe(false);
+    expect(shouldIgnorePath('src/environment.ts')).toBe(false);
     expect(shouldIgnorePath('src/node_modules-ish/file.ts')).toBe(false);
   });
 });

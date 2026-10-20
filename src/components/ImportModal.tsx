@@ -66,8 +66,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImp
 
         <div className="p-4 space-y-3 text-xs">
           <p className="text-neutral-500">
-            HTML page, CodePen pen, raw GitHub file, or JSON. Current work is checkpointed first;
-            imported files merge in.
+            GitHub repo, HTML page, CodePen pen, raw GitHub file, or JSON. Current work is
+            checkpointed first; imported files merge in.
           </p>
           {error && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-[11px] text-red-600 dark:text-red-400">
@@ -78,7 +78,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImp
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://…"
+              placeholder="https://github.com/owner/repo"
               inputMode="url"
               autoFocus
               className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent font-mono focus:outline-none focus:ring-1 focus:ring-red-500"

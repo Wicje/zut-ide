@@ -9,3 +9,5 @@ cloud/*.env
 *.log
 supabase/.temp/
 broker-data/
+test-results/
+playwright-report/

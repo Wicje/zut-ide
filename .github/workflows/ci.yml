@@ -39,6 +39,11 @@ jobs:
           node --check scripts/check-bundle.mjs
           node --check scripts/health-check.mjs
           node --check cloud/server.mjs
+          node --check host/server.mjs
+          node --check host/files.mjs
+          node --check host/git.mjs
+          node --check host/lib.mjs
+          node --check host/debug.mjs
 
       - name: UI contract (no deleted shadcn layer)
         run: |

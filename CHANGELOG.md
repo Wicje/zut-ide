@@ -5,6 +5,22 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Changed / Fixed (2026-10-20 — workspace safety)
+- Host workspace reloads external edits (3s stamp poll) without clobbering
+  pending local writes; local folder reloads snapshot first.
+- `git commit` in the host now stages only visible paths (`git add -A --`), so
+  `.env*`, `node_modules`, build output, and binaries can never be committed;
+  deletions of visible files still stage correctly.
+- Lockfiles now sync to host workspaces; `.env*` remains excluded from local
+  host sync, repo import, and AI context.
+- Fixed debug session ownership: a failed `start()` no longer wedges the host,
+  and closing one debug socket cannot stop another viewer's session.
+- Host `/health` hides the absolute workspace path unless the request is
+  authorized; remote hosts now explain `CORS_ORIGIN` errors.
+- GitHub repo import resolves `/tree/<ref>/<path>` URLs (tries long refs first,
+  then folder prefixes) and skips secrets.
+- Host URLs typed in the connect dialog are normalized before testing/saving.
+
 ### Added (2026-10-12 — landing relaunch + waitlist)
 - Landing relaunched dark Cursor-style ("Where sentences become software"):
   hero with overlapping product screenshots, alternating feature rows, wall of

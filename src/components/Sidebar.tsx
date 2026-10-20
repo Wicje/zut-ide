@@ -6,6 +6,9 @@ import {
   Search,
   PanelLeftClose,
   MoreHorizontal,
+  FolderOpen,
+  Download,
+  Server,
   FileText,
   LayoutTemplate,
   Bell,
@@ -24,6 +27,12 @@ interface SidebarProps {
   activeItem: string;
   onSelectItem: (id: string) => void;
   onNewAgent?: () => void;
+  onOpenFolder?: () => void;
+  onCloneRepo?: () => void;
+  onOpenHost?: () => void;
+  onOpenGit?: () => void;
+  hostConnected?: boolean;
+  workspaceLabel?: string | null;
   onOpenCommandPalette?: () => void;
   onOpenAccount?: () => void;
   onOpenRules?: () => void;
@@ -38,6 +47,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeItem,
   onSelectItem,
   onNewAgent,
+  onOpenFolder,
+  onCloneRepo,
+  onOpenHost,
+  onOpenGit,
+  hostConnected,
+  workspaceLabel,
   onOpenCommandPalette,
   onOpenAccount,
   onOpenRules,
@@ -124,6 +139,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-[11px] font-mono text-neutral-400">⌘N</span>
           </button>
 
+          {onOpenFolder && (
+            <button
+              onClick={onOpenFolder}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+                isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
+              }`}
+              title="Open a folder on this device (Chrome/Edge/ChromeOS)"
+            >
+              <div className="flex items-center gap-2">
+                <FolderOpen size={15} className="text-neutral-500" />
+                <span>Open folder</span>
+              </div>
+              <span className="text-[11px] font-mono text-neutral-400">⌘O</span>
+            </button>
+          )}
+
+          {onCloneRepo && (
+            <button
+              onClick={onCloneRepo}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+                isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
+              }`}
+              title="Import a GitHub repository"
+            >
+              <div className="flex items-center gap-2">
+                <Download size={15} className="text-neutral-500" />
+                <span>Import repo</span>
+              </div>
+            </button>
+          )}
+
+          {onOpenHost && (
+            <button
+              onClick={onOpenHost}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+                isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
+              }`}
+              title="Open the workspace on your zut host"
+            >
+              <div className="flex items-center gap-2">
+                <Server size={15} className={hostConnected ? 'text-emerald-500' : 'text-neutral-500'} />
+                <span>{hostConnected ? 'Open host' : 'Connect host'}</span>
+              </div>
+              {hostConnected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+            </button>
+          )}
+
+          {onOpenGit && (
+            <button
+              onClick={onOpenGit}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+                isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
+              }`}
+              title="Host git: status, diff, commit, branches"
+            >
+              <div className="flex items-center gap-2">
+                <GitBranch size={15} className="text-neutral-500" />
+                <span>Git</span>
+              </div>
+              <span className="text-[10px] text-neutral-400">{hostConnected ? 'host' : ''}</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenCommandPalette}
             className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
@@ -147,6 +225,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Customize</span>
           </button>
         </div>
+
+        {workspaceLabel && (
+          <div className="px-2.5 pb-1 text-[10.5px] text-neutral-400 truncate" title={`Workspace: ${workspaceLabel}`}>
+            Workspace · {workspaceLabel}
+          </div>
+        )}
 
         {/* Sections list */}
         <div className="px-2 space-y-3.5 overflow-y-auto flex-1 min-h-0 pb-4">

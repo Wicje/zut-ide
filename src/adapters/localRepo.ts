@@ -8,7 +8,7 @@
 // device draft / host workspace. Callers must check isLocalRepoSupported().
 import type { FileMap } from './filemap';
 
-export type WorkspaceSourceKind = 'device' | 'local' | 'cloud';
+export type WorkspaceSourceKind = 'device' | 'local' | 'cloud' | 'host';
 
 export interface LocalRepo {
   root: FileSystemDirectoryHandle;
@@ -103,7 +103,10 @@ export function isLocalRepoSupported(): boolean {
 /** Pure: true when any path segment is a heavy/generated directory. */
 export function shouldIgnorePath(path: string): boolean {
   const parts = path.split('/').filter(Boolean);
-  return parts.some((p) => IGNORED_DIRS.has(p));
+  if (parts.some((p) => IGNORED_DIRS.has(p))) return true;
+  // Secrets never enter a draft, the AI context, or any sync path.
+  const base = parts[parts.length - 1] ?? '';
+  return /^\.env(\.|$)/i.test(base);
 }
 
 /** Pure: obvious text/code extension, or a known extension-less text file. */
@@ -151,8 +154,10 @@ export async function hasPermission(
   mode: PermissionMode = 'readwrite',
 ): Promise<boolean> {
   const h = handle as FileSystemDirectoryHandle & PermissionCapable;
+  const query = h.queryPermission;
+  if (typeof query !== 'function') return false;
   try {
-    return Boolean(h.queryPermission) && (await h.queryPermission({ mode })) === 'granted';
+    return (await query.call(h, { mode })) === 'granted';
   } catch {
     return false;
   }
@@ -164,14 +169,16 @@ export async function ensurePermission(
   mode: PermissionMode = 'readwrite',
 ): Promise<boolean> {
   const h = handle as FileSystemDirectoryHandle & PermissionCapable;
+  const query = h.queryPermission;
+  const request = h.requestPermission;
   try {
-    if (h.queryPermission && (await h.queryPermission({ mode })) === 'granted') return true;
-    if (h.requestPermission && (await h.requestPermission({ mode })) === 'granted') return true;
+    if (typeof query === 'function' && (await query.call(h, { mode })) === 'granted') return true;
+    if (typeof request === 'function' && (await request.call(h, { mode })) === 'granted') return true;
   } catch {
     return false;
   }
   // Older implementations may not expose permission methods at all.
-  return !h.queryPermission && !h.requestPermission;
+  return typeof query !== 'function' && typeof request !== 'function';
 }
 
 /** Show the folder picker. Returns null when the user cancels. */
@@ -222,7 +229,7 @@ export async function readLocalTree(root: FileSystemDirectoryHandle): Promise<Lo
       }
       const path = prefix ? `${prefix}/${name}` : name;
       if (shouldIgnorePath(path)) continue;
-      if ((child as FileSystemFileHandle).kind === 'directory') {
+      if (child.kind === 'directory') {
         await walk(child as FileSystemDirectoryHandle, path);
         continue;
       }
@@ -250,6 +257,35 @@ export async function readLocalTree(root: FileSystemDirectoryHandle): Promise<Lo
 
   await walk(root, '');
   return { files, skipped, bytes };
+}
+
+/**
+ * Cheap fingerprint of the directory (path + size + mtime), used to detect
+ * external edits without re-reading every file's contents on each poll.
+ */
+export async function readLocalStamp(root: FileSystemDirectoryHandle): Promise<string> {
+  const rows: string[] = [];
+  async function walk(dir: FileSystemDirectoryHandle, prefix: string): Promise<void> {
+    for await (const [name, child] of (dir as unknown as {
+      entries(): AsyncIterableIterator<[string, FileSystemDirectoryHandle | FileSystemFileHandle]>;
+    }).entries()) {
+      const path = prefix ? `${prefix}/${name}` : name;
+      if (shouldIgnorePath(path)) continue;
+      if (child.kind === 'directory') {
+        await walk(child as FileSystemDirectoryHandle, path);
+        continue;
+      }
+      try {
+        const file = await (child as FileSystemFileHandle).getFile();
+        rows.push(`${path}:${file.size}:${file.lastModified}`);
+      } catch {
+        rows.push(`${path}:?:?`);
+      }
+    }
+  }
+  await walk(root, '');
+  rows.sort();
+  return rows.join('\n');
 }
 
 async function resolveParent(
