@@ -24,6 +24,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Typecheck the terminal client
+        run: |
+          npm --prefix terminal ci --no-audit --no-fund
+          npm --prefix terminal run typecheck
+          npm --prefix terminal run test
+        env:
+          # The patched Electron runtime is only needed to run the app, not to
+          # typecheck it — skip the ~280 MB download in CI.
+          PIXEL_SKIP_DOWNLOAD: "1"
+
       - name: Unit tests
         run: npm run test
 

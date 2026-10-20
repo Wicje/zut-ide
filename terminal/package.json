@@ -1,0 +1,33 @@
+{
+  "name": "zut-terminal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/main.js",
+  "bin": {
+    "zut-term": "bin/zut-term.mjs"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "start": "npm run build && pixel . --"
+  },
+  "dependencies": {
+    "@zenbu-labs/pixel": "^0.2.6",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.5.4",
+    "vitest": "^3.2.7"
+  },
+  "allowScripts": {
+    "@zenbu-labs/pixel@0.2.6": true,
+    "esbuild@0.28.2": true
+  },
+  "trustedDependencies": [
+    "@zenbu-labs/pixel"
+  ]
+}

@@ -5,6 +5,17 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-20 — the IDE in the terminal)
+- `zut-term`: the Zut IDE runs inside a terminal window, painting real pixels
+  over the kitty graphics protocol with
+  [`@zenbu-labs/pixel`](https://pixelgui.com).
+  The IDE itself is a WebView, so every pane, modal and editor is the real
+  app. New `terminal/` package (own install, so the root stays light) plus
+  `npm run term`, `npm run term:setup`, `npm run term:build`. The launcher
+  serves the production build (rebuilding when `dist/` is missing), can reuse
+  a server that is already up, and offers `--dev`, `--url`, `--port`,
+  `--rebuild`.
+
 ### Changed / Fixed (2026-10-20 — workspace safety)
 - Host workspace reloads external edits (3s stamp poll) without clobbering
   pending local writes; local folder reloads snapshot first.

@@ -69,6 +69,21 @@ npm run dev        # → http://localhost:5173
 The app runs fine with no configuration — try it before touching Supabase.
 "New project" → pick a template, edit, watch the preview, open the console.
 
+## The IDE in your terminal
+
+`zut-term` runs the same IDE inside a terminal window, painting real pixels
+over the kitty graphics protocol via
+[`@zenbu-labs/pixel`](https://pixelgui.com).
+It is the same app — every pane, modal and editor behaves identically.
+
+```bash
+npm run term:setup     # installs + builds the terminal client (one-off)
+npm run term           # launches
+```
+
+Needs kitty, ghostty, wezterm, foot, or tmux with graphics passthrough. See
+[`terminal/README.md`](terminal/README.md) for keys and options.
+
 ## Real workspace: local folder or host
 
 Two ways to work on real files, both read/write from day one:
@@ -350,6 +365,13 @@ src/
   lib/                   # app model + broker URL + host client + debug client +
                          # connectors/secrets/terminal
   hooks/                 # waitlist gate, remote shell, wallpaper, pane widths
+terminal/                # zut-term: the IDE in the terminal (pixel, own package)
+  bin/zut-term.mjs       # launcher entry → serves the app, execs pixel
+  src/options.ts         # argument parsing (pure)
+  src/server.ts          # app server lifecycle (vite preview / dev)
+  src/launcher.ts        # plain-node launcher
+  src/main.tsx           # pixel entry: root + global keys
+  src/ZutApp.tsx         # native status bar + the IDE as a WebView
 broker/
   server.mjs             # thin broker (npm run broker): BaaS routes + run/terminal/preview
   cells.mjs              # ONLY file that speaks Cells (env-driven, VERIFY markers)
