@@ -18,8 +18,14 @@
 ## Palette (light + dark, manual toggle)
 
 Theme lives in `App` state (`light | dark`), drilled as a `theme` prop into
-every pane and modal — each renders `isDark` ternaries. No Tailwind dark-mode
-config, no CSS variables file; tokens are inline.
+every pane and modal — each renders `isDark` ternaries. No CSS variables file;
+tokens are inline.
+
+`App` also writes `data-theme` on `<html>`, and `src/index.css` overrides the
+Tailwind `dark:` variant to key off that attribute
+(`@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *))`).
+Without this, `dark:` utilities follow `prefers-color-scheme` and the two
+theming mechanisms disagree. The OS setting never drives the theme.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
@@ -33,9 +39,32 @@ config, no CSS variables file; tokens are inline.
 | diff del | `bg-[#ffeef0]` / chip `bg-[#ffc0c7]` | `bg-[#3b1219]` / chip `bg-[#5c2024]` | removed lines |
 | primary | `bg-red-600 hover:bg-red-500` | same | Run, confirm, deploy |
 | pass/fail | emerald / red pills | same | checks, tests |
+| secondary control | `bg-[#f4f4f6] hover:bg-[#eaeaea]` | `bg-[#24242a] hover:bg-[#2c2c34]` | pills, chips, tabs |
 
 One accent per meaning. Emerald = go/success, amber = wait,
 red = primary action (and error states). Do not add new accent hues without updating this table.
+
+A color may not carry a meaning it does not own. A language badge, an empty
+state, or a neutral chip is not a success and is not an error — it gets a
+neutral surface, not a green or red one.
+
+## Controls
+
+- **Primary:** `bg-red-600 hover:bg-red-500 text-white`. No border — a border
+  the same color as the fill is invisible and shifts the box by 2px.
+- **Secondary:** filled surface, no border.
+  Light `bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800`,
+  dark `bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200`.
+  Pills and buttons do not carry a border; the fill separates them.
+- **Focus:** one treatment everywhere — `focus:ring-1 focus:ring-red-500` on
+  inputs, `focus-within:border-red-500` on composed inputs. Not `ring-2`, not
+  a ring + border pair, not a neutral ring.
+- **Borders** are for surfaces (cards, panels, inputs, dividers), never for
+  buttons. Use the `borders` token; do not invent a near-miss hex.
+- **Status surfaces** (success / error / waiting callouts) are the one place
+  a tinted border is allowed — `border-emerald-500/20`, `border-red-500/20`,
+  `border-amber-500/20` over the matching `bg-*-500/10`.
+
 
 ## Typography
 

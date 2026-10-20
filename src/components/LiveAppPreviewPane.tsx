@@ -168,12 +168,12 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
           {!hasLivePreview && (
           <button
             onClick={() => setIsInspectMode(!isInspectMode)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer border ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${
               isInspectMode
-                ? 'bg-red-600 text-white border-red-600 shadow-sm animate-pulse'
+                ? 'bg-red-600 text-white shadow-sm animate-pulse'
                 : isDark
-                ? 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white'
-                : 'bg-white border-neutral-300 text-neutral-700 hover:text-neutral-900'
+                ? 'bg-[#24242a] text-neutral-300 hover:text-white'
+                : 'bg-[#f4f4f6] text-neutral-700 hover:text-neutral-900'
             }`}
             title="Click an element to inspect and send to Composer"
           >

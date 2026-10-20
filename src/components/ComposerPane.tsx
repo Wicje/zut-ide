@@ -315,7 +315,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           className={`border rounded-xl p-3 text-[13px] leading-[1.45] shadow-2xs font-normal ${
             isDark
               ? 'bg-[#222227] border-neutral-700 text-neutral-100'
-              : 'bg-[#f8f8fa] border-[#e5e5e8] text-neutral-800'
+              : 'bg-[#f8f8fa] border-[#e5e5e7] text-neutral-800'
           }`}
         >
           {session.prompt || <span className="text-neutral-400">New agent — send a prompt below to begin.</span>}
@@ -556,8 +556,10 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         </div>
 
         {/* Feature 3: Real-Time Animated Left Gutter Glow in Agent Response */}
-        <div className={`p-3 rounded-xl border-l-3 border-emerald-500 space-y-2 transition-all ${
-          isDark ? 'bg-[#1e1e24] shadow-[0_0_15px_rgba(16,185,129,0.08)]' : 'bg-emerald-500/5 border-emerald-500 shadow-2xs'
+        <div className={`p-3 rounded-xl border-l-3 space-y-2 transition-all ${
+          isDark
+            ? 'bg-[#1e1e24] border-l-neutral-700'
+            : 'bg-[#f4f4f6] border-l-neutral-300'
         }`}>
           <p className={isDark ? 'text-neutral-200' : 'text-neutral-800'}>
             {session.response}
@@ -578,7 +580,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             className={`relative group rounded-xl overflow-hidden border aspect-[16/10] cursor-pointer shadow-2xs transition-all ${
               isDark
                 ? 'border-neutral-700 bg-neutral-900 hover:border-neutral-500'
-                : 'border-[#dcdce0] bg-[#f2f2f5] hover:border-neutral-400'
+                : 'border-[#e5e5e7] bg-[#f2f2f5] hover:border-neutral-400'
             }`}
           >
             <img
@@ -697,10 +699,10 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onReviewClick}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium rounded-lg border transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium rounded-lg transition-colors cursor-pointer ${
               isDark
-                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200 border-neutral-700'
-                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800 border-[#e2e2e6]'
+                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
+                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
             }`}
           >
             <span>Review</span>
@@ -710,10 +712,10 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
           <button
             onClick={onCommitPush}
-            className={`flex items-center gap-1 px-3 py-1 text-[12px] font-medium rounded-lg border transition-colors cursor-pointer ${
+            className={`flex items-center gap-1 px-3 py-1 text-[12px] font-medium rounded-lg transition-colors cursor-pointer ${
               isDark
-                ? 'bg-[#1e1e24] hover:bg-neutral-800 text-neutral-300 border-neutral-700'
-                : 'bg-white hover:bg-neutral-50 text-neutral-700 border-[#d8d8dc]'
+                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
+                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
             }`}
           >
             <span>Save & deploy</span>
@@ -752,7 +754,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           className={`relative flex items-center justify-between pl-2 pr-1.5 py-1.5 rounded-2xl border shadow-2xs transition-all ${
             isDark
               ? 'bg-[#222227] border-neutral-700 focus-within:border-red-500'
-              : 'bg-white border-[#dcdcde] focus-within:border-neutral-400 focus-within:ring-2 focus-within:ring-neutral-200/50'
+              : 'bg-white border-[#e5e5e7] focus-within:border-red-500'
           }`}
         >
           {/* @ Mention Popover Trigger */}

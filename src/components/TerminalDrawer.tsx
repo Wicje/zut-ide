@@ -324,7 +324,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
               activeTab === 'benchmarks' && isOpen
                 ? isDark
                   ? 'text-white border-b-2 border-red-500 font-semibold'
-                  : 'text-neutral-900 border-b-2 border-red-600 font-semibold'
+                  : 'text-neutral-900 border-b-2 border-red-500 font-semibold'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >
@@ -341,7 +341,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
               activeTab === 'terminal' && isOpen
                 ? isDark
                   ? 'text-white border-b-2 border-red-500 font-semibold'
-                  : 'text-neutral-900 border-b-2 border-red-600 font-semibold'
+                  : 'text-neutral-900 border-b-2 border-red-500 font-semibold'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >
@@ -358,7 +358,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
               activeTab === 'debug' && isOpen
                 ? isDark
                   ? 'text-white border-b-2 border-red-500 font-semibold'
-                  : 'text-neutral-900 border-b-2 border-red-600 font-semibold'
+                  : 'text-neutral-900 border-b-2 border-red-500 font-semibold'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >
@@ -375,7 +375,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
               activeTab === 'logs' && isOpen
                 ? isDark
                   ? 'text-white border-b-2 border-red-500 font-semibold'
-                  : 'text-neutral-900 border-b-2 border-red-600 font-semibold'
+                  : 'text-neutral-900 border-b-2 border-red-500 font-semibold'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >

@@ -266,10 +266,10 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onSwitchToDiff}
-            className={`px-2.5 py-1 text-xs rounded-md font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               isDark
-                ? 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white'
-                : 'bg-neutral-100 border-neutral-300 text-neutral-700 hover:text-neutral-900'
+                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200 hover:text-white'
+                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800 hover:text-neutral-900'
             }`}
           >
             <Split size={13} />
@@ -297,12 +297,12 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
           {/* Trigger ⌘K in editor */}
           <button
             onClick={() => setInlineKOpen(!inlineKOpen)}
-            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
               inlineKOpen
-                ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                ? 'bg-red-600 text-white shadow-sm'
                 : isDark
-                ? 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white'
-                : 'bg-neutral-50 border-neutral-300 text-neutral-700 hover:text-neutral-900'
+                ? 'bg-[#24242a] text-neutral-300 hover:text-white'
+                : 'bg-[#f4f4f6] text-neutral-700 hover:text-neutral-900'
             }`}
             title="Open Inline Composer (⌘K)"
           >
@@ -310,7 +310,11 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
             <span>Inline ⌘K</span>
           </button>
 
-          <div className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <div
+            className={`flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded ${
+              isDark ? 'bg-[#24242a] text-neutral-400' : 'bg-neutral-100 text-neutral-600'
+            }`}
+          >
             <Zap size={11} />
             <span>{activeFile.language}</span>
           </div>
@@ -579,7 +583,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                     isActive
                       ? isDark
                         ? 'bg-[#1e1e24] text-white border-b-2 border-b-red-500 border-r-neutral-800 font-medium'
-                        : 'bg-white text-neutral-900 border-b-2 border-b-red-600 border-r-[#e5e5e7] font-medium'
+                        : 'bg-white text-neutral-900 border-b-2 border-b-red-500 border-r-[#e5e5e7] font-medium'
                       : isDark
                       ? 'text-neutral-400 hover:bg-neutral-800/40 border-r-neutral-800'
                       : 'text-neutral-600 hover:bg-neutral-100 border-r-[#e5e5e7]'

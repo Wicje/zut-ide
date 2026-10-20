@@ -16,6 +16,27 @@ moved to a version section on release.
   a server that is already up, and offers `--dev`, `--url`, `--port`,
   `--rebuild`.
 
+### Changed / Fixed (2026-10-20 — one theme, one control language)
+- `dark:` Tailwind utilities now follow the in-app theme toggle instead of
+  `prefers-color-scheme`. Previously 184 utilities across 22 components
+  disagreed with the `isDark` ternaries, so an OS-dark machine with the app
+  in light mode rendered a half-and-half UI.
+- Buttons no longer carry borders. Pills and buttons use a filled surface
+  (light `bg-[#f4f4f6]`, dark `bg-[#24242a]`) instead of a border over a
+  background — one secondary-button recipe everywhere.
+- Solid primary buttons dropped the redundant same-colour border, which was
+  invisible but shifted the box by 2px.
+- One focus treatment everywhere: `focus:ring-1 focus:ring-red-500`.
+- Tab underlines use one red in both themes instead of two.
+- Off-system accents removed: the landing orange in the waitlist gate, the
+  green language badge in the editor, the green "no checks recorded yet"
+  empty state, and the green glow on agent replies. A merged pull request
+  reads as success (green) rather than error (red).
+- Border colours consolidated onto the `DESIGN.md` tokens; the last
+  near-duplicate hexes are gone.
+- `DESIGN.md` gained a Controls section (primary / secondary / focus / borders
+  / status surfaces) and the theme-mechanism note.
+
 ### Changed / Fixed (2026-10-20 — workspace safety)
 - Host workspace reloads external edits (3s stamp poll) without clobbering
   pending local writes; local folder reloads snapshot first.

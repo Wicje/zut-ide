@@ -151,6 +151,11 @@ function savedSource(): string | null {
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>('light');
+  // Single source of truth for theming: the `dark:` Tailwind variant keys off
+  // this attribute, so it must match the `isDark` ternaries everywhere else.
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
   // Join-first: /app is gated until the landing waitlist flag exists.
   const [waitlistOk, setWaitlistOk] = useWaitlistGate();
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('diff');
@@ -1428,9 +1433,7 @@ export default function App() {
 
   return (
     <div
-      className={`relative w-screen h-dvh overflow-hidden flex flex-col items-center justify-center bg-cover bg-center select-none transition-colors duration-500 ${
-        isDark ? 'dark' : ''
-      }`}
+      className="relative w-screen h-dvh overflow-hidden flex flex-col items-center justify-center bg-cover bg-center select-none transition-colors duration-500"
       style={{
         backgroundImage: effectiveWallpaper ? `url(${effectiveWallpaper})` : undefined,
         backgroundColor: isDark ? '#141416' : '#6c798a',

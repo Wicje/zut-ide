@@ -49,7 +49,7 @@ export function WaitlistGate({ onJoined, theme = 'dark' }: WaitlistGateProps) {
         }`}
       >
         <div className="flex items-center gap-2.5 mb-3">
-          <span className="w-8 h-8 rounded-lg bg-[#ff6b35] text-white font-extrabold flex items-center justify-center text-lg">
+          <span className="w-8 h-8 rounded-lg bg-red-600 text-white font-extrabold flex items-center justify-center text-lg">
             Z
           </span>
           <div>
@@ -71,7 +71,7 @@ export function WaitlistGate({ onJoined, theme = 'dark' }: WaitlistGateProps) {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#ff6b35]/60 ${
+            className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:ring-1 focus:ring-red-500 ${
               isDark
                 ? 'bg-black/40 border-white/10 placeholder:text-neutral-500'
                 : 'bg-neutral-50 border-black/10 placeholder:text-neutral-400'

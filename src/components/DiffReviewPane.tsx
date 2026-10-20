@@ -227,7 +227,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
               {isBranchDropdownOpen && (
                 <div
                   className={`absolute left-0 top-full mt-1 w-56 border rounded-lg shadow-xl py-1 z-30 text-[12px] ${
-                    isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                isDark ? 'bg-[#222228] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
                   }`}
                 >
                   {[currentBranch, 'main'].filter((b, i, arr) => arr.indexOf(b) === i).map(
@@ -268,8 +268,8 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
               onClick={onCreatePR}
               className={`px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
                 isDark
-                  ? 'bg-[#27272f] hover:bg-[#32323c] text-white border border-neutral-700'
-                  : 'bg-white hover:bg-neutral-50 text-neutral-800 border border-[#d2d2d6]'
+                  ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
+                  : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
               }`}
             >
               Create PR
@@ -290,8 +290,8 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
             onClick={onCommitPush}
             className={`flex items-center gap-1 px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
               isDark
-                ? 'bg-[#27272f] hover:bg-[#32323c] text-white border border-neutral-700'
-                : 'bg-white hover:bg-neutral-50 text-neutral-800 border border-[#d2d2d6]'
+                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
+                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
             }`}
           >
             <span>Save & deploy</span>

@@ -71,7 +71,7 @@ export const PRModal: React.FC<PRModalProps> = ({
               type="text"
               value={prTitle}
               onChange={(e) => setPrTitle(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+              className="w-full px-3 py-2 text-xs border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
 
@@ -83,7 +83,7 @@ export const PRModal: React.FC<PRModalProps> = ({
               rows={3}
               value={prDesc}
               onChange={(e) => setPrDesc(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 resize-none"
+              className="w-full px-3 py-2 text-xs border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 resize-none"
             />
           </div>
 

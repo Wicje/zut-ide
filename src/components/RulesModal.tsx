@@ -67,7 +67,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
             rows={8}
             value={rules}
             onChange={(e) => setRules(e.target.value)}
-            className={`w-full p-3 font-code text-[11.5px] rounded-xl border leading-relaxed focus:outline-none focus:ring-2 focus:ring-red-500/30 ${
+            className={`w-full p-3 font-code text-[11.5px] rounded-xl border leading-relaxed focus:outline-none focus:ring-1 focus:ring-red-500 ${
               isDark
                 ? 'bg-[#222227] border-neutral-700 text-neutral-200'
                 : 'bg-neutral-50 border-neutral-300 text-neutral-800'

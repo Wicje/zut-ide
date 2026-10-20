@@ -68,6 +68,8 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
   onMerge,
 }) => {
   const isDark = theme === 'dark';
+  const checksPassed = checks.filter((c) => c.status === 'passed').length;
+  const checksAllPassed = checks.length > 0 && checksPassed === checks.length;
   const [activeTab, setActiveTab] = useState<'conversation' | 'commits' | 'checks' | 'files'>('conversation');
   const [prStatus, setPrStatus] = useState<'open' | 'merged'>('open');
   const [reviewDecision, setReviewDecision] = useState<'approved' | null>(null);
@@ -223,27 +225,46 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               ))}
 
               {/* Automated Checks Summary Card */}
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+              <div
+                className={`p-3 rounded-xl border flex items-center justify-between ${
+                  checks.length === 0
+                    ? isDark
+                      ? 'bg-[#24242a] border-neutral-800 text-neutral-300'
+                      : 'bg-neutral-100 border-neutral-200 text-neutral-700'
+                    : checksAllPassed
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300'
+                }`}
+              >
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} className="text-emerald-500" />
+                  <CheckCircle2
+                    size={16}
+                    className={
+                      checks.length === 0
+                        ? 'text-neutral-400'
+                        : checksAllPassed
+                        ? 'text-emerald-500'
+                        : 'text-amber-500'
+                    }
+                  />
                   <span className="font-medium">
                     {checks.length === 0
                       ? 'No checks recorded yet'
-                      : checks.every((c) => c.status === 'passed')
+                      : checksAllPassed
                         ? `All checks have passed (${checks.length} successful check${checks.length === 1 ? '' : 's'})`
-                        : `${checks.filter((c) => c.status === 'passed').length}/${checks.length} checks passing`}
+                        : `${checksPassed}/${checks.length} checks passing`}
                   </span>
                 </div>
                 {checks.length > 0 && (
                   <span className="text-[11px] font-mono opacity-80">
-                    {Math.round((checks.filter((c) => c.status === 'passed').length / checks.length) * 100)}% Passing
+                    {Math.round((checksPassed / checks.length) * 100)}% Passing
                   </span>
                 )}
               </div>
 
               {/* Status Banner */}
               {prStatus === 'merged' && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
                   <GitMerge size={16} />
                   <span>Pull request successfully merged into main branch.</span>
                 </div>
