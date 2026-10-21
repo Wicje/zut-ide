@@ -20,6 +20,7 @@ import { ImportModal } from './components/ImportModal';
 import { HostModal } from './components/HostModal';
 import { HostGitModal } from './components/HostGitModal';
 import { LoginAndAccountModal } from './components/LoginAndAccountModal';
+import { AuthPage } from './components/AuthPage';
 import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { WaitlistGate } from './components/WaitlistGate';
@@ -30,6 +31,7 @@ import type {
   ThemeMode,
   SessionData,
   SidebarSection,
+  SidebarTask,
   RightPaneMode,
   TestCase,
   AttachedImage,
@@ -174,6 +176,7 @@ export default function App() {
   const [isPRStudioOpen, setIsPRStudioOpen] = useState(false);
   const [isVercelDeployOpen, setIsVercelDeployOpen] = useState(false);
   const [isLoginAccountOpen, setIsLoginAccountOpen] = useState(false);
+  const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -952,6 +955,7 @@ export default function App() {
             summary: clean.slice(0, 280),
             diffStats: { additions: totals.additions, deletions: totals.deletions, filesCount: files.length },
             files,
+            updatedAt: Date.now(),
           },
         };
       });
@@ -980,16 +984,37 @@ export default function App() {
   // Sidebar sections from live data (agents + project files).
   const sections: SidebarSection[] = [
     {
-      title: 'Agents',
-      items: Object.values(sessions).map((s) => ({ id: s.id, title: s.title })),
-    },
-    {
       title: 'Project',
       items: Object.keys(files)
         .sort()
         .map((p) => ({ id: `file:${p}`, title: p })),
     },
   ];
+
+  // The task rail: sessions that are running, then the ones waiting for a
+  // look. A session becomes a task the moment it has a prompt.
+  const tasks: SidebarTask[] = Object.values(sessions)
+    .filter((s) => s.prompt.trim() || s.steps.length > 0 || s.response.trim())
+    .map((s) => {
+      const running = isGenerating && s.id === activeSessionId;
+      const lastStep = s.steps[s.steps.length - 1];
+      const title = (s.prompt.trim() || s.title).split('\n')[0].slice(0, 64);
+      const subtitle = running
+        ? 'Working…'
+        : lastStep
+          ? `${lastStep.type}: ${lastStep.query}`.slice(0, 72)
+          : s.response.trim().split('\n')[0].slice(0, 72);
+      return {
+        id: s.id,
+        title,
+        subtitle,
+        state: running ? ('running' as const) : ('review' as const),
+        time: running ? 'now' : s.updatedAt ? timeAgo(s.updatedAt) : undefined,
+        additions: s.diffStats?.additions,
+        deletions: s.diffStats?.deletions,
+      };
+    })
+    .sort((a, b) => (a.state === b.state ? 0 : a.state === 'running' ? -1 : 1));
 
   const telemetry = useMemo(() => {
     if (runs.length === 0) return null;
@@ -1063,6 +1088,35 @@ export default function App() {
     }
     return 'Check your email for the sign-in link — it lands you straight back here.';
   }
+
+  /** Social sign-in, shared by the account modal and the full sign-in page. */
+  async function handleProviderSignIn(
+    provider: 'github' | 'google' | 'email',
+    email?: string,
+  ): Promise<{ name: string; email: string }> {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Sign-in is not configured (VITE_SUPABASE_URL).');
+    setSignInError(null);
+    if (provider !== 'github' && provider !== 'google') {
+      throw new Error('Use a magic link for email sign-in.');
+    }
+    const { error } = await sb.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw new Error(error.message);
+    return { name: provider, email: email ?? '' };
+  }
+
+  // The account button opens the sign-in page when nobody is signed in, and
+  // the settings modal when there is somebody.
+  const openAccount = () => {
+    if (user) {
+      setIsLoginAccountOpen(true);
+      return;
+    }
+    setIsAuthPageOpen(true);
+  };
 
   // Close the login modal the moment a real session lands (e.g. OAuth redirect).
   useEffect(() => {
@@ -1286,6 +1340,9 @@ export default function App() {
   const [opencodeReady, setOpencodeReady] = useState(false);
   const [opencodeModels, setOpencodeModels] = useState<Array<{ providerID: string; id: string; name: string; free: boolean }>>([]);
   const [opencodeModel, setOpencodeModel] = useState<{ providerID: string; modelID: string } | null>(null);
+  // Sessions where the user picked a model themselves — the IDE never
+  // switches those to the local agent behind their back.
+  const pickedModelSessionsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     // The local stack may still be starting (the dev server starts it for
     // you), so keep asking instead of deciding once.
@@ -1304,6 +1361,19 @@ export default function App() {
         mod.listOpencodeModels()
           .then(setOpencodeModels)
           .catch(() => {});
+        // The local agent is the one that works without keys: make it the
+        // default, unless the user already chose a model for that session.
+        setSessions((prev) => {
+          const next = { ...prev };
+          let changed = false;
+          for (const [id, s] of Object.entries(prev)) {
+            if (s.model === OPENCODE_LABEL) continue;
+            if (pickedModelSessionsRef.current.has(id)) continue;
+            next[id] = { ...s, model: OPENCODE_LABEL };
+            changed = true;
+          }
+          return changed ? next : prev;
+        });
       } catch {
         /* the stack is not up yet */
       }
@@ -1363,7 +1433,11 @@ export default function App() {
     rememberSource('device');
     const fresh = { ...STARTER };
     const newId = `session-${Date.now()}`;
-    const newSession = blankSession(newId, 'New project', activeSession?.model ?? 'Gemini 2.5 Flash');
+    const newSession = blankSession(
+      newId,
+      'New project',
+      activeSession?.model ?? (opencodeReady ? OPENCODE_LABEL : 'Gemini 2.5 Flash'),
+    );
     generatingRef.current = false;
     setIsGenerating(false);
     setFiles(fresh);
@@ -1647,6 +1721,7 @@ export default function App() {
           ) : (
           <Sidebar
             sections={sections}
+            tasks={tasks}
             activeItem={activeSessionId}
             onSelectItem={(id) => {
               if (id.startsWith('file:')) {
@@ -1675,7 +1750,7 @@ export default function App() {
             onOpenHost={() => void openHostWorkspace()}
             onOpenGit={() => setIsHostGitModalOpen(true)}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-            onOpenAccount={() => setIsLoginAccountOpen(true)}
+            onOpenAccount={openAccount}
             onOpenRules={() => setIsRulesModalOpen(true)}
             user={user}
             theme={theme}
@@ -1709,6 +1784,7 @@ export default function App() {
             opencodeModel={opencodeModel}
             onOpencodeModelChange={changeOpencodeModel}
             onModelChange={(model) => {
+              pickedModelSessionsRef.current.add(activeSessionId);
               setSessions((prev) => {
                 const s = prev[activeSessionId];
                 if (!s) return prev;
@@ -1719,6 +1795,10 @@ export default function App() {
               .sort()
               .map((name) => ({ name, tokens: Math.max(1, Math.ceil((filesRef.current[name] ?? '').length / 4)) }))}
             onOpenVideoModal={() => setIsVideoModalOpen(true)}
+            onOpenFile={(path) => {
+              setActiveFilePath(path);
+              setRightPaneMode('diff');
+            }}
             onCommitPush={() => {
               void save();
               setIsVercelDeployOpen(true);
@@ -2158,6 +2238,29 @@ export default function App() {
         theme={theme}
       />
 
+      {isAuthPageOpen && (
+        <AuthPage
+          onClose={() => {
+            setIsAuthPageOpen(false);
+            setSignInError(null);
+          }}
+          onProviderSignIn={handleProviderSignIn}
+          onMagicLink={handleMagicLink}
+          onSignedIn={(u) => {
+            setUser(u);
+            setIsAuthPageOpen(false);
+            showToast(`Signed in as ${u.name}`);
+          }}
+          signedInAs={user ? { name: user.name, email: user.email } : null}
+          signInError={signInError}
+          authHint={
+            getSupabase()
+              ? null
+              : 'Running local-only: add VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY and restart to enable sign-in.'
+          }
+        />
+      )}
+
       <LoginAndAccountModal
         isOpen={isLoginAccountOpen}
         onClose={() => {
@@ -2182,20 +2285,7 @@ export default function App() {
           setUser(null);
           showToast('Signed out.');
         }}
-        onProviderSignIn={async (provider, email) => {
-          const sb = getSupabase();
-          if (!sb) throw new Error('Sign-in is not configured (VITE_SUPABASE_URL).');
-          setSignInError(null);
-          if (provider !== 'github' && provider !== 'google') {
-            throw new Error('Use a magic link for email sign-in.');
-          }
-          const { error } = await sb.auth.signInWithOAuth({
-            provider,
-            options: { redirectTo: window.location.origin },
-          });
-          if (error) throw new Error(error.message);
-          return { name: provider, email: email ?? '' };
-        }}
+        onProviderSignIn={handleProviderSignIn}
         onMagicLink={handleMagicLink}
         signInError={signInError}
         authHint={
@@ -2274,7 +2364,7 @@ export default function App() {
         }}
         onNewAgent={startNewProject}
         onOpenDeploy={() => setIsVercelDeployOpen(true)}
-        onOpenAccount={() => setIsLoginAccountOpen(true)}
+        onOpenAccount={openAccount}
         onOpenHistory={() => setShowHistory(true)}
         onShare={() => setShowShare(true)}
         onImportUrl={() => setShowImport(true)}

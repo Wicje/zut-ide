@@ -27,6 +27,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   ImagePlus,
+  FileText,
 } from 'lucide-react';
 import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext, AttachedImage } from '../types';
 import screenRecThumb from '../assets/images/screen_recording_thumb_1791421930526.jpg';
@@ -38,6 +39,8 @@ interface ComposerPaneProps {
   onReviewClick: () => void;
   onGenerateEdits: (promptText: string, images?: AttachedImage[]) => void;
   onRollbackCheckpoint?: (checkpointId: string, stepTitle: string) => void;
+  /** Open a changed file in the diff pane. */
+  onOpenFile?: (path: string) => void;
   onOpenRules?: () => void;
   isGenerating?: boolean;
   theme?: 'light' | 'dark';
@@ -100,6 +103,24 @@ function downscaleImage(file: File): Promise<AttachedImage> {
   });
 }
 
+/** Tool events read like the reference UI: Read x, Searched y, Edited z. */
+function stepVerb(type: string): string {
+  switch (type) {
+    case 'read':
+      return 'Read';
+    case 'search':
+      return 'Searched';
+    case 'grep':
+      return 'Grepped';
+    case 'edit':
+      return 'Edited';
+    case 'test':
+      return 'Ran';
+    default:
+      return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+}
+
 export const ComposerPane: React.FC<ComposerPaneProps> = ({
   session,
   onOpenVideoModal,
@@ -107,6 +128,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
   onReviewClick,
   onGenerateEdits,
   onRollbackCheckpoint,
+  onOpenFile,
   onOpenRules,
   isGenerating = false,
   theme = 'light',
@@ -138,6 +160,14 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
   };
   const imgInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedModel, setSelectedModel] = useState(session.model || modelOptions[0]);
+
+  // The composer shows the concrete model when the local agent is selected.
+  const modelLabel =
+    selectedModel === selfHostLabel && opencodeModel
+      ? ((opencodeModels ?? []).find(
+          (m) => m.providerID === opencodeModel.providerID && m.id === opencodeModel.modelID,
+        )?.name ?? opencodeModel.modelID)
+      : selectedModel;
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [opencodeCustom, setOpencodeCustom] = useState('');
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
@@ -346,117 +376,10 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           </div>
         )}
 
-        {/* Autonomous Multi-Phase Execution Graph */}
-        <div
-          className={`rounded-xl border overflow-hidden transition-all ${
-            isDark ? 'bg-[#202025] border-neutral-700' : 'bg-[#fafafc] border-neutral-200'
-          }`}
-        >
-          <div
-            onClick={() => setIsExecutionGraphOpen(!isExecutionGraphOpen)}
-            className="px-3 py-2 flex items-center justify-between cursor-pointer border-b border-neutral-200/50 dark:border-neutral-700"
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-semibold text-xs tracking-tight">Activity</span>
-              <span className="text-[10px] text-neutral-400 font-mono">({session.steps.length} steps)</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-neutral-400">
-              {isExecutionGraphOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            </div>
-          </div>
-
-          {isExecutionGraphOpen && (
-            <div className="p-3 space-y-2 text-xs">
-              {session.steps.length === 0 && (
-                <p className="text-[11px] text-neutral-400">No activity yet — send a prompt below.</p>
-              )}
-              {session.steps.map((step) => (
-                <div key={step.id} className="flex items-start gap-2.5">
-                  <div className="mt-0.5 shrink-0">
-                    {step.status === 'completed' ? (
-                      <CheckCircle2 size={13} className="text-emerald-500" />
-                    ) : step.status === 'running' ? (
-                      <Loader2 size={13} className="text-red-500 animate-spin" />
-                    ) : step.status === 'failed' ? (
-                      <XCircle size={13} className="text-red-500" />
-                    ) : (
-                      <Clock size={13} className="text-neutral-400" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between text-[11.5px]">
-                      <span className={`font-medium capitalize ${step.status === 'completed' ? 'text-neutral-700 dark:text-neutral-300' : 'text-red-500 font-semibold'}`}>
-                        {step.type}: {step.query.length > 48 ? `${step.query.slice(0, 48)}…` : step.query}
-                      </span>
-                      {step.durationMs != null && (
-                        <span className="text-[10px] font-mono text-neutral-400">{step.durationMs}ms</span>
-                      )}
-                    </div>
-                    {step.details && <div className="text-[11px] text-neutral-400 truncate">{step.details}</div>}
-                    {(step.status === 'completed' || step.status === 'failed') && (
-                      <div className="flex items-center gap-0.5 pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => rateStep(step.id, 1)}
-                          className={`p-0.5 rounded transition-colors cursor-pointer ${
-                            ratings[step.id] === 1 ? 'text-emerald-500' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
-                          }`}
-                          title="Good turn"
-                          aria-label="Rate turn good"
-                        >
-                          <ThumbsUp size={11} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => rateStep(step.id, -1)}
-                          className={`p-0.5 rounded transition-colors cursor-pointer ${
-                            ratings[step.id] === -1 ? 'text-red-500' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
-                          }`}
-                          title="Bad turn"
-                          aria-label="Rate turn bad"
-                        >
-                          <ThumbsDown size={11} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              <div className="flex items-center justify-end pt-2 border-t border-neutral-200/60 dark:border-neutral-700 text-[11px]">
-                <button
-                  onClick={() => sendPromptText('Review your last changes for issues and fix what you find')}
-                  className="px-2 py-0.5 rounded bg-red-600 text-white font-medium hover:bg-red-500 cursor-pointer"
-                >
-                  Verify
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Action Steps */}
-        {session.steps.length === 0 && !isGenerating && (
+        {session.steps.length === 0 && !isGenerating && !session.response && (
           <div className="space-y-2 px-1">
             <p className="text-[12px] text-neutral-400">No activity yet — send a prompt below to start the agent.</p>
-            <div className="flex flex-wrap gap-1.5">
-              {['Build a landing page', 'Create a starter index.html', 'Review the workspace and suggest next steps'].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => sendPromptText(s)}
-                  className={`px-2.5 py-1 rounded-lg border text-[11px] transition-colors cursor-pointer ${
-                    isDark
-                      ? 'border-neutral-700 text-neutral-300 hover:bg-neutral-800'
-                      : 'border-neutral-300 text-neutral-600 hover:bg-neutral-100'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
         )}
         <div className="space-y-1.5 text-[12.5px]">
@@ -464,41 +387,32 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             const isExpanded = expandedStepId === step.id;
 
             return (
-              <div
-                key={step.id}
-                className={`rounded-lg transition-colors border ${
-                  isExpanded
-                    ? isDark
-                      ? 'bg-[#202025] border-neutral-700 p-2.5'
-                      : 'bg-neutral-50/80 border-neutral-300 p-2.5 shadow-2xs'
-                    : 'border-transparent hover:bg-neutral-500/5 px-1 py-0.5'
-                }`}
-              >
+              <div key={step.id} className={isExpanded ? 'py-1' : ''}>
                 <div
                   onClick={() => toggleStepExpand(step.id)}
-                  className="flex items-center justify-between cursor-pointer"
+                  className="flex items-center justify-between cursor-pointer text-[12px] text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
                 >
-                  <div className="flex items-center gap-1.5 font-medium min-w-0">
-                    <span className="text-neutral-400">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-neutral-400 shrink-0">
                       {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </span>
-                    <span className={`font-semibold capitalize ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                      {step.type}
-                    </span>
-                    <span className="text-neutral-500 font-normal truncate">
-                      {step.query}
+                    <span className="truncate">
+                      {stepVerb(step.type)}
+                      {step.query ? ` ${step.query}` : ''}
                     </span>
                   </div>
 
-                  {step.durationMs && (
-                    <span className="text-[10.5px] font-mono text-neutral-400 shrink-0 ml-1">
-                      {step.durationMs}ms
+                  {step.durationMs != null && (
+                    <span className="text-[11px] text-neutral-400 shrink-0 ml-1">
+                      {step.durationMs >= 1000
+                        ? `${Math.round(step.durationMs / 1000)}s`
+                        : `${step.durationMs}ms`}
                     </span>
                   )}
                 </div>
 
                 {isExpanded && (
-                  <div className="mt-2.5 pt-2 border-t border-neutral-200/60 dark:border-neutral-700 space-y-2 text-xs">
+                  <div className="mt-1.5 pl-5 space-y-2 text-xs">
                     {step.details && (
                       <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400">
                         {step.details}
@@ -555,24 +469,58 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           })}
         </div>
 
-        {/* Feature 3: Real-Time Animated Left Gutter Glow in Agent Response */}
-        <div className={`p-3 rounded-xl border-l-3 space-y-2 transition-all ${
-          isDark
-            ? 'bg-[#1e1e24] border-l-neutral-700'
-            : 'bg-[#f4f4f6] border-l-neutral-300'
-        }`}>
-          <p className={isDark ? 'text-neutral-200' : 'text-neutral-800'}>
-            {session.response}
-          </p>
-          {session.processedItem && (
-            <div className="flex items-center gap-1.5 text-[12.5px]">
-              <span className={`font-semibold ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                Processed
-              </span>
-              <span className="text-neutral-500 font-normal">{session.processedItem}</span>
-            </div>
-          )}
-        </div>
+        {/* The agent's reply — plain prose */}
+        {session.response && (
+          <div className="group/reply flex items-start gap-2">
+            <p className={`flex-1 text-[13.5px] leading-[1.5] ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>
+              {session.response}
+            </p>
+            <button
+              onClick={handleCopySummary}
+              className="opacity-0 group-hover/reply:opacity-100 transition-opacity text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 cursor-pointer shrink-0"
+              title={copied ? 'Copied!' : 'Copy reply'}
+            >
+              {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+            </button>
+          </div>
+        )}
+        {/* Changed files */}
+        {session.files.length > 0 && (
+          <div className="space-y-1.5">
+            {session.files.map((file) => (
+              <button
+                key={file.path}
+                type="button"
+                onClick={() => onOpenFile?.(file.path)}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                  isDark
+                    ? 'border-neutral-800 hover:border-neutral-700 hover:bg-white/5'
+                    : 'border-[#e5e5e7] hover:bg-neutral-50'
+                }`}
+              >
+                <FileText size={12} className="text-neutral-400 shrink-0" />
+                <span className="text-[12px] truncate flex-1">{file.path}</span>
+                {file.additions > 0 && (
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
+                    +{file.additions}
+                  </span>
+                )}
+                {file.deletions > 0 && (
+                  <span className="text-[11px] font-mono text-red-600 dark:text-red-400 shrink-0">
+                    -{file.deletions}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {session.processedItem && (
+          <div className="flex items-center gap-1.5 text-[12.5px]">
+            <span className={`font-semibold ${isDark ? 'text-white' : 'text-neutral-900'}`}>Processed</span>
+            <span className="text-neutral-500 font-normal">{session.processedItem}</span>
+          </div>
+        )}
 
         {session.videoPreview && (
           <div
@@ -598,96 +546,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           </div>
         )}
 
-        {/* Summary Card */}
-        {session.summary && (
-        <div className="pt-1">
-          <h4 className={`font-semibold text-[13px] mb-1 ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-            Summary
-          </h4>
-          <p className={`text-[13px] leading-[1.45] ${isDark ? 'text-neutral-300' : 'text-neutral-800'}`}>
-            {session.summary}
-          </p>
-
-          <div className="flex items-center justify-end gap-2.5 mt-2.5 text-neutral-400">
-            <button
-              onClick={handleCopySummary}
-              className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5 cursor-pointer"
-              title={copied ? 'Copied!' : 'Copy summary'}
-            >
-              {copied ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
-            </button>
-            <button className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5 cursor-pointer">
-              <MoreHorizontal size={13} />
-            </button>
-          </div>
-        </div>
-        )}
       </div>
-
-        {/* Self-host model picker (free-first + custom ID) */}
-        {selfHostLabel && selectedModel === selfHostLabel && (opencodeModels ?? []).length > 0 && (
-          <div className="space-y-1.5">
-            <select
-              value={opencodeModel ? `${opencodeModel.providerID}/${opencodeModel.modelID}` : ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) {
-                  onOpencodeModelChange?.(null);
-                  return;
-                }
-                const i = v.indexOf('/');
-                if (i > 0) onOpencodeModelChange?.({ providerID: v.slice(0, i), modelID: v.slice(i + 1) });
-              }}
-              className={`w-full px-2 py-1.5 rounded-lg border text-[11.5px] focus:outline-none focus:ring-1 focus:ring-red-500 cursor-pointer ${
-                isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-300 text-neutral-700'
-              }`}
-              aria-label="Self-hosted model"
-            >
-              <option value="">Server default</option>
-              {(opencodeModels ?? []).map((m) => (
-                <option key={`${m.providerID}/${m.id}`} value={`${m.providerID}/${m.id}`}>
-                  {m.name} — {m.providerID}
-                  {m.free ? ' · free' : ''}
-                </option>
-              ))}
-            </select>
-            <div className="flex items-center gap-1.5">
-              <input
-                value={opencodeCustom}
-                onChange={(e) => setOpencodeCustom(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter') return;
-                  const v = opencodeCustom.trim();
-                  const i = v.indexOf('/');
-                  if (i > 0) {
-                    onOpencodeModelChange?.({ providerID: v.slice(0, i).trim(), modelID: v.slice(i + 1).trim() });
-                    setOpencodeCustom('');
-                  }
-                }}
-                placeholder="or provider/model-id, Enter to use"
-                spellCheck={false}
-                aria-label="Custom model ID"
-                className={`flex-1 min-w-0 px-2 py-1 rounded-lg border font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                  isDark
-                    ? 'bg-transparent border-neutral-700 text-neutral-300 placeholder-neutral-600'
-                    : 'bg-transparent border-neutral-300 text-neutral-600 placeholder-neutral-400'
-                }`}
-              />
-              {opencodeModel && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpencodeModelChange?.(null);
-                    setOpencodeCustom('');
-                  }}
-                  className="text-[11px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline-offset-2 hover:underline cursor-pointer shrink-0"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
       {/* Bottom Controls, Context Chips & Follow-up Input */}
       <div
@@ -695,34 +554,6 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           isDark ? 'border-neutral-800 bg-[#18181b]' : 'border-[#e5e5e7] bg-white'
         }`}
       >
-        {/* Review Action Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onReviewClick}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium rounded-lg transition-colors cursor-pointer ${
-              isDark
-                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
-                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
-            }`}
-          >
-            <span>Review</span>
-            <span className="text-[#16a34a] font-medium">+{session.diffStats.additions}</span>
-            <span className="text-[#dc2626] font-medium">-{session.diffStats.deletions}</span>
-          </button>
-
-          <button
-            onClick={onCommitPush}
-            className={`flex items-center gap-1 px-3 py-1 text-[12px] font-medium rounded-lg transition-colors cursor-pointer ${
-              isDark
-                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
-                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
-            }`}
-          >
-            <span>Save & deploy</span>
-            <ChevronDown size={12} className="text-neutral-500" />
-          </button>
-        </div>
-
         {/* Attached Context Chips Bar */}
         {attachedContexts.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -848,7 +679,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             value={followUpText}
             onChange={(e) => setFollowUpText(e.target.value)}
             disabled={isGenerating}
-            placeholder={isGenerating ? 'Synthesizing code...' : 'Send follow-up or type @'}
+            placeholder={isGenerating ? 'Synthesizing code...' : 'Plan, search, build anything...'}
             className={`flex-1 px-2 text-[12.5px] max-sm:text-base bg-transparent focus:outline-none placeholder-neutral-400 ${
               isDark ? 'text-white' : 'text-neutral-800'
             }`}
@@ -863,7 +694,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                 isDark ? 'text-neutral-300 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              <span>{selectedModel}</span>
+              <span>{modelLabel}</span>
               <ChevronDown size={11} className="text-neutral-400" />
             </button>
 
@@ -873,19 +704,74 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                   isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
                 }`}
               >
-                {modelOptions.map(
-                  (model) => (
-                    <button
-                      key={model}
-                      type="button"
-                      onClick={() => pickModel(model)}
-                      className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
-                        isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                      } ${selectedModel === model ? 'font-medium text-red-500' : ''}`}
-                    >
-                      <span>{model}</span>
-                      {selectedModel === model && <Check size={12} />}
-                    </button>
+                {selectedModel === selfHostLabel && (opencodeModels ?? []).length > 0 ? (
+                  <>
+                    {(opencodeModels ?? []).map((m) => {
+                      const id = `${m.providerID}/${m.id}`;
+                      const on = opencodeModel?.providerID === m.providerID && opencodeModel?.modelID === m.id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => {
+                            onOpencodeModelChange?.({ providerID: m.providerID, modelID: m.id });
+                            setIsModelDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 cursor-pointer ${
+                            isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                          } ${on ? 'font-medium text-red-500' : ''}`}
+                        >
+                          <span className="truncate">{m.name}</span>
+                          <span className="text-[10px] text-neutral-400 shrink-0">
+                            {m.providerID}
+                            {m.free ? ' · free' : ''}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    <div className="px-2 py-1.5 border-t border-neutral-200/60 dark:border-neutral-800">
+                      <input
+                        value={opencodeCustom}
+                        onChange={(e) => setOpencodeCustom(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter') return;
+                          const v = opencodeCustom.trim();
+                          const i = v.indexOf('/');
+                          if (i > 0) {
+                            onOpencodeModelChange?.({
+                              providerID: v.slice(0, i).trim(),
+                              modelID: v.slice(i + 1).trim(),
+                            });
+                            setOpencodeCustom('');
+                            setIsModelDropdownOpen(false);
+                          }
+                        }}
+                        placeholder="provider/model-id, Enter to use"
+                        spellCheck={false}
+                        aria-label="Custom model ID"
+                        className={`w-full px-2 py-1 rounded-md border font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 ${
+                          isDark
+                            ? 'bg-transparent border-neutral-700 text-neutral-300 placeholder-neutral-600'
+                            : 'bg-transparent border-neutral-300 text-neutral-600 placeholder-neutral-400'
+                        }`}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  modelOptions.map(
+                    (model) => (
+                      <button
+                        key={model}
+                        type="button"
+                        onClick={() => pickModel(model)}
+                        className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                        } ${selectedModel === model ? 'font-medium text-red-500' : ''}`}
+                      >
+                        <span>{model}</span>
+                        {selectedModel === model && <Check size={12} />}
+                      </button>
+                    )
                   )
                 )}
               </div>

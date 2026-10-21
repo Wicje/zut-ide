@@ -31,9 +31,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.zut-local');
 const LOGS = path.join(STATE, 'logs');
 const PIDS = path.join(STATE, 'pids.json');
-const WORKSPACE = path.resolve(
-  process.env.ZUT_WORKSPACE ?? path.join(os.homedir(), '.zut-projects', 'default'),
+// Two workspaces on purpose:
+//   agent/ — a scratch copy of the project the IDE has open. The bridge
+//            mirrors it exactly, so the agent never sees leftovers.
+//   host/  — the real workspace with git and a real terminal.
+const PROJECTS = path.resolve(
+  process.env.ZUT_PROJECTS_ROOT ?? path.join(os.homedir(), '.zut-projects'),
 );
+const WORKSPACE = path.join(PROJECTS, 'agent');
+const HOST_WORKSPACE = path.join(PROJECTS, 'host');
 
 function opencodeBin() {
   const local = path.join(os.homedir(), '.opencode', 'bin', 'opencode');
@@ -77,7 +83,7 @@ const SERVICES = [
     health: 'http://127.0.0.1:8790/health',
     cmd: process.execPath,
     args: [path.join(ROOT, 'host', 'server.mjs')],
-    env: { ZUT_WORKSPACE: WORKSPACE, PORT: '8790', ZUT_HOST_MODE: 'selfhost' },
+    env: { ZUT_WORKSPACE: HOST_WORKSPACE, PORT: '8790', ZUT_HOST_MODE: 'selfhost' },
   },
   {
     name: 'broker',
@@ -170,6 +176,7 @@ async function up() {
     return;
   }
   mkdirSync(WORKSPACE, { recursive: true });
+  mkdirSync(HOST_WORKSPACE, { recursive: true });
   mkdirSync(LOGS, { recursive: true });
   const pids = readPids();
 
@@ -203,7 +210,8 @@ async function up() {
   console.log('');
   console.log('  browser   http://127.0.0.1:5173/');
   console.log('  terminal  npm run term -- --url http://127.0.0.1:5173/');
-  console.log(`  workspace ${WORKSPACE}`);
+  console.log(`  agent dir ${WORKSPACE}`);
+  console.log(`  host dir  ${HOST_WORKSPACE}`);
   console.log(`  logs      ${LOGS}`);
 }
 
@@ -240,6 +248,7 @@ async function serve() {
     return;
   }
   mkdirSync(WORKSPACE, { recursive: true });
+  mkdirSync(HOST_WORKSPACE, { recursive: true });
   mkdirSync(LOGS, { recursive: true });
 
   const children = new Map();
@@ -297,7 +306,8 @@ async function serve() {
   console.log('');
   console.log('  browser   http://127.0.0.1:5173/');
   console.log('  terminal  npm run term -- --url http://127.0.0.1:5173/');
-  console.log(`  workspace ${WORKSPACE}`);
+  console.log(`  agent dir ${WORKSPACE}`);
+  console.log(`  host dir  ${HOST_WORKSPACE}`);
 
   const stop = () => {
     if (stopping) return;

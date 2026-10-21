@@ -82,8 +82,13 @@ launch anything else. It brings up:
 | zut broker | 8787 | program runs (python/go) and previews |
 | vite | 5173 | the IDE itself |
 
-Everything binds loopback only. The workspace is `~/.zut-projects/default`
-(override with `ZUT_WORKSPACE`).
+Everything binds loopback only. Two workspaces on this machine:
+
+- `~/.zut-projects/agent` — a scratch copy of the project the IDE has open.
+  The bridge mirrors it exactly (no leftovers from another project), and the
+  agent works here.
+- `~/.zut-projects/host` — the real workspace behind "Open host", with git
+  and a real terminal.
 
 ```bash
 npm run dev            # browser: http://127.0.0.1:5173

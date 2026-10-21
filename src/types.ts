@@ -40,6 +40,17 @@ export interface SidebarItem {
   category?: string;
 }
 
+export interface SidebarTask {
+  id: string;
+  title: string;
+  subtitle: string;
+  /** running = the agent is working on it; review = done, waiting for you. */
+  state: 'running' | 'review';
+  time?: string;
+  additions?: number;
+  deletions?: number;
+}
+
 export interface SidebarSection {
   title: string;
   items: SidebarItem[];
@@ -93,6 +104,8 @@ export interface SessionData {
   diffStats: { additions: number; deletions: number; filesCount: number };
   files: DiffFile[];
   model: string;
+  /** When the session last changed (for the task rail). */
+  updatedAt?: number;
 }
 
 export type RightPaneMode = 'diff' | 'editor' | 'preview' | 'tests';

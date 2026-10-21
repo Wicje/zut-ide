@@ -18,8 +18,10 @@ import {
   ChevronUp,
   ChevronDown,
   User,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
-import { SidebarSection, SidebarItem } from '../types';
+import { SidebarSection, SidebarItem, SidebarTask } from '../types';
 
 interface SidebarProps {
   sections: SidebarSection[];
@@ -35,6 +37,8 @@ interface SidebarProps {
   workspaceLabel?: string | null;
   onOpenCommandPalette?: () => void;
   onOpenAccount?: () => void;
+  /** Task list: in progress, then ready for review. */
+  tasks?: SidebarTask[];
   onOpenRules?: () => void;
   onToggleSidebar?: () => void;
   user?: { name: string; email: string } | null;
@@ -55,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   workspaceLabel,
   onOpenCommandPalette,
   onOpenAccount,
+  tasks,
   onOpenRules,
   onToggleSidebar,
   user,
@@ -229,6 +234,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {workspaceLabel && (
           <div className="px-2.5 pb-1 text-[10.5px] text-neutral-400 truncate" title={`Workspace: ${workspaceLabel}`}>
             Workspace · {workspaceLabel}
+          </div>
+        )}
+
+        {/* Task rail: what is running, what is ready for review */}
+        {tasks && tasks.length > 0 && (
+          <div className="px-2 pb-1 space-y-3 overflow-y-auto flex-1 min-h-0">
+            {(['running', 'review'] as const).map((state) => {
+              const group = tasks.filter((t) => t.state === state);
+              if (group.length === 0) return null;
+              return (
+                <div key={state} className="space-y-0.5">
+                  <div className="px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase flex items-center gap-1.5">
+                    {state === 'running' ? (
+                      <Loader2 size={10} className="animate-spin text-red-500" />
+                    ) : (
+                      <CheckCircle2 size={10} className="text-emerald-500" />
+                    )}
+                    <span>{state === 'running' ? 'In progress' : 'Ready for review'}</span>
+                    <span className="text-neutral-400 font-mono">{group.length}</span>
+                  </div>
+                  {group.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => onSelectItem(task.id)}
+                      className={`w-full text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
+                        activeItem === task.id
+                          ? isDark
+                            ? 'bg-white/8'
+                            : 'bg-black/6'
+                          : isDark
+                            ? 'hover:bg-white/5'
+                            : 'hover:bg-black/5'
+                      }`}
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[12px] font-medium truncate flex-1">
+                          {task.title}
+                        </span>
+                        {task.time && (
+                          <span className="text-[10px] text-neutral-400 shrink-0">{task.time}</span>
+                        )}
+                      </div>
+                      {task.subtitle && (
+                        <div className="text-[10.5px] text-neutral-400 truncate mt-0.5">
+                          {task.subtitle}
+                        </div>
+                      )}
+                      {(task.additions || task.deletions) ? (
+                        <div className="text-[10.5px] font-mono mt-0.5">
+                          {task.additions ? (
+                            <span className="text-emerald-600 dark:text-emerald-400">+{task.additions}</span>
+                          ) : null}
+                          {task.additions && task.deletions ? <span className="text-neutral-400"> </span> : null}
+                          {task.deletions ? (
+                            <span className="text-red-600 dark:text-red-400">-{task.deletions}</span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         )}
 

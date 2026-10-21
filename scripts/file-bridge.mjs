@@ -25,6 +25,7 @@ import http from 'node:http'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { readTree as readTreeFiles, safePath, writeMirror } from './bridge-files.mjs'
 
 const PORT = Number(process.env.ZUT_BRIDGE_PORT ?? 4331)
 const HOST = process.env.ZUT_BRIDGE_HOST ?? '127.0.0.1'
@@ -69,35 +70,11 @@ function readBody(req) {
 }
 
 function safe(p) {
-  const clean = path.normalize(p).replace(/\\/g, '/')
-  if (clean.startsWith('/') || clean.split('/').includes('..')) return null
-  if (clean === '' || clean === '.') return null
-  return clean
+  return safePath(p);
 }
 
 async function readTree(dir) {
-  const out = {}
-  let entries = []
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true })
-  } catch {
-    return out
-  }
-  for (const e of entries) {
-    if (e.name === '.git' || e.name === 'node_modules') continue
-    const full = path.join(dir, e.name)
-    const rel = path.relative(ROOT, full).replace(/\\/g, '/')
-    if (e.isDirectory()) {
-      Object.assign(out, await readTree(full))
-    } else if (e.isFile()) {
-      try {
-        out[rel] = await fs.readFile(full, 'utf8')
-      } catch {
-        /* binary/unreadable — skip */
-      }
-    }
-  }
-  return out
+  return readTreeFiles(dir)
 }
 
 const server = http.createServer(async (req, res) => {
@@ -138,19 +115,17 @@ const server = http.createServer(async (req, res) => {
       json(res, 400, { error: 'expected { files: { path: content } }' })
       return
     }
-    let wrote = 0
-    for (const [p, content] of Object.entries(files)) {
-      const target = safe(p)
-      if (!target) {
-        json(res, 400, { error: `unsafe path: ${p}` })
-        return
-      }
-      const full = path.join(ROOT, target)
-      await fs.mkdir(path.dirname(full), { recursive: true })
-      await fs.writeFile(full, String(content), 'utf8')
-      wrote++
+    // The workspace is an exact mirror of the project: anything left over
+    // from another project is removed, so the agent only ever sees the
+    // project the IDE has open.
+    let stale = []
+    try {
+      stale = await writeMirror(ROOT, files)
+    } catch (e) {
+      json(res, 400, { error: e.message })
+      return
     }
-    json(res, 200, { ok: true, wrote })
+    json(res, 200, { ok: true, wrote: Object.keys(files).length, removed: stale.length })
     return
   }
 

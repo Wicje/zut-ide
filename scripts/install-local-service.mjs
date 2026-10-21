@@ -15,8 +15,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const UNIT_DIR = path.join(os.homedir(), '.config', 'systemd', 'user');
 const UNIT = path.join(UNIT_DIR, 'zut-local-stack.service');
 const TEMPLATE = path.join(ROOT, 'scripts', 'zut-local-stack.service');
-const WORKSPACE = path.resolve(
-  process.env.ZUT_WORKSPACE ?? path.join(os.homedir(), '.zut-projects', 'default'),
+const PROJECTS = path.resolve(
+  process.env.ZUT_PROJECTS_ROOT ?? path.join(os.homedir(), '.zut-projects'),
 );
 
 function systemctl(...args) {
@@ -50,7 +50,7 @@ mkdirSync(UNIT_DIR, { recursive: true });
 const unit = readFileSync(TEMPLATE, 'utf8')
   .replaceAll('__REPO__', ROOT)
   .replaceAll('__NODE__', process.execPath)
-  .replaceAll('__WORKSPACE__', WORKSPACE);
+  .replaceAll('__PROJECTS__', PROJECTS);
 writeFileSync(UNIT, unit);
 
 systemctl('daemon-reload');

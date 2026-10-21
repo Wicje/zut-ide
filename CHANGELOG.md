@@ -5,6 +5,26 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Removed (2026-10-21 — no defaults)
+- The agent's empty state no longer offers pre-baked prompts ("Build a
+  landing page", "Create a starter index.html", "Review the workspace and
+  suggest next steps"). You open a folder or start from scratch, then say
+  what you want.
+
+### Changed (2026-10-21 — the local agent is the default)
+- When the local opencode server is up, it is the default model — it is the
+  one that works without an API key. A model you pick yourself is never
+  overridden.
+
+### Fixed (2026-10-21 — the agent reviews *your* project)
+- The agent's workspace is now an exact mirror of the project the IDE has
+  open: anything left over from a previous project is removed before the
+  turn. Before, a review covered the old files too (and the IDE pulled
+  them back as if the agent had created them).
+- The agent's scratch workspace (`~/.zut-projects/agent`) and the host's
+  real workspace (`~/.zut-projects/host`) are separate directories, so the
+  agent can never write into the files you opened.
+
 ### Added (2026-10-21 — the local stack)
 - The IDE runs on your laptop with no VPS: `npm run dev` starts opencode
   serve, the file bridge, zut-host, the broker and the dev server itself.

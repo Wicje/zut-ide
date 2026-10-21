@@ -14,7 +14,7 @@ Type=simple
 WorkingDirectory=__REPO__
 ExecStart=__NODE__ scripts/local-stack.mjs serve
 Environment="PATH=/home/zk3/.opencode/bin:/home/zk3/.local/bin:/home/zk3/.npm-global/bin:/usr/local/bin:/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Environment="ZUT_WORKSPACE=__WORKSPACE__"
+Environment="ZUT_PROJECTS_ROOT=__PROJECTS__"
 # The supervisor starts the stack itself — do not let the Vite plugin try.
 Environment="ZUT_LOCAL_STACK=0"
 Restart=always
