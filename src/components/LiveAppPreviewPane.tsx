@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Sliders,
   ChevronDown,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { DeviceViewport } from '../types';
 
@@ -49,6 +51,7 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
   const [isCompact, setIsCompact] = useState(false);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<string[]>(() => consoleLines ?? []);
+  const frameRef = React.useRef<HTMLIFrameElement | null>(null);
   const seenConsoleCount = React.useRef((consoleLines ?? []).length);
   React.useEffect(() => {
     const lines = consoleLines ?? [];
@@ -92,13 +95,22 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
           isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-white'
         }`}
       >
-        {/* Left: URL Bar */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 text-[11.5px] font-mono text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{previewLabel ?? (hasLivePreview ? 'preview (sandboxed)' : 'no preview')}</span>
-          </div>
-
+        {/* Left: URL bar — back, forward, reload, address */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => frameRef.current?.contentWindow?.history.back()}
+            className="p-1 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer text-neutral-400"
+            title="Back"
+          >
+            <ArrowLeft size={13} />
+          </button>
+          <button
+            onClick={() => frameRef.current?.contentWindow?.history.forward()}
+            className="p-1 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer text-neutral-400"
+            title="Forward"
+          >
+            <ArrowRight size={13} />
+          </button>
           {onReloadPreview && (
           <button
             onClick={onReloadPreview}
@@ -108,6 +120,12 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
             <RefreshCw size={13} />
           </button>
           )}
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 text-[11.5px] font-mono text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 min-w-0 max-w-[320px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="truncate">{previewUrl ?? previewLabel ?? (hasLivePreview ? 'preview (sandboxed)' : 'no preview')}</span>
+          </div>
+
           {previewUrl && (
           <button
             onClick={() => onOpenLiveUrl?.(previewUrl)}
@@ -203,6 +221,7 @@ export const LiveAppPreviewPane: React.FC<LiveAppPreviewPaneProps> = ({
             } ${getContainerWidth()} flex flex-col`}
           >
             <iframe
+              ref={frameRef}
               title="preview"
               srcDoc={srcDoc ?? ''}
               sandbox="allow-scripts allow-forms allow-modals allow-popups"

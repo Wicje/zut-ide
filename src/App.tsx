@@ -1555,44 +1555,6 @@ export default function App() {
 
         <span className="text-white/20 text-xs">|</span>
 
-        {/* Pane switch lives in the big mobile switcher — hide here on phones */}
-        {!isMobile && (
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setRightPaneMode('diff')}
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-              rightPaneMode === 'diff' ? 'bg-white/20 text-white font-semibold' : 'text-white/70 hover:text-white'
-            }`}
-          >
-            Diff
-          </button>
-          <button
-            onClick={() => setRightPaneMode('editor')}
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-              rightPaneMode === 'editor' ? 'bg-white/20 text-white font-semibold' : 'text-white/70 hover:text-white'
-            }`}
-          >
-            Editor
-          </button>
-          <button
-            onClick={() => setRightPaneMode('preview')}
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-              rightPaneMode === 'preview' ? 'bg-white/20 text-white font-semibold' : 'text-white/70 hover:text-white'
-            }`}
-          >
-            Preview
-          </button>
-          <button
-            onClick={() => setRightPaneMode('tests')}
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-              rightPaneMode === 'tests' ? 'bg-white/20 text-white font-semibold' : 'text-white/70 hover:text-white'
-            }`}
-          >
-            Checks
-          </button>
-        </div>
-        )}
-
         {!isMobile && <span className="text-white/20 text-xs">|</span>}
 
         <button
@@ -1841,12 +1803,13 @@ export default function App() {
             isMobile ? (mobileTab === 'code' || mobileTab === 'preview' ? 'w-full h-full' : 'hidden') : 'h-full'
           }`}
         >
-          {/* Mobile pane switcher: big touch targets, replaces the tiny top-bar pills */}
-          {isMobile && (mobileTab === 'code' || mobileTab === 'preview') && (
+          {/* Right pane tabs — the pane owns its own switcher, like the
+              reference UI; on phones the targets are big enough to tap. */}
+          {(isMobile ? mobileTab === 'code' || mobileTab === 'preview' : true) && (
             <div
-              className={`shrink-0 grid grid-cols-4 gap-1 p-1.5 border-b ${
+              className={`shrink-0 flex items-center gap-1 px-2 border-b ${
                 isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7] bg-[#f4f4f6]'
-              }`}
+              } ${isMobile ? 'py-1.5' : 'h-9'}`}
               role="tablist"
               aria-label="Right pane mode"
             >
@@ -1863,12 +1826,16 @@ export default function App() {
                   role="tab"
                   aria-selected={rightPaneMode === id}
                   onClick={() => setRightPaneMode(id)}
-                  className={`min-h-[44px] rounded-lg text-[13px] font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
+                    isMobile ? 'flex-1 min-h-[40px]' : 'px-2.5 py-1'
+                  } ${
                     rightPaneMode === id
-                      ? 'bg-red-600 text-white'
+                      ? isDark
+                        ? 'bg-white/10 text-white'
+                        : 'bg-white text-neutral-900 shadow-xs'
                       : isDark
-                      ? 'bg-white/5 text-neutral-300'
-                      : 'bg-black/5 text-neutral-700'
+                        ? 'text-neutral-400 hover:text-neutral-200'
+                        : 'text-neutral-500 hover:text-neutral-900'
                   }`}
                 >
                   {label}

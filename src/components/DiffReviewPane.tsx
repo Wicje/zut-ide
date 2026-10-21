@@ -141,61 +141,6 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
       >
         {/* Left cluster */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          {/* Mode switcher (roomy panes; in the ⋯ menu when narrow).
-              Split/Telemetry live in the ⋯ menu too, so no width is wasted here. */}
-          {onSelectPaneMode && (
-            <div className="hidden @[540px]:flex items-center gap-1 shrink-0 bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-md border border-neutral-200 dark:border-neutral-700">
-              <button
-                onClick={() => onSelectPaneMode('diff')}
-                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                  rightPaneMode === 'diff'
-                    ? isDark
-                      ? 'bg-neutral-700 text-white'
-                      : 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                }`}
-              >
-                Diff
-              </button>
-              <button
-                onClick={() => onSelectPaneMode('editor')}
-                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                  rightPaneMode === 'editor'
-                    ? isDark
-                      ? 'bg-neutral-700 text-white'
-                      : 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                }`}
-              >
-                Editor
-              </button>
-              <button
-                onClick={() => onSelectPaneMode('preview')}
-                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                  rightPaneMode === 'preview'
-                    ? isDark
-                      ? 'bg-neutral-700 text-white'
-                      : 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                }`}
-              >
-                Preview
-              </button>
-              <button
-                onClick={() => onSelectPaneMode('tests')}
-                className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                  rightPaneMode === 'tests'
-                    ? isDark
-                      ? 'bg-neutral-700 text-white'
-                      : 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                }`}
-              >
-                Checks
-              </button>
-            </div>
-          )}
-
           <div className="h-3.5 w-px bg-neutral-200 dark:bg-neutral-800 hidden @[540px]:block" />
 
           {/* SCM Branch selector */}

@@ -5,6 +5,17 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Changed (2026-10-21 — the shell, rebuilt to the reference UI)
+- The right pane owns its tabs: a quiet strip (Review / Code / Preview /
+  Checks) sits at the top of the pane instead of pills floating in the app
+  bar. The duplicate switcher inside the diff pane is gone.
+- The preview pane grew a real URL bar — back, forward, reload and an
+  address field — like the reference browser chrome.
+- The composer is one input again: "Plan, search, build anything…". The
+  model dropdown lists the local agent's models directly (free first), and
+  the separate model select, the free-text model row and the Review /
+  Save row are gone — review lives in the file cards and in the pane.
+
 ### Removed (2026-10-21 — no defaults)
 - The agent's empty state no longer offers pre-baked prompts ("Build a
   landing page", "Create a starter index.html", "Review the workspace and
