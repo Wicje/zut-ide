@@ -1,0 +1,28 @@
+# Zut local stack — the IDE plus the local opencode agent, at login.
+#
+# Installed by `npm run local:install` into ~/.config/systemd/user/.
+# The path below is filled in by the installer; the checked-in copy is a
+# template.
+[Unit]
+Description=Zut local stack — IDE and local opencode agent
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__
+ExecStart=__NODE__ scripts/local-stack.mjs serve
+Environment="PATH=/home/zk3/.opencode/bin:/home/zk3/.local/bin:/home/zk3/.npm-global/bin:/usr/local/bin:/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="ZUT_WORKSPACE=__WORKSPACE__"
+# The supervisor starts the stack itself — do not let the Vite plugin try.
+Environment="ZUT_LOCAL_STACK=0"
+Restart=always
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

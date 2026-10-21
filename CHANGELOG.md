@@ -14,6 +14,10 @@ moved to a version section on release.
   `~/.zut-projects/default`.
 - The dev/preview server starts the stack for you (`scripts/local-stack.mjs`
   via a Vite plugin). `ZUT_LOCAL_STACK=0` opts out; CI never starts it.
+- `npm run local:install` installs the stack as a systemd **user** service
+  (no root): the IDE and the local agent are up at every login, a service
+  that dies is restarted in 2s, and `npm run local:down` stops the service
+  instead of fighting it.
 
 ### Fixed (2026-10-21 — the local agent)
 - The model picker read a flat `/provider` list, but the opencode server

@@ -20,7 +20,7 @@
 //
 // Every service binds loopback only. Nothing is exposed to the network.
 
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -140,18 +140,18 @@ function writePids(pids) {
   writeFileSync(PIDS, `${JSON.stringify(pids, null, 2)}\n`);
 }
 
-function startService(service) {
+function startService(service, { detached = true, unref = detached } = {}) {
   mkdirSync(LOGS, { recursive: true });
   const logPath = path.join(LOGS, `${service.name}.log`);
   const fd = openSync(logPath, 'a');
   const child = spawn(service.cmd, service.args, {
     cwd: service.cwd ?? ROOT,
     env: { ...process.env, ...(service.env ?? {}) },
-    detached: true,
+    detached,
     stdio: ['ignore', fd, fd],
   });
-  child.unref();
-  return { pid: child.pid, log: logPath };
+  if (unref) child.unref();
+  return { child, pid: child.pid, log: logPath };
 }
 
 const argv = process.argv.slice(2);
@@ -216,7 +216,112 @@ function pidAlive(pid) {
   }
 }
 
+/** True when the systemd user service is running the stack. */
+function supervisedBySystemd() {
+  try {
+    const state = execFileSync('systemctl', ['--user', 'is-active', 'zut-local-stack.service'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return state === 'active';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Foreground supervisor: starts every service, restarts it when it dies and
+ * stops them all on SIGTERM. This is what systemd runs, so the IDE and the
+ * local agent are up at login without anyone typing a command.
+ */
+async function serve() {
+  if (process.env.CI) {
+    console.error('[local] refused to serve in CI');
+    return;
+  }
+  mkdirSync(WORKSPACE, { recursive: true });
+  mkdirSync(LOGS, { recursive: true });
+
+  const children = new Map();
+  const pids = readPids();
+  let stopping = false;
+
+  const kill = (pid) => {
+    try {
+      process.kill(-pid, 'SIGTERM');
+    } catch {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        /* already gone */
+      }
+    }
+  };
+
+  const spawnService = (service) => {
+    // Not unref'd: the supervisor stays alive as long as its children run.
+    const { child, pid, log } = startService(service, { detached: true, unref: false });
+    children.set(service.name, { pid, log });
+    pids[service.name] = { pid, port: service.port, log };
+    child.on('exit', (code, signal) => {
+      if (stopping) return;
+      console.log(`[local] ${service.name} exited (code ${code}, signal ${signal}) — restarting in 2s`);
+      setTimeout(() => {
+        if (!stopping) spawnService(service);
+      }, 2000);
+    });
+    console.log(`[local] ${service.name}: started (pid ${pid}) — ${log}`);
+  };
+
+  // Services first, the dev server last: the IDE is only useful once the
+  // agent behind it is answering.
+  for (const service of SERVICES.filter((s) => s.name !== 'vite')) {
+    if (await portOpen(service.port)) {
+      console.log(`[local] ${service.name}: already up on :${service.port} — leaving it alone`);
+      continue;
+    }
+    spawnService(service);
+  }
+
+  const vite = SERVICES.find((s) => s.name === 'vite');
+  if (vite) {
+    if (await portOpen(vite.port)) {
+      console.log(`[local] vite: already up on :${vite.port} — leaving it alone`);
+    } else {
+      // The Vite plugin would try to start a second stack; we are the stack.
+      spawnService({ ...vite, env: { ...(vite.env ?? {}), ZUT_LOCAL_STACK: '0' } });
+    }
+  }
+
+  writePids(pids);
+  console.log('');
+  console.log('  browser   http://127.0.0.1:5173/');
+  console.log('  terminal  npm run term -- --url http://127.0.0.1:5173/');
+  console.log(`  workspace ${WORKSPACE}`);
+
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    console.log('[local] stopping');
+    for (const { pid } of children.values()) kill(pid);
+    setTimeout(() => process.exit(0), 1500);
+  };
+  process.on('SIGTERM', stop);
+  process.on('SIGINT', stop);
+}
+
 async function down() {
+  // The systemd service supervises the stack — stopping the children would
+  // just make it restart them. Stop the service instead.
+  if (supervisedBySystemd()) {
+    try {
+      execFileSync('systemctl', ['--user', 'stop', 'zut-local-stack.service'], { encoding: 'utf8' });
+    } catch {
+      /* fall through to the pid cleanup below */
+    }
+    console.log('[local] stopped the systemd service (it will start again at login)');
+  }
+
   const pids = readPids();
   for (const [name, info] of Object.entries(pids)) {
     const pid = Number(info.pid);
@@ -259,10 +364,11 @@ async function logs() {
 }
 
 if (command === 'up') await up();
+else if (command === 'serve') await serve();
 else if (command === 'down') await down();
 else if (command === 'status') await status();
 else if (command === 'logs') await logs();
 else {
-  console.error(`usage: node scripts/local-stack.mjs [up|down|status|logs] [--quiet]`);
+  console.error(`usage: node scripts/local-stack.mjs [up|serve|down|status|logs] [--quiet]`);
   process.exit(2);
 }

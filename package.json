@@ -22,6 +22,8 @@
     "local:down": "node scripts/local-stack.mjs down",
     "local:status": "node scripts/local-stack.mjs status",
     "local:logs": "node scripts/local-stack.mjs logs",
+    "local:install": "node scripts/install-local-service.mjs install",
+    "local:uninstall": "node scripts/install-local-service.mjs uninstall",
     "term:build": "npm --prefix terminal run build",
     "term:setup": "npm --prefix terminal install && npm --prefix terminal run build",
     "typecheck": "tsc -b",

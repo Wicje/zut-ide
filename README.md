@@ -98,6 +98,27 @@ picker as soon as the server is ready — no reload needed. When the VPS
 arrives, point the `VITE_*` URLs in `.env` at it and the same app talks to
 the server instead.
 
+### Start it at login (systemd)
+
+```bash
+npm run local:install    # user service, no root
+```
+
+That installs `zut-local-stack.service` into `~/.config/systemd/user/`, so
+the IDE and the local agent are waiting at every login — open
+http://127.0.0.1:5173/ or run `npm run term -- --url http://127.0.0.1:5173/`
+without starting anything first. The service supervises the stack: a service
+that dies is restarted in 2s.
+
+```bash
+systemctl --user status zut-local-stack    # is it up
+journalctl --user -u zut-local-stack -f    # follow the logs
+npm run local:uninstall                    # remove it
+```
+
+It is a *user* service, so it stops when you log out. To have it running
+from boot without a login: `loginctl enable-linger $USER`.
+
 ## The IDE in your terminal
 
 `zut-term` runs the same IDE inside a terminal window, painting real pixels
