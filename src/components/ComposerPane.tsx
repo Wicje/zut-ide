@@ -29,7 +29,7 @@ import {
   ImagePlus,
   FileText,
 } from 'lucide-react';
-import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext, AttachedImage } from '../types';
+import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext, AttachedImage, ComposerMode } from '../types';
 import screenRecThumb from '../assets/images/screen_recording_thumb_1791421930526.jpg';
 
 interface ComposerPaneProps {
@@ -41,6 +41,9 @@ interface ComposerPaneProps {
   onRollbackCheckpoint?: (checkpointId: string, stepTitle: string) => void;
   /** Open a changed file in the diff pane. */
   onOpenFile?: (path: string) => void;
+  /** Agent = change the code, Plan = write a plan first. */
+  mode?: ComposerMode;
+  onModeChange?: (mode: ComposerMode) => void;
   onOpenRules?: () => void;
   isGenerating?: boolean;
   theme?: 'light' | 'dark';
@@ -129,6 +132,8 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
   onGenerateEdits,
   onRollbackCheckpoint,
   onOpenFile,
+  mode = 'agent',
+  onModeChange,
   onOpenRules,
   isGenerating = false,
   theme = 'light',
@@ -169,6 +174,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         )?.name ?? opencodeModel.modelID)
       : selectedModel;
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const [opencodeCustom, setOpencodeCustom] = useState('');
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
   const [voiceHint, setVoiceHint] = useState<string | null>(null);
@@ -680,13 +686,59 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             onChange={(e) => setFollowUpText(e.target.value)}
             disabled={isGenerating}
             placeholder={isGenerating ? 'Synthesizing code...' : 'Plan, search, build anything...'}
-            className={`flex-1 px-2 text-[12.5px] max-sm:text-base bg-transparent focus:outline-none placeholder-neutral-400 ${
+            className={`flex-1 min-w-0 px-2 text-[12.5px] max-sm:text-base bg-transparent focus:outline-none placeholder-neutral-400 ${
               isDark ? 'text-white' : 'text-neutral-800'
             }`}
           />
 
-          {/* Model selector dropdown */}
+          {/* Mode: agent or plan */}
           <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsModeMenuOpen(!isModeMenuOpen)}
+              className={`flex items-center gap-1 shrink-0 text-[11.5px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                isDark ? 'text-neutral-300 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+              title={mode === 'plan' ? 'Plan mode: write a plan first' : 'Agent mode: change the code'}
+            >
+              <Sparkles size={11} className={mode === 'plan' ? 'text-amber-500' : 'text-neutral-400'} />
+              <span>{mode === 'plan' ? 'Plan' : 'Agent'}</span>
+              <ChevronDown size={11} className="text-neutral-400" />
+            </button>
+
+            {isModeMenuOpen && (
+              <div
+                className={`absolute right-0 bottom-full mb-2 w-44 border rounded-lg shadow-xl py-1 z-30 text-[12px] ${
+                  isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                }`}
+              >
+                {(
+                  [
+                    { id: 'agent', label: 'Agent', hint: 'Change the code' },
+                    { id: 'plan', label: 'Plan', hint: 'Write a plan first' },
+                  ] as const
+                ).map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      onModeChange?.(m.id);
+                      setIsModeMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
+                      isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                    } ${mode === m.id ? 'font-medium text-red-500' : ''}`}
+                  >
+                    <span>{m.label}</span>
+                    <span className="text-[10.5px] text-neutral-400">{m.hint}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Model selector dropdown */}
+          <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
@@ -694,8 +746,8 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                 isDark ? 'text-neutral-300 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              <span>{modelLabel}</span>
-              <ChevronDown size={11} className="text-neutral-400" />
+              <span className="max-w-[120px] truncate">{modelLabel}</span>
+              <ChevronDown size={11} className="text-neutral-400 shrink-0" />
             </button>
 
             {isModelDropdownOpen && (

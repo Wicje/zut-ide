@@ -21,6 +21,7 @@ import { HostModal } from './components/HostModal';
 import { HostGitModal } from './components/HostGitModal';
 import { LoginAndAccountModal } from './components/LoginAndAccountModal';
 import { AuthPage } from './components/AuthPage';
+import { PlanTasks } from './components/PlanTasks';
 import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { WaitlistGate } from './components/WaitlistGate';
@@ -32,6 +33,7 @@ import type {
   SessionData,
   SidebarSection,
   SidebarTask,
+  ComposerMode,
   RightPaneMode,
   TestCase,
   AttachedImage,
@@ -121,6 +123,7 @@ import {
   Maximize2,
   Minimize2,
   Sun,
+  X,
   Moon,
   RefreshCw,
   Command,
@@ -161,6 +164,9 @@ export default function App() {
   // Join-first: /app is gated until the landing waitlist flag exists.
   const [waitlistOk, setWaitlistOk] = useWaitlistGate();
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('diff');
+  const [composerMode, setComposerMode] = useState<ComposerMode>('agent');
+  // Open files, most recent last — the tabs across the top of the right pane.
+  const [openFileTabs, setOpenFileTabs] = useState<string[]>([]);
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified');
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   // A `zut host` gives the terminal a real pty and (later) git/workspace.
@@ -345,6 +351,16 @@ export default function App() {
     const names = Object.keys(loadDraft()?.files ?? STARTER).sort();
     return names[0] ?? 'index.html';
   });
+
+  // The active file joins the tab strip (most recent last, a few deep).
+  useEffect(() => {
+    if (!activeFilePath) return;
+    setOpenFileTabs((prev) => {
+      const next = prev.filter((p) => p !== activeFilePath);
+      next.push(activeFilePath);
+      return next.slice(-6);
+    });
+  }, [activeFilePath]);
 
   // ---- Real sessions (agent conversations; no fixtures; survive reload) ----
   const [sessions, setSessions] = useState<Record<string, SessionData>>(() => {
@@ -791,6 +807,25 @@ export default function App() {
   }
 
   // ---- Real agent turn (Gemini direct, or cloud agent) ----
+  /** In plan mode the agent plans instead of touching the code. */
+  function planInstruction(): string | undefined {
+    if (composerMode !== 'plan') return undefined;
+    return [
+      'Plan mode: reply with the plan only, and do not use any file tools.',
+      'The plan is a markdown checklist, one task per line: "- [ ] task".',
+      'Five tasks or fewer, in the order they should happen, one sentence each.',
+      'The IDE saves your reply as PLAN.md.',
+    ].join('\n');
+  }
+
+  /** The checklist the agent wrote, if it wrote one. */
+  function planTasksFrom(reply: string): string[] {
+    return reply
+      .split('\n')
+      .map((l) => /^\s*[-*]\s+\[[ xX]\]\s*(.+)$/.exec(l)?.[1]?.trim())
+      .filter((t): t is string => Boolean(t));
+  }
+
   async function runAgentTurn(sessionId: string, promptText: string, images: AttachedImage[] = []) {
     const sess = sessionsRef.current[sessionId];
     if (!sess || generatingRef.current) return;
@@ -838,7 +873,7 @@ export default function App() {
         const r = await opencodeTurn(
           base,
           promptText,
-          buildSystemPrompt(projectName, base, activeFilePath),
+          buildSystemPrompt(projectName, base, activeFilePath, planInstruction()),
           () => {},
           opencodeModel ?? undefined,
         );
@@ -848,6 +883,13 @@ export default function App() {
         if (r.deleted.length) deleteFromDisk(r.deleted);
         reply = r.reply;
         changedPaths = [...Object.keys(r.updated), ...Object.keys(r.created), ...r.deleted];
+        if (composerMode === 'plan') {
+          const tasks = planTasksFrom(r.reply);
+          if (tasks.length > 0) {
+            base['PLAN.md'] = `# Plan\n\n${tasks.map((t) => `- [ ] ${t}`).join('\n')}\n`;
+            changedPaths = [...new Set([...changedPaths, 'PLAN.md'])];
+          }
+        }
       } else if (PROVIDER_LABELS.some((p) => p.label === modelLabel)) {
         const provider = PROVIDER_LABELS.find((p) => p.label === modelLabel)!.id;
         const { streamProvider } = await import('./adapters/providers');
@@ -914,6 +956,11 @@ export default function App() {
       }
       const ms = Math.round(performance.now() - t0);
       setFiles({ ...base });
+      // A plan is a document: open it so the task list is right there.
+      if (composerMode === 'plan' && base['PLAN.md'] !== undefined) {
+        setActiveFilePath('PLAN.md');
+        setRightPaneMode('editor');
+      }
       const files = buildDiffFiles(snap.files, base);
       const totals = files.reduce(
         (acc, f) => ({ additions: acc.additions + f.additions, deletions: acc.deletions + f.deletions }),
@@ -1756,6 +1803,8 @@ export default function App() {
             attachableFiles={Object.keys(filesRef.current)
               .sort()
               .map((name) => ({ name, tokens: Math.max(1, Math.ceil((filesRef.current[name] ?? '').length / 4)) }))}
+            mode={composerMode}
+            onModeChange={setComposerMode}
             onOpenVideoModal={() => setIsVideoModalOpen(true)}
             onOpenFile={(path) => {
               setActiveFilePath(path);
@@ -1843,6 +1892,48 @@ export default function App() {
               ))}
             </div>
           )}
+          {/* Open file tabs */}
+          {!isMobile && openFileTabs.length > 0 && (
+            <div
+              className={`shrink-0 flex items-center gap-1 px-2 border-b overflow-x-auto ${
+                isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7] bg-[#f4f4f6]'
+              }`}
+              role="tablist"
+              aria-label="Open files"
+            >
+              {openFileTabs.map((path) => (
+                <div
+                  key={path}
+                  className={`group/tab flex items-center gap-1.5 pl-2.5 pr-1.5 h-7 rounded-t-md text-[12px] cursor-pointer ${
+                    activeFilePath === path && rightPaneMode === 'editor'
+                      ? isDark
+                        ? 'bg-[#1e1e24] text-white'
+                        : 'bg-white text-neutral-900'
+                      : isDark
+                        ? 'text-neutral-400 hover:text-neutral-200'
+                        : 'text-neutral-500 hover:text-neutral-900'
+                  }`}
+                  onClick={() => {
+                    setActiveFilePath(path);
+                    setRightPaneMode('editor');
+                  }}
+                >
+                  <span className="truncate max-w-[180px]">{path}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenFileTabs((prev) => prev.filter((p) => p !== path));
+                    }}
+                    className="opacity-0 group-hover/tab:opacity-100 transition-opacity text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+                    title={`Close ${path}`}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {rightPaneMode === 'diff' && (
             <DiffReviewPane
               files={activeFiles}
@@ -1889,6 +1980,23 @@ export default function App() {
                   },
                 },
               }}
+            />
+          )}
+
+          {rightPaneMode === 'editor' && activeFilePath.endsWith('.md') && (
+            <PlanTasks
+              content={files[activeFilePath] ?? ''}
+              onChange={(next) => {
+                setFiles((prev) => ({ ...prev, [activeFilePath]: next }));
+                const repo = localRepoRef.current;
+                if (workspaceSource === 'local' && repo) {
+                  void import('./adapters/localRepo').then(({ writeLocalFile }) =>
+                    writeLocalFile(repo.root, activeFilePath, next),
+                  );
+                }
+              }}
+              onRequestAgent={() => showToast('Ask the agent to plan: "Plan the next steps".')}
+              theme={theme}
             />
           )}
 

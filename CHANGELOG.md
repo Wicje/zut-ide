@@ -5,6 +5,16 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-21 — file tabs, plan mode, task lists)
+- The right pane has file tabs: the files you have open, newest last, each
+  one clickable (it opens in the editor) and closable.
+- The composer has a mode: **Agent** changes the code, **Plan** plans first.
+  In plan mode the agent is told to reply with a checklist and to keep its
+  hands off the files; the IDE saves the checklist as `PLAN.md` and opens it.
+- A plan document is a task list: every `- [ ]` line is a task you can tick
+  (the file is rewritten, so the plan and the list never disagree), and
+  "Add a task, ⌘K to generate…" appends one.
+
 ### Changed (2026-10-21 — the shell, rebuilt to the reference UI)
 - The right pane owns its tabs: a quiet strip (Review / Code / Preview /
   Checks) sits at the top of the pane instead of pills floating in the app

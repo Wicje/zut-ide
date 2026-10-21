@@ -109,6 +109,8 @@ export interface SessionData {
 }
 
 export type RightPaneMode = 'diff' | 'editor' | 'preview' | 'tests';
+/** The composer either changes code or writes a plan first. */
+export type ComposerMode = 'agent' | 'plan';
 export type DiffViewMode = 'unified' | 'split';
 export type ThemeMode = 'light' | 'dark';
 export type DeviceViewport = 'desktop' | 'tablet' | 'mobile';
