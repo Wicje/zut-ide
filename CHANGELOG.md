@@ -5,6 +5,27 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-21 — the local stack)
+- The IDE runs on your laptop with no VPS: `npm run dev` starts opencode
+  serve, the file bridge, zut-host, the broker and the dev server itself.
+  `npm run term:local` puts the same IDE (same agent, same workspace) in a
+  terminal window. `npm run local:status` / `local:down` / `local:logs`
+  manage the stack. Everything binds loopback; the workspace is
+  `~/.zut-projects/default`.
+- The dev/preview server starts the stack for you (`scripts/local-stack.mjs`
+  via a Vite plugin). `ZUT_LOCAL_STACK=0` opts out; CI never starts it.
+
+### Fixed (2026-10-21 — the local agent)
+- The model picker read a flat `/provider` list, but the opencode server
+  nests models under their provider — the picker came up empty. Both shapes
+  are read now, and an empty list is not cached.
+- The IDE decided once whether the local agent was reachable. It now polls,
+  so "opencode (self-host)" appears as soon as the server is up.
+- The dev server bound `localhost` (IPv6 only); the terminal client and the
+  local stack talk to `127.0.0.1`, so it is bound explicitly now.
+- The terminal client served a stale `dist/` when sources were newer. It
+  rebuilds when the build is out of date.
+
 ### Added (2026-10-20 — the IDE in the terminal)
 - `zut-term`: the Zut IDE runs inside a terminal window, painting real pixels
   over the kitty graphics protocol with

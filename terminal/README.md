@@ -33,7 +33,12 @@ downloads a patched Electron runtime, ~280 MB).
 ```bash
 npm run term:setup     # installs + builds terminal/
 npm run term           # launches
+npm run term:local     # launches the dev build and the local stack
 ```
+
+`npm run term:local` starts the whole local stack (opencode, file bridge,
+host, broker, dev server) and attaches the terminal to the same dev server
+the browser uses — one IDE, one agent, one workspace. See the root README.
 
 Or by hand:
 

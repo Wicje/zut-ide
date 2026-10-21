@@ -63,11 +63,40 @@ When you want it, bring your own key or use the cloud agent.
 
 ```bash
 npm install
-npm run dev        # → http://localhost:5173
+npm run dev        # → http://127.0.0.1:5173
 ```
 
 The app runs fine with no configuration — try it before touching Supabase.
 "New project" → pick a template, edit, watch the preview, open the console.
+
+## Run it on your own laptop (no VPS needed)
+
+`npm run dev` starts the whole local stack by itself — you do not have to
+launch anything else. It brings up:
+
+| service | port | what it is |
+|---|---|---|
+| opencode | 4096 | the coding agent — your models, your machine |
+| file bridge | 4331 | moves the IDE's project files in and out of the disk workspace |
+| zut host | 8790 | real workspace, git, real terminal |
+| zut broker | 8787 | program runs (python/go) and previews |
+| vite | 5173 | the IDE itself |
+
+Everything binds loopback only. The workspace is `~/.zut-projects/default`
+(override with `ZUT_WORKSPACE`).
+
+```bash
+npm run dev            # browser: http://127.0.0.1:5173
+npm run term:local     # the same IDE in your terminal, same agent
+npm run local:status   # what is up
+npm run local:down     # stop it
+npm run local:logs     # tail every service log
+```
+
+The IDE polls for the agent, so "opencode (self-host)" appears in the model
+picker as soon as the server is ready — no reload needed. When the VPS
+arrives, point the `VITE_*` URLs in `.env` at it and the same app talks to
+the server instead.
 
 ## The IDE in your terminal
 
@@ -78,7 +107,8 @@ It is the same app — every pane, modal and editor behaves identically.
 
 ```bash
 npm run term:setup     # installs + builds the terminal client (one-off)
-npm run term           # launches
+npm run term           # launches (production build)
+npm run term:local     # launches the dev build, shared with the browser
 ```
 
 Needs kitty, ghostty, wezterm, foot, or tmux with graphics passthrough. See

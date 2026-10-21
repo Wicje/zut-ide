@@ -47,6 +47,21 @@ export interface OpencodeModelOption {
   free: boolean;
 }
 
+interface RawModel {
+  id?: string;
+  providerID?: string;
+  name?: string;
+  cost?: { input?: number; output?: number };
+}
+
+/**
+ * The server nests models under their provider (`{id, models: {...}}`); older
+ * builds listed models flat (`{id, providerID}`). Read both.
+ */
+interface RawProviderEntry extends RawModel {
+  models?: Record<string, RawModel>;
+}
+
 let modelsCache: OpencodeModelOption[] | null = null;
 
 /** Models served by the local opencode server (connected providers only). */
@@ -55,20 +70,27 @@ export async function listOpencodeModels(): Promise<OpencodeModelOption[]> {
   const res = await fetch(`${baseUrl}/provider`, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`Model list failed (${res.status})`);
   const json = (await res.json()) as {
-    all?: Array<{ id?: string; providerID?: string; name?: string; cost?: { input?: number; output?: number } }>;
+    all?: RawProviderEntry[];
     connected?: string[];
   };
   const connected = new Set(json.connected ?? []);
-  const out = (json.all ?? [])
-    .filter((m) => m.id && m.providerID && connected.has(m.providerID))
-    .map((m) => ({
-      providerID: m.providerID as string,
-      id: m.id as string,
-      name: m.name || (m.id as string),
-      free: (m.cost?.input ?? 1) === 0 && (m.cost?.output ?? 1) === 0,
-    }))
-    .sort((a, b) => Number(b.free) - Number(a.free) || a.name.localeCompare(b.name));
-  modelsCache = out;
+  const out: OpencodeModelOption[] = [];
+  for (const entry of json.all ?? []) {
+    const models = entry.models ? Object.values(entry.models) : entry.id ? [entry] : [];
+    for (const m of models) {
+      const providerID = m.providerID ?? entry.id;
+      if (!m.id || !providerID || !connected.has(providerID)) continue;
+      out.push({
+        providerID,
+        id: m.id,
+        name: m.name || m.id,
+        free: (m.cost?.input ?? 1) === 0 && (m.cost?.output ?? 1) === 0,
+      });
+    }
+  }
+  out.sort((a, b) => Number(b.free) - Number(a.free) || a.name.localeCompare(b.name));
+  // Never cache an empty list: the server may not have loaded its providers yet.
+  if (out.length) modelsCache = out;
   return out;
 }
 

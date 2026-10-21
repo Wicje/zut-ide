@@ -1287,18 +1287,33 @@ export default function App() {
   const [opencodeModels, setOpencodeModels] = useState<Array<{ providerID: string; id: string; name: string; free: boolean }>>([]);
   const [opencodeModel, setOpencodeModel] = useState<{ providerID: string; modelID: string } | null>(null);
   useEffect(() => {
-    void import('./adapters/opencode').then(({ selfHostReady, listOpencodeModels, getOpencodeModel }) => {
-      selfHostReady()
-        .then((ok) => {
-          setOpencodeReady(ok);
-          if (!ok) return;
-          setOpencodeModel(getOpencodeModel());
-          listOpencodeModels()
-            .then(setOpencodeModels)
-            .catch(() => {});
-        })
-        .catch(() => {});
-    });
+    // The local stack may still be starting (the dev server starts it for
+    // you), so keep asking instead of deciding once.
+    let cancelled = false;
+    let wasReady = false;
+    const check = async () => {
+      if (cancelled) return;
+      try {
+        const mod = await import('./adapters/opencode');
+        const ok = await mod.selfHostReady();
+        if (cancelled || ok === wasReady) return;
+        wasReady = ok;
+        setOpencodeReady(ok);
+        if (!ok) return;
+        setOpencodeModel(mod.getOpencodeModel());
+        mod.listOpencodeModels()
+          .then(setOpencodeModels)
+          .catch(() => {});
+      } catch {
+        /* the stack is not up yet */
+      }
+    };
+    void check();
+    const timer = setInterval(check, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
   const changeOpencodeModel = (m: { providerID: string; modelID: string } | null) => {
