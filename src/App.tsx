@@ -1578,23 +1578,54 @@ export default function App() {
         backgroundColor: isDark ? '#141416' : '#6c798a',
       }}
     >
-      {/* Top Floating Control Bar */}
-      <div className="relative z-40 w-full flex justify-start sm:justify-center px-4 pt-3 shrink-0 overflow-x-auto">
-        <div className="flex items-center gap-2 shrink-0 bg-black/45 dark:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl text-white/90 text-xs shadow-xl border border-white/10 transition-opacity hover:opacity-100 opacity-80">
+      {/* Main Zut App Window with Interactive Drag Handles */}
+      <div
+        ref={containerRef}
+        className={`relative z-10 transition-all duration-100 ease-out flex shadow-2xl overflow-hidden border ${
+          isMobile || isMaximized
+            ? 'w-full flex-1 min-h-0 rounded-none border-none'
+            : 'w-[96vw] max-w-[1240px] h-[88vh] max-h-[800px] rounded-2xl shadow-2xl shadow-black/50 border-black/15'
+        } ${isMobile ? 'flex-col' : ''}`}
+        style={{
+          boxShadow: isMaximized || isMobile
+            ? 'none'
+            : isDark
+            ? '0 30px 70px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+            : '0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.12)',
+        }}
+      >
+      {/* Window title bar — the app name, the project, the actions */}
+      <div className="absolute top-0 left-0 right-0 z-30 h-11 flex items-center justify-between gap-3 px-3 border-b border-black/10 dark:border-white/10 bg-[#f4f4f6]/85 dark:bg-[#18181b]/85 backdrop-blur-md text-xs">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-5 h-5 rounded bg-red-600 text-white flex items-center justify-center text-[10px] font-bold">
+            Z
+          </div>
+          <span className={`font-medium ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>Zut</span>
+        </div>
+
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 max-w-[45%] truncate pointer-events-none hidden sm:block ${
+            isDark ? 'text-neutral-400' : 'text-neutral-500'
+          }`}
+        >
+          {projectName}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={() => setIsCommandPaletteOpen(true)}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Command Palette (⌘K)"
         >
           <Command size={11} />
           <span className="text-[11px] font-medium hidden sm:inline">⌘K</span>
         </button>
 
-        <span className="text-white/20 text-xs">|</span>
+        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setIsVercelDeployOpen(true)}
-          className="flex items-center gap-1.5 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Deploy to the web"
         >
           <svg viewBox="0 0 76 65" fill="currentColor" className="w-2.5 h-2.5">
@@ -1603,55 +1634,55 @@ export default function App() {
           <span className="text-[11px] font-medium hidden md:inline">Deploy</span>
         </button>
 
-        <span className="text-white/20 text-xs">|</span>
+        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
-        {!isMobile && <span className="text-white/20 text-xs">|</span>}
+        {!isMobile && <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>}
 
         <button
           onClick={toggleTheme}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
         >
           {isDark ? <Sun size={12} className="text-amber-400" /> : <Moon size={12} className="text-red-300" />}
         </button>
 
-        <span className="text-white/20 text-xs">|</span>
+        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setWallpaperMenuOpen((v) => !v)}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Wallpaper"
         >
-          <Image size={12} className={wallpaperMenuOpen ? 'text-white' : wallpaperOn ? 'text-white/90' : 'text-white/40'} />
+          <Image size={12} className={wallpaperMenuOpen ? 'text-white' : wallpaperOn ? 'text-neutral-600 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-600'} />
         </button>
 
-        <span className="text-white/20 text-xs">|</span>
+        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setIsMaximized(!isMaximized)}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title={isMaximized ? 'Restore Window' : 'Full Screen'}
         >
           {isMaximized ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
         </button>
 
-        <span className="text-white/20 text-xs">|</span>
+        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={handleReset}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Refresh workspace from saved state"
         >
           <RefreshCw size={11} />
         </button>
         </div>
         {wallpaperMenuOpen && (
-          <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 w-60 rounded-xl border border-white/10 bg-black/75 backdrop-blur-md p-2 text-white/90 text-xs shadow-xl">
+          <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 w-60 rounded-xl border border-white/10 bg-black/75 backdrop-blur-md p-2 text-neutral-600 dark:text-neutral-300 text-xs shadow-xl">
             {(['auto', 'light', 'dark'] as const).map((c) => (
               <button
                 key={c}
                 onClick={() => chooseWallpaper(c)}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer capitalize"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer capitalize"
               >
                 <span>{c === 'auto' ? 'Auto (follows theme)' : `${c[0].toUpperCase()}${c.slice(1)} wallpaper`}</span>
                 {wallpaperChoice === c && <span className="text-red-400">✓</span>}
@@ -1660,13 +1691,13 @@ export default function App() {
             {customWallpaper && (
               <button
                 onClick={() => chooseWallpaper('custom')}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <span>Custom photo</span>
                 {wallpaperChoice === 'custom' && <span className="text-red-400">✓</span>}
               </button>
             )}
-            <label className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+            <label className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer">
               <span>Upload custom…</span>
               <input
                 type="file"
@@ -1684,7 +1715,7 @@ export default function App() {
                 toggleWallpaper();
                 setWallpaperMenuOpen(false);
               }}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
             >
               <span>{wallpaperOn ? 'Hide wallpaper' : 'Show wallpaper'}</span>
               {!wallpaperOn && <span className="text-red-400">✓</span>}
@@ -1693,26 +1724,10 @@ export default function App() {
         )}
       </div>
 
-      {/* Main Zut App Window with Interactive Drag Handles */}
-      <div
-        ref={containerRef}
-        className={`relative z-10 transition-all duration-100 ease-out flex shadow-2xl overflow-hidden border ${
-          isMobile || isMaximized
-            ? 'w-full flex-1 min-h-0 rounded-none border-none'
-            : 'w-[96vw] max-w-[1240px] h-[88vh] max-h-[800px] rounded-2xl shadow-2xl shadow-black/50 border-black/15'
-        } ${isMobile ? 'flex-col' : ''}`}
-        style={{
-          boxShadow: isMaximized || isMobile
-            ? 'none'
-            : isDark
-            ? '0 30px 70px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1)'
-            : '0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.12)',
-        }}
-      >
         {/* Left Column: Sidebar with Dynamic Width */}
         <div
           style={isMobile ? undefined : { width: `${sidebarCollapsed ? 44 : sidebarWidth}px` }}
-          className={`shrink-0 overflow-hidden flex flex-col ${
+          className={`shrink-0 overflow-hidden flex flex-col pt-11 ${
             isMobile ? (mobileTab === 'files' ? 'w-full h-full' : 'hidden') : 'h-full'
           }`}
         >
@@ -1784,7 +1799,7 @@ export default function App() {
         {/* Middle Column: Composer Ghost Chat Pane with Dynamic Width */}
         <div
           style={isMobile ? undefined : { width: `${composerWidth}px` }}
-          className={`shrink-0 overflow-hidden flex flex-col ${
+          className={`shrink-0 overflow-hidden flex flex-col pt-11 ${
             isMobile ? (mobileTab === 'agent' ? 'w-full h-full' : 'hidden') : 'h-full'
           }`}
         >
@@ -1851,7 +1866,7 @@ export default function App() {
 
         {/* Right Column: Dynamic Pane Selection (flex-1) */}
         <div
-          className={`flex-1 overflow-hidden flex flex-col ${
+          className={`flex-1 overflow-hidden flex flex-col pt-11 ${
             isMobile ? (mobileTab === 'code' || mobileTab === 'preview' ? 'w-full h-full' : 'hidden') : 'h-full'
           }`}
         >

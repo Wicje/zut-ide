@@ -5,6 +5,12 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Changed (2026-10-21 — a real window title bar)
+- The floating pill above the window is gone. The app now has a title bar
+  inside the window, like the reference: the Zut mark and name on the left,
+  the project name in the middle, the actions on the right. The wallpaper
+  still shows around the window.
+
 ### Added (2026-10-21 — documents, questions, build)
 - Markdown can be read as a document: a `Document | Source` toggle in the
   file tabs renders the plan as prose (headings, lists, code, quotes) with
