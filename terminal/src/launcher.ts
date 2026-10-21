@@ -9,6 +9,7 @@ import {
   GRAPHICS_TERMINALS,
   isReachable,
   probeGraphics,
+  tmuxNote,
   unreachableMessage,
   unsupportedMessage,
 } from './capabilities.js';
@@ -81,6 +82,8 @@ export async function main(argv: string[]): Promise<number> {
     );
     console.error('zut-term: continuing anyway — if you see garbage, switch terminals.');
   }
+  const note = tmuxNote();
+  if (note) console.error(note);
   console.error(`zut-term: serving ${url}`);
 
   const child = spawn(process.execPath, [pixelEntry(), '.', '--', url], {

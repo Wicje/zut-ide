@@ -8,6 +8,8 @@
 //
 // Both are cheap to check up front, so the launcher can say what is wrong.
 
+import { execFileSync } from 'node:child_process';
+
 export type GraphicsSupport = 'supported' | 'unsupported' | 'unknown';
 
 const PROBE_ID = 4207;
@@ -111,5 +113,30 @@ export function unsupportedMessage(): string {
     `  IDE cannot be shown here. Use one of: ${GRAPHICS_TERMINALS}.`,
     '  Inside tmux the *client* terminal must support it (tmux passthrough',
     '  alone is not enough).',
+  ].join('\n');
+}
+
+/**
+ * A note for the case that actually bites: inside tmux, pixel can end up
+ * with the default 80x24 size instead of the real pane size, and the IDE is
+ * then drawn scaled down until it is a texture instead of a picture.
+ */
+export function tmuxNote(): string | null {
+  if (!process.env.TMUX) return null;
+  const client = (() => {
+    try {
+      return execFileSync('tmux', ['display', '-p', '#{client_termname}'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+    } catch {
+      return '';
+    }
+  })();
+  return [
+    `zut-term: running inside tmux (client terminal: ${client || 'unknown'}).`,
+    '  tmux and pixel can disagree about the pane size, which draws the IDE',
+    '  as a scaled-down mosaic. If the picture looks like noise, run this',
+    '  outside tmux — or use kitty as the tmux client terminal.',
   ].join('\n');
 }
