@@ -3,7 +3,7 @@
 // runtime — so the terminal is still usable while the app boots.
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { TermOptions } from './options.js';
@@ -98,6 +98,48 @@ export async function buildApp(log: (message: string) => void): Promise<void> {
   await run(npmCmd(), ['run', 'build'], REPO_ROOT);
 }
 
+/** Newest mtime under a directory tree (0 when it does not exist). */
+function newestMtime(dir: string): number {
+  let newest = 0;
+  const walk = (current: string) => {
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else {
+        try {
+          newest = Math.max(newest, statSync(full).mtimeMs);
+        } catch {
+          /* skip */
+        }
+      }
+    }
+  };
+  walk(dir);
+  return newest;
+}
+
+/**
+ * True when the built app is older than the sources. Serving a stale build
+ * means the terminal shows an IDE that no longer matches the repo.
+ */
+export function isDistStale(): boolean {
+  const distEntry = path.join(REPO_ROOT, 'dist', 'index.html');
+  if (!existsSync(distEntry)) return true;
+  try {
+    return newestMtime(path.join(REPO_ROOT, 'src')) > statSync(distEntry).mtimeMs;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Makes sure the Zut app is reachable and returns how to reach it.
  * An already-running server on the port is reused rather than duplicated.
@@ -111,7 +153,7 @@ export async function ensureAppServer(opts: EnsureOptions): Promise<AppServer> {
   }
 
   const distEntry = path.join(REPO_ROOT, 'dist', 'index.html');
-  if (opts.mode === 'preview' && (opts.rebuild || !existsSync(distEntry))) {
+  if (opts.mode === 'preview' && (opts.rebuild || !existsSync(distEntry) || isDistStale())) {
     await buildApp(opts.log);
   }
 
