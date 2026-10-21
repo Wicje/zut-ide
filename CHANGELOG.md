@@ -20,6 +20,11 @@ moved to a version section on release.
   instead of fighting it.
 
 ### Fixed (2026-10-21 — the local agent)
+- The terminal client now checks two things before it hands the screen to
+  pixel: that the IDE is actually serving the URL, and that the terminal
+  answers the kitty graphics query. A wrong URL or a terminal that cannot
+  draw the protocol used to show a broken picture with no explanation —
+  now both print what is wrong and what to do.
 - The model picker read a flat `/provider` list, but the opencode server
   nests models under their provider — the picker came up empty. Both shapes
   are read now, and an empty list is not cached.

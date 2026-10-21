@@ -6,6 +6,13 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { UsageError, parseArgs, usage } from './options.js';
 import {
+  GRAPHICS_TERMINALS,
+  isReachable,
+  probeGraphics,
+  unreachableMessage,
+  unsupportedMessage,
+} from './capabilities.js';
+import {
   TERMINAL_DIR,
   ensureAppServer,
   pixelAppEntry,
@@ -54,6 +61,27 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   const url = opts.url ?? server!.url;
+
+  // Say what is wrong instead of painting a broken picture.
+  if (!(await isReachable(url))) {
+    console.error(unreachableMessage(url));
+    server?.stop();
+    return 1;
+  }
+
+  const graphics = await probeGraphics();
+  if (graphics === 'unsupported') {
+    console.error(unsupportedMessage());
+    server?.stop();
+    return 1;
+  }
+  if (graphics === 'unknown') {
+    console.error(
+      `zut-term: could not confirm graphics support in this terminal (needs: ${GRAPHICS_TERMINALS}).`,
+    );
+    console.error('zut-term: continuing anyway — if you see garbage, switch terminals.');
+  }
+  console.error(`zut-term: serving ${url}`);
 
   const child = spawn(process.execPath, [pixelEntry(), '.', '--', url], {
     cwd: TERMINAL_DIR,

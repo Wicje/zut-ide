@@ -23,7 +23,25 @@ A terminal that supports the **kitty graphics protocol**:
 - kitty, ghostty, wezterm, foot, cmux, supacode, tty7 — full support.
 - tmux — works through kitty graphics passthrough, with lower precision mouse
   and reduced performance. Enable it with `set -g allow-passthrough on` (tmux
-  3.3+).
+  3.3+). Inside tmux it is the *client* terminal that must support the
+  protocol: tmux passthrough alone is not enough.
+
+On macOS, Terminal.app and iTerm2 do **not** support the kitty graphics
+protocol — use kitty, ghostty or wezterm there.
+
+The launcher checks both things before it hands the screen to pixel: that the
+IDE is actually serving the URL, and that the terminal answers the kitty
+graphics query. If either fails it says so instead of painting a broken
+picture.
+
+```
+zut-term: nothing is serving the IDE at http://127.0.0.1:5173/.
+  Start it on this machine with `npm run dev` (or `npm run local`),
+  or point at another URL with --url.
+
+zut-term: this terminal cannot draw the kitty graphics protocol, so the
+  IDE cannot be shown here. Use one of: kitty, ghostty, wezterm, foot …
+```
 
 ## Setup
 
