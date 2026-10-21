@@ -5,6 +5,12 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-21 — AI completion)
+- The editor offers the rest of the line as ghost text; Tab takes it. It
+  talks straight to the provider you already have a key for (OpenRouter,
+  Anthropic or OpenAI), so nothing is proxied through us. The *AI* button in
+  the editor toolbar turns it off.
+
 ### Changed (2026-10-21 — a real window title bar)
 - The floating pill above the window is gone. The app now has a title bar
   inside the window, like the reference: the Zut mark and name on the left,

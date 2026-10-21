@@ -66,6 +66,36 @@ neutral surface, not a green or red one.
   `border-amber-500/20` over the matching `bg-*-500/10`.
 
 
+## Type scale
+
+Four sizes. Nothing else — a UI with ten font sizes reads as assembled, not
+designed.
+
+| token | px | use |
+|---|---|---|
+| `t-micro` | 10 | badges, counts, timestamps |
+| `t-small` | 11 | labels, secondary text, toolbars |
+| `t-body` | 13 | prose, list items, table cells |
+| `t-lead` | 15 | section headings, the app name |
+
+`text-[10.5px]`, `text-[11.5px]`, `text-[12.5px]` and friends are drift;
+round to the nearest step. Body prose is 13, never 12.5.
+
+## Surfaces
+
+Three layers, no more. Near-duplicate greys (`#141416`, `#18181b`,
+`#18181c`, `#1e1e24`, `#1f1f25`, `#202025`, `#222228`, `#24242a` …) are the
+other half of the same drift.
+
+| layer | light | dark | use |
+|---|---|---|---|
+| canvas | `#f4f4f6` | `#141416` | the app stage behind the window |
+| panel | `#ffffff` | `#18181b` | panes, the composer, the rail |
+| raised | `#fafafc` | `#1e1e24` | cards, dropdowns, the task list |
+
+Anything else must be a tint of one of these, or a status colour from the
+table above. Borders are for surfaces, not for buttons.
+
 ## Typography
 
 - **UI:** `-apple-system, Inter, SF Pro Text, Segoe UI` (Google Fonts Inter).

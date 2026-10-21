@@ -10,6 +10,26 @@ Your code lives in your private project. Editing is free — only runs use run t
 AI is optional: plain code + Run works with no key, no sign-in, no server.
 When you want it, bring your own key or use the cloud agent.
 
+## Why Zut
+
+Cursor and Replit put the agent in *their* cloud and meter it. Zut is the
+other way round:
+
+- **It runs on your machine.** The agent is [opencode](https://opencode.ai)
+  on your own box — your models, your keys, your quota. Your files are your
+  files; the terminal is a real PTY; git is real git. No account, no
+  waitlist, no limits, no telemetry.
+- **Bring your own agent, not a vendor's models.** The model picker lists
+  whatever your opencode server has connected — opencode zen, OpenRouter,
+  Cerebras, anything else you connect. Zut is a client of the agent, not a
+  locked-in product.
+- **The IDE lives in your terminal too.** The same app renders as real
+  pixels in a kitty / ghostty / wezterm window (kitty graphics protocol), so
+  you can work in the terminal without leaving it.
+- **The agent asks before it acts.** Plan mode writes a checklist you tick
+  off; a question from the agent becomes a card you answer. Every turn is a
+  per-file diff you accept or revert, with checkpoints.
+
 - **Editor**: Monaco (VS Code's editor) with IntelliSense and red-squiggle type errors for JS/TS.
 - **Multiple files**: `index.html`, `style.css`, `script.js`, `script.ts`, `main.py`, `main.go`, JSON, text — anything.
 - **Desktop shell**: resizable sidebar / composer / right-pane window on a wallpaper
@@ -53,6 +73,11 @@ When you want it, bring your own key or use the cloud agent.
   with checkpoints. Bring your own key (Gemini, OpenRouter, Claude, ChatGPT),
   run free models via self-hosted opencode, and attach images the models can
   actually see. Keys stay in your browser.
+- **AI completion** — type and the editor offers the rest of the line as ghost
+  text; Tab takes it. Straight to the provider you already have a key for, so
+  nothing is proxied through us. Toggle it with the *AI* button in the editor.
+- **Plan mode** — ask for a plan and the agent writes one: a markdown checklist
+  you can tick off, and it asks you a question when it needs a decision.
 - **Run checks** — the Checks pane executes the project entry and lists each run
   as a pass/fail row with output; failing rows offer agent auto-fix.
 - **Resilient workspace** — every New / Import / Restore / revert / rollback

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Editor, { type OnMount, type Monaco } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+import { completeInline, completionProvider } from '../adapters/inlineComplete';
+import type { editor, IDisposable, Position } from 'monaco-editor';
 import {
   Upload,
   FileCode,
@@ -20,6 +21,7 @@ import {
   FileText,
   Save,
   Zap,
+  Wand2,
   Sparkles,
   Command,
   RotateCcw,
@@ -108,6 +110,13 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
   const activeFile = files.find((f) => f.id === activeFileId) || files[0];
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
+  // AI completion (ghost text, Tab to accept) — on when a provider key exists.
+  const [aiCompleteOn, setAiCompleteOn] = useState(() => localStorage.getItem('zut:ai-complete') !== 'off');
+  const aiCompleteOnRef = useRef(aiCompleteOn);
+  const inlineCompletionRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    aiCompleteOnRef.current = aiCompleteOn;
+  }, [aiCompleteOn]);
   const decorationsRef = useRef<string[]>([]);
   const [editorReady, setEditorReady] = useState(false);
   const activeFileRef = useRef<string>('');
@@ -199,10 +208,77 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
     );
   }
 
+  // AI completion: ask the provider for the text at the cursor and show it as
+  // ghost text. Debounced, abortable, and only for code files.
+  const registerInlineCompletion = (ed: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+    const LANGUAGES = [
+      'typescript',
+      'javascript',
+      'python',
+      'go',
+      'html',
+      'css',
+      'json',
+      'rust',
+      'java',
+      'php',
+      'sql',
+      'yaml',
+    ];
+    const disposables: IDisposable[] = [];
+    let inFlight: AbortController | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    for (const language of LANGUAGES) {
+      disposables.push(
+        monaco.languages.registerInlineCompletionsProvider(language, {
+          provideInlineCompletions: async (model: editor.ITextModel, position: Position) => {
+            if (!aiCompleteOnRef.current) return null;
+            if (!completionProvider()) return null;
+            const path = activeFileRef.current;
+            if (!path) return null;
+            if (model.getWordUntilPosition(position).word.length > 0) return null;
+
+            const full = model.getValue();
+            const offset = model.getOffsetAt(position);
+            const prefix = full.slice(0, offset);
+            const suffix = full.slice(offset, offset + 800);
+            const line = model.getLineContent(position.lineNumber);
+            const column = position.column;
+            // Replace the rest of the line, not the whole document.
+            const rest = line.slice(column - 1);
+            const range = new monaco.Range(position.lineNumber, column, position.lineNumber, line.length + 1);
+
+            inFlight?.abort();
+            const controller = new AbortController();
+            inFlight = controller;
+
+            const text = await completeInline({
+              path,
+              language,
+              prefix: prefix.slice(-4000),
+              suffix: suffix.slice(0, 800),
+              signal: controller.signal,
+            });
+            if (controller.signal.aborted || !text) return null;
+            const insert = text.startsWith(rest) ? text.slice(rest.length) : text;
+            if (!insert.trim()) return null;
+            return {
+              items: [{ insertText: insert, range }],
+            };
+          },
+          freeInlineCompletions: () => {},
+        }),
+      );
+    }
+    inlineCompletionRef.current = () => disposables.forEach((d) => d.dispose());
+  };
+
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
     setEditorReady(true);
+    registerInlineCompletion(editor, monaco);
     editor.onDidChangeCursorPosition((e) => {
       setCursor({ line: e.position.lineNumber, col: e.position.column });
     });
@@ -318,6 +394,36 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
             <Zap size={11} />
             <span>{activeFile.language}</span>
           </div>
+
+          {/* AI completion (ghost text, Tab to accept) */}
+          <button
+            onClick={() => {
+              const next = !aiCompleteOn;
+              setAiCompleteOn(next);
+              try {
+                localStorage.setItem('zut:ai-complete', next ? 'on' : 'off');
+              } catch {
+                /* ignore */
+              }
+            }}
+            className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors cursor-pointer ${
+              aiCompleteOn
+                ? isDark
+                  ? 'bg-[#24242a] text-neutral-200'
+                  : 'bg-neutral-100 text-neutral-800'
+                : isDark
+                  ? 'text-neutral-500 hover:text-neutral-300'
+                  : 'text-neutral-400 hover:text-neutral-700'
+            }`}
+            title={
+              completionProvider()
+                ? 'AI completion: type, then press Tab to accept the suggestion'
+                : 'AI completion needs an OpenRouter, Anthropic or OpenAI key (account settings)'
+            }
+          >
+            <Wand2 size={11} />
+            <span>AI</span>
+          </button>
 
           <button
             onClick={handleCopyCode}
