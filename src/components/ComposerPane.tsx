@@ -30,6 +30,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext, AttachedImage, ComposerMode } from '../types';
+import { answersPrompt, parseQuestions, stripQuestions } from '../lib/questions';
 import screenRecThumb from '../assets/images/screen_recording_thumb_1791421930526.jpg';
 
 interface ComposerPaneProps {
@@ -175,6 +176,9 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
       : selectedModel;
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
+  const [questionChoice, setQuestionChoice] = useState<number | null>(null);
+  const [isQuestionOpen, setIsQuestionOpen] = useState(true);
+  const question = React.useMemo(() => parseQuestions(session.response ?? ''), [session.response]);
   const [opencodeCustom, setOpencodeCustom] = useState('');
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
   const [voiceHint, setVoiceHint] = useState<string | null>(null);
@@ -479,7 +483,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         {session.response && (
           <div className="group/reply flex items-start gap-2">
             <p className={`flex-1 text-[13.5px] leading-[1.5] ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>
-              {session.response}
+              {stripQuestions(session.response)}
             </p>
             <button
               onClick={handleCopySummary}
@@ -490,6 +494,68 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             </button>
           </div>
         )}
+        {/* The agent asked something: pick an answer and it continues */}
+        {question && (
+          <div
+            className={`rounded-xl border p-3 space-y-2 ${
+              isDark ? 'border-neutral-700 bg-[#1c1c22]' : 'border-[#e5e5e7] bg-[#f8f8fa]'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[12px] font-semibold ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>
+                Questions
+              </span>
+              <button
+                onClick={() => setIsQuestionOpen(!isQuestionOpen)}
+                className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 cursor-pointer"
+                title={isQuestionOpen ? 'Hide' : 'Show'}
+              >
+                {isQuestionOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </button>
+            </div>
+            {isQuestionOpen && (
+              <>
+                <p className={`text-[13px] leading-[1.45] ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>
+                  {question.question}
+                </p>
+                <div className="space-y-1.5 pt-0.5">
+                  {question.options.map((option, i) => (
+                    <label key={i} className="flex items-start gap-2 cursor-pointer group">
+                      <input
+                        type="radio"
+                        name="zut-question"
+                        checked={questionChoice === i}
+                        onChange={() => setQuestionChoice(i)}
+                        className="mt-1 accent-red-500"
+                      />
+                      <span className="text-[12.5px] leading-[1.4] text-neutral-600 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white">
+                        {option}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setQuestionChoice(null);
+                      sendPromptText(answersPrompt(question, null));
+                    }}
+                    className="px-2.5 py-1 rounded-md text-[12px] text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    onClick={() => sendPromptText(answersPrompt(question, questionChoice))}
+                    className="px-2.5 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-white text-[12px] font-medium transition-colors cursor-pointer"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Changed files */}
         {session.files.length > 0 && (
           <div className="space-y-1.5">

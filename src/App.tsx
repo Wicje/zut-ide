@@ -22,6 +22,7 @@ import { HostGitModal } from './components/HostGitModal';
 import { LoginAndAccountModal } from './components/LoginAndAccountModal';
 import { AuthPage } from './components/AuthPage';
 import { PlanTasks } from './components/PlanTasks';
+import { MarkdownDoc } from './components/MarkdownDoc';
 import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { WaitlistGate } from './components/WaitlistGate';
@@ -165,6 +166,8 @@ export default function App() {
   const [waitlistOk, setWaitlistOk] = useWaitlistGate();
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('diff');
   const [composerMode, setComposerMode] = useState<ComposerMode>('agent');
+  // Markdown can be read as a document or as source.
+  const [editorView, setEditorView] = useState<'source' | 'document'>('source');
   // Open files, most recent last — the tabs across the top of the right pane.
   const [openFileTabs, setOpenFileTabs] = useState<string[]>([]);
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified');
@@ -1901,6 +1904,43 @@ export default function App() {
               role="tablist"
               aria-label="Open files"
             >
+              <div className="flex items-center gap-1 mr-1 ml-auto shrink-0">
+                <button
+                  onClick={() => {
+                    void rebuildPreview(filesRef.current).then(() => {
+                      setRightPaneMode('preview');
+                      showToast('Preview rebuilt.');
+                    });
+                  }}
+                  className={`px-2 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${
+                    isDark ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200' : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
+                  }`}
+                  title="Build the preview"
+                >
+                  Build
+                </button>
+                {activeFilePath.endsWith('.md') && (
+                  <div className="flex items-center gap-0.5 rounded-md border border-neutral-200 dark:border-neutral-700 p-0.5">
+                    {(['document', 'source'] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setEditorView(v)}
+                        className={`px-1.5 py-0.5 rounded text-[11px] capitalize transition-colors cursor-pointer ${
+                          editorView === v
+                            ? isDark
+                              ? 'bg-white/10 text-white'
+                              : 'bg-white text-neutral-900 shadow-xs'
+                            : isDark
+                              ? 'text-neutral-400 hover:text-neutral-200'
+                              : 'text-neutral-500 hover:text-neutral-900'
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {openFileTabs.map((path) => (
                 <div
                   key={path}
@@ -2000,7 +2040,11 @@ export default function App() {
             />
           )}
 
-          {rightPaneMode === 'editor' && (
+          {rightPaneMode === 'editor' && activeFilePath.endsWith('.md') && editorView === 'document' && (
+            <MarkdownDoc content={files[activeFilePath] ?? ''} theme={theme} />
+          )}
+
+          {rightPaneMode === 'editor' && !(activeFilePath.endsWith('.md') && editorView === 'document') && (
             <Suspense
               fallback={
                 <div className="flex-1 flex items-center justify-center text-xs text-neutral-400">

@@ -202,7 +202,9 @@ export async function opencodeTurn(
         fn();
       }
     };
-    const timeout = setTimeout(() => finish(() => reject(new Error('Agent response timed out'))), 120_000);
+    // A local model can be slow (the free ones often are). Two minutes was
+    // too tight: the turn looked dead while the agent was still working.
+    const timeout = setTimeout(() => finish(() => reject(new Error('Agent response timed out'))), 300_000);
     source.onmessage = (ev) => {
       let event: Record<string, unknown>;
       try {

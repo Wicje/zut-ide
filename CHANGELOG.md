@@ -5,6 +5,20 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-21 — documents, questions, build)
+- Markdown can be read as a document: a `Document | Source` toggle in the
+  file tabs renders the plan as prose (headings, lists, code, quotes) with
+  no dependency and no HTML injection.
+- The agent can ask instead of guessing. End its reply with a questions
+  block and the IDE shows a card: the question, the options, Skip and
+  Continue. Your answer goes back as the next turn.
+- A `Build` button in the pane header rebuilds the preview and opens it.
+
+### Fixed (2026-10-21 — slow local models)
+- A local agent turn timed out after two minutes, which read as a failure
+  while the model was still working. Five minutes now, and the questions
+  block is stripped from the prose (it is a card, not text).
+
 ### Added (2026-10-21 — file tabs, plan mode, task lists)
 - The right pane has file tabs: the files you have open, newest last, each
   one clickable (it opens in the editor) and closable.

@@ -56,6 +56,12 @@ export function buildSystemPrompt(
     const body = active.length > 4000 ? `${active.slice(0, 4000)}\n…(truncated)` : active;
     parts.push('', `Active file: ${activePath}`, '```', body, '```');
   }
+  parts.push(
+    '',
+    'If you need a decision before you can continue, end your reply with a questions block:',
+    '[questions] on its own line, then the question, then one numbered option per line,',
+    'then [/questions]. Otherwise do not ask anything.',
+  );
   const rules = loadRules().trim();
   if (rules) parts.push('', `Project rules (always follow):\n${rules}`);
   const tools = connectorsPromptBlock();
