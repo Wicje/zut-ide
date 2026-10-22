@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
+import mark from './assets/zut-mark.png';
 import { Sidebar } from './components/Sidebar';
 import { ComposerPane } from './components/ComposerPane';
 import { DiffReviewPane } from './components/DiffReviewPane';
@@ -25,8 +26,10 @@ import { PlanTasks } from './components/PlanTasks';
 import { MarkdownDoc } from './components/MarkdownDoc';
 import { RulesModal } from './components/RulesModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
-import { WaitlistGate } from './components/WaitlistGate';
+import { AccountGate } from './components/AccountGate';
+import { AgentSetup } from './components/AgentSetup';
 import { redactSecrets } from './lib/secrets';
+import { accessBypassed, accountsConfigured, currentAccount, getAgentMode } from './lib/account';
 import type {
   AgentStep,
   DiffViewMode,
@@ -90,7 +93,6 @@ import {
   deployStatic,
 } from './adapters/zut';
 import { geminiTurn, getGeminiKey, setGeminiKey } from './adapters/gemini';
-import { useWaitlistGate } from './hooks/useWaitlistGate';
 import { useRemoteShell } from './hooks/useRemoteShell';
 import { useWallpaper } from './hooks/useWallpaper';
 import { usePaneWidths, SIDEBAR_WIDTH, COMPOSER_WIDTH } from './hooks/usePaneWidths';
@@ -133,6 +135,10 @@ import {
   Folder,
   Image,
   PanelLeftOpen,
+  Copy,
+  Check,
+  MoreHorizontal,
+  Terminal,
 } from 'lucide-react';
 
 // Which workspace was open last, so a reload can reconnect it without
@@ -162,8 +168,9 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-  // Join-first: /app is gated until the landing waitlist flag exists.
-  const [waitlistOk, setWaitlistOk] = useWaitlistGate();
+  // An account opens the IDE: /app stays closed until there is a session
+  // (local development and ?nowait skip the door).
+  const [authChecked, setAuthChecked] = useState(false);
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('diff');
   const [composerMode, setComposerMode] = useState<ComposerMode>('agent');
   // Markdown can be read as a document or as source.
@@ -186,6 +193,9 @@ export default function App() {
   const [isVercelDeployOpen, setIsVercelDeployOpen] = useState(false);
   const [isLoginAccountOpen, setIsLoginAccountOpen] = useState(false);
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  // A signed-in user picks where the agent runs (their machine, or ours).
+  const [needsAgentSetup, setNeedsAgentSetup] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -232,6 +242,9 @@ export default function App() {
         })
         .catch(() => {});
     });
+    // The door needs to know: are we signed in yet?
+    void currentAccount().then(() => setAuthChecked(true));
+
     const sb = getSupabase();
     if (!sb) return;
     sb.auth.getSession().then(({ data }) => {
@@ -744,6 +757,53 @@ export default function App() {
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, []);
+
+  // The pane header: the diff summary, copy-the-diff, and the two actions
+  // that live with it (create a PR, save and deploy).
+  const diffAdditions = activeFiles.reduce((acc, f) => acc + f.additions, 0);
+  const diffDeletions = activeFiles.reduce((acc, f) => acc + f.deletions, 0);
+  const [copiedDiff, setCopiedDiff] = useState(false);
+  const [isPaneMenuOpen, setIsPaneMenuOpen] = useState(false);
+  const paneMenuRef = useRef<HTMLDivElement>(null);
+
+  // The pane menu closes when you click anywhere else.
+  useEffect(() => {
+    if (!isPaneMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (paneMenuRef.current && !paneMenuRef.current.contains(e.target as Node)) {
+        setIsPaneMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [isPaneMenuOpen]);
+
+  function copyFullDiff() {
+    const text = activeFiles
+      .map((f) => {
+        const body = [...(f.extraContextTop ?? []), ...f.lines]
+          .map((l) => `${l.type === 'add' ? '+' : l.type === 'delete' ? '-' : ' '}${l.content}`)
+          .join('\n');
+        return `--- a/${f.path}\n+++ b/${f.path}\n${body}`;
+      })
+      .join('\n\n');
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+    setCopiedDiff(true);
+    setTimeout(() => setCopiedDiff(false), 2000);
+  }
+
+  function handleBuildPreview() {
+    void rebuildPreview(filesRef.current).then(() => {
+      setRightPaneMode('preview');
+      showToast('Preview rebuilt.');
+    });
+  }
+
+  function handleCommitPush() {
+    void save();
+    setIsVercelDeployOpen(true);
+  }
 
   async function rebuildPreview(target: FileMap) {
     if (detectProjectKind(target) !== 'web' || target['index.html'] === undefined) {
@@ -1597,9 +1657,7 @@ export default function App() {
       {/* Window title bar — the app name, the project, the actions */}
       <div className="absolute top-0 left-0 right-0 z-30 h-11 flex items-center justify-between gap-3 px-3 border-b border-black/10 dark:border-white/10 bg-[#f4f4f6]/85 dark:bg-[#18181b]/85 backdrop-blur-md text-xs">
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-5 h-5 rounded bg-red-600 text-white flex items-center justify-center text-[10px] font-bold">
-            Z
-          </div>
+          <img src={mark} alt="Zut" className={`h-4 w-4 ${isDark ? 'brightness-0 invert' : ''}`} />
           <span className={`font-medium ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>Zut</span>
         </div>
 
@@ -1866,51 +1924,199 @@ export default function App() {
 
         {/* Right Column: Dynamic Pane Selection (flex-1) */}
         <div
-          className={`flex-1 overflow-hidden flex flex-col pt-11 ${
+          className={`@container flex-1 overflow-hidden flex flex-col pt-11 ${
             isMobile ? (mobileTab === 'code' || mobileTab === 'preview' ? 'w-full h-full' : 'hidden') : 'h-full'
           }`}
         >
-          {/* Right pane tabs — the pane owns its own switcher, like the
-              reference UI; on phones the targets are big enough to tap. */}
+          {/* Right pane header — one row: the pane's switcher on the left,
+              its actions on the right. Open files get the row underneath, so
+              the pane is two rows of chrome at most. */}
           {(isMobile ? mobileTab === 'code' || mobileTab === 'preview' : true) && (
             <div
-              className={`shrink-0 flex items-center gap-1 px-2 border-b ${
+              className={`shrink-0 flex items-center gap-2 px-2 border-b min-w-0 ${
                 isDark ? 'border-neutral-800 bg-[#141416]' : 'border-[#e5e5e7] bg-[#f4f4f6]'
               } ${isMobile ? 'py-1.5' : 'h-9'}`}
-              role="tablist"
-              aria-label="Right pane mode"
             >
-              {(
-                [
-                  { id: 'diff', label: 'Review' },
-                  { id: 'editor', label: 'Code' },
-                  { id: 'preview', label: 'Preview' },
-                  { id: 'tests', label: 'Checks' },
-                ] as const
-              ).map(({ id, label }) => (
-                <button
-                  key={id}
-                  role="tab"
-                  aria-selected={rightPaneMode === id}
-                  onClick={() => setRightPaneMode(id)}
-                  className={`rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
-                    isMobile ? 'flex-1 min-h-[40px]' : 'px-2.5 py-1'
-                  } ${
-                    rightPaneMode === id
-                      ? isDark
-                        ? 'bg-white/10 text-white'
-                        : 'bg-white text-neutral-900 shadow-xs'
-                      : isDark
-                        ? 'text-neutral-400 hover:text-neutral-200'
-                        : 'text-neutral-500 hover:text-neutral-900'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <div
+                className="flex items-center gap-0.5 shrink-0"
+                role="tablist"
+                aria-label="Right pane mode"
+              >
+                {(
+                  [
+                    { id: 'diff', label: 'Review' },
+                    { id: 'editor', label: 'Code' },
+                    { id: 'preview', label: 'Preview' },
+                    { id: 'tests', label: 'Checks' },
+                  ] as const
+                ).map(({ id, label }) => (
+                  <button
+                    key={id}
+                    role="tab"
+                    aria-selected={rightPaneMode === id}
+                    onClick={() => setRightPaneMode(id)}
+                    className={`rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
+                      isMobile ? 'flex-1 min-h-[40px]' : 'px-2.5 py-1'
+                    } ${
+                      rightPaneMode === id
+                        ? isDark
+                          ? 'bg-white/10 text-white'
+                          : 'bg-white text-neutral-900 shadow-xs'
+                        : isDark
+                          ? 'text-neutral-400 hover:text-neutral-200'
+                          : 'text-neutral-500 hover:text-neutral-900'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* What the pane can do right now — one row, no second header. */}
+              <div className="ml-auto flex items-center gap-1 shrink-0">
+                {rightPaneMode === 'diff' && (
+                  <>
+                    <span className="hidden @[520px]:inline text-[11px] text-neutral-400 tabular-nums">
+                      {activeFiles.length} {activeFiles.length === 1 ? 'file' : 'files'}{' '}
+                      <span className="text-emerald-600 dark:text-emerald-400">+{diffAdditions}</span>{' '}
+                      <span className="text-red-600 dark:text-red-400">-{diffDeletions}</span>
+                    </span>
+                    <button
+                      onClick={copyFullDiff}
+                      className={`p-1 rounded transition-colors cursor-pointer ${
+                        isDark
+                          ? 'text-neutral-400 hover:text-neutral-200 hover:bg-white/5'
+                          : 'text-neutral-400 hover:text-neutral-700 hover:bg-black/5'
+                      }`}
+                      title="Copy the whole diff"
+                      aria-label="Copy the whole diff"
+                    >
+                      {copiedDiff ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                    </button>
+                    <button
+                      onClick={() => setIsPRModalOpen(true)}
+                      className={`hidden @[420px]:inline-block px-2 py-1 rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
+                        isDark
+                          ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
+                          : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
+                      }`}
+                    >
+                      Create PR
+                    </button>
+                    <button
+                      onClick={handleCommitPush}
+                      className={`px-2 py-1 rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
+                        isDark
+                          ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
+                          : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
+                      }`}
+                    >
+                      Save & deploy
+                    </button>
+                  </>
+                )}
+
+                {rightPaneMode === 'editor' && (
+                  <button
+                    onClick={handleBuildPreview}
+                    className={`px-2 py-1 rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
+                      isDark
+                        ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
+                        : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
+                    }`}
+                    title="Build the preview"
+                  >
+                    Build
+                  </button>
+                )}
+
+                <div className="relative" ref={paneMenuRef}>
+                  <button
+                    onClick={() => setIsPaneMenuOpen((v) => !v)}
+                    className={`p-1 rounded transition-colors cursor-pointer ${
+                      isDark
+                        ? 'text-neutral-400 hover:text-neutral-200 hover:bg-white/5'
+                        : 'text-neutral-400 hover:text-neutral-700 hover:bg-black/5'
+                    }`}
+                    title="More pane actions"
+                    aria-label="More pane actions"
+                  >
+                    <MoreHorizontal size={14} />
+                  </button>
+                  {isPaneMenuOpen && (
+                    <div
+                      className={`absolute right-0 top-full mt-1 w-52 rounded-lg border py-1 shadow-xl z-40 text-[12px] ${
+                        isDark
+                          ? 'bg-[#222228] border-neutral-700 text-neutral-200'
+                          : 'bg-white border-neutral-200 text-neutral-700'
+                      }`}
+                    >
+                      <button
+                        onClick={() => {
+                          setDiffViewMode(diffViewMode === 'unified' ? 'split' : 'unified');
+                          setRightPaneMode('diff');
+                          setIsPaneMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                        }`}
+                      >
+                        Switch to {diffViewMode === 'split' ? 'Unified' : 'Split'} view
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsTerminalOpen(!isTerminalOpen);
+                          setRightPaneMode('diff');
+                          setIsPaneMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer ${
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                        }`}
+                      >
+                        <Terminal size={13} className="text-neutral-400" />
+                        Terminal
+                      </button>
+                      <button
+                        onClick={() => {
+                          copyFullDiff();
+                          setIsPaneMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                        }`}
+                      >
+                        {copiedDiff ? 'Diff copied!' : 'Copy the whole diff'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsPRModalOpen(true);
+                          setIsPaneMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                        }`}
+                      >
+                        Create PR
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleCommitPush();
+                          setIsPaneMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                        }`}
+                      >
+                        Save & deploy
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
-          {/* Open file tabs */}
+
+          {/* Open files — the second row of the pane, only when files are open */}
           {!isMobile && openFileTabs.length > 0 && (
             <div
               className={`shrink-0 flex items-center gap-1 px-2 border-b overflow-x-auto ${
@@ -1919,21 +2125,7 @@ export default function App() {
               role="tablist"
               aria-label="Open files"
             >
-              <div className="flex items-center gap-1 mr-1 ml-auto shrink-0">
-                <button
-                  onClick={() => {
-                    void rebuildPreview(filesRef.current).then(() => {
-                      setRightPaneMode('preview');
-                      showToast('Preview rebuilt.');
-                    });
-                  }}
-                  className={`px-2 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${
-                    isDark ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200' : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
-                  }`}
-                  title="Build the preview"
-                >
-                  Build
-                </button>
+              <div className="flex items-center gap-0.5 mr-1 ml-auto shrink-0">
                 {activeFilePath.endsWith('.md') && (
                   <div className="flex items-center gap-0.5 rounded-md border border-neutral-200 dark:border-neutral-700 p-0.5">
                     {(['document', 'source'] as const).map((v) => (
@@ -1995,22 +2187,10 @@ export default function App() {
               onAcceptFile={handleAcceptFile}
               onRevertFile={handleRevertFile}
               onToggleStageFile={handleToggleStageFile}
-              onCreatePR={() => setIsPRModalOpen(true)}
-              onCommitPush={() => {
-                void save();
-                setIsVercelDeployOpen(true);
-              }}
               onAskComposer={handleAskComposerAboutLine}
-              onSwitchToEditor={() => setRightPaneMode('editor')}
-              rightPaneMode={rightPaneMode}
-              onSelectPaneMode={(mode) => setRightPaneMode(mode)}
               diffViewMode={diffViewMode}
-              onToggleDiffViewMode={() => setDiffViewMode(diffViewMode === 'unified' ? 'split' : 'unified')}
               isTerminalOpen={isTerminalOpen}
               onToggleTerminal={() => setIsTerminalOpen(!isTerminalOpen)}
-              isMaximized={isMaximized}
-              onToggleMaximize={() => setIsMaximized(!isMaximized)}
-              branchName={projectName}
               theme={theme}
               terminal={{
                 onCommand: handleTerminalCommand,
@@ -2374,6 +2554,7 @@ export default function App() {
 
       {isAuthPageOpen && (
         <AuthPage
+          initialMode={authMode}
           onClose={() => {
             setIsAuthPageOpen(false);
             setSignInError(null);
@@ -2384,6 +2565,7 @@ export default function App() {
             setUser(u);
             setIsAuthPageOpen(false);
             showToast(`Signed in as ${u.name}`);
+            if (!getAgentMode()) setNeedsAgentSetup(true);
           }}
           signedInAs={user ? { name: user.name, email: user.email } : null}
           signInError={signInError}
@@ -2412,6 +2594,7 @@ export default function App() {
         onLoginSuccess={(u) => {
           setUser(u);
           showToast(`Signed in as ${u.name}`);
+          if (!getAgentMode()) setNeedsAgentSetup(true);
         }}
         onLogout={() => {
           void getSupabase()?.auth.signOut();
@@ -2592,9 +2775,33 @@ export default function App() {
         theme={theme}
       />
 
-      {/* Join-first gate: blocks /app until waitlist join */}
-      {!waitlistOk && (
-        <WaitlistGate theme={theme} onJoined={() => setWaitlistOk(true)} />
+      {/* Where the agent runs: your machine, or ours. Asked once. */}
+      {needsAgentSetup && (
+        <AgentSetup
+          onDone={(mode) => {
+            setNeedsAgentSetup(false);
+            showToast(
+              mode === 'self'
+                ? 'Agent runs on your machine — connect opencode or a zut host.'
+                : 'Using our hosted agent.',
+            );
+          }}
+          onClose={() => setNeedsAgentSetup(false)}
+        />
+      )}
+
+      {/* The door: an account opens the IDE. */}
+      {/* The door: an account opens the IDE. It steps aside while the
+          account page itself is open. */}
+      {!accessBypassed() && accountsConfigured() && !user && !isAuthPageOpen && (
+        <AccountGate
+          theme={theme}
+          checking={!authChecked}
+          onCreateAccount={() => {
+            setAuthMode('signup');
+            setIsAuthPageOpen(true);
+          }}
+        />
       )}
 
       {/* Toast Notification */}

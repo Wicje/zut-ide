@@ -31,8 +31,16 @@ export interface AgentTurnResult {
 
 const brokerUrl = resolveBrokerUrl(import.meta.env as unknown as BrokerEnv);
 const cloudUrl = (import.meta.env.VITE_CLOUD_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+// The Zut project's publishable key is public — it is the same one the
+// landing page uses to create accounts. Env wins when set; the hardcoded
+// fallback keeps deployed builds working when VITE_SUPABASE_* is missing.
+const SUPABASE_FALLBACK_URL = 'https://tmajgvivaizcjpysggod.supabase.co';
+const SUPABASE_FALLBACK_ANON = 'sb_publishable_mjeMCS-80ht6EV04Zdc7hA_VWiyssbs';
+const supabaseUrl =
+  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? SUPABASE_FALLBACK_URL;
+const supabaseAnonKey =
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? SUPABASE_FALLBACK_ANON;
 
 export function brokerEnabled(): boolean {
   return Boolean(brokerUrl);

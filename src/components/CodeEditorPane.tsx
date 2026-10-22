@@ -20,9 +20,6 @@ import {
   Maximize2,
   FileText,
   Save,
-  Zap,
-  Wand2,
-  Sparkles,
   Command,
   RotateCcw,
   CornerDownLeft,
@@ -382,7 +379,6 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
             }`}
             title="Open Inline Composer (⌘K)"
           >
-            <Sparkles size={11} className={inlineKOpen ? 'text-white' : 'text-red-500'} />
             <span>Inline ⌘K</span>
           </button>
 
@@ -391,7 +387,6 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
               isDark ? 'bg-[#24242a] text-neutral-400' : 'bg-neutral-100 text-neutral-600'
             }`}
           >
-            <Zap size={11} />
             <span>{activeFile.language}</span>
           </div>
 
@@ -421,7 +416,6 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                 : 'AI completion needs an OpenRouter, Anthropic or OpenAI key (account settings)'
             }
           >
-            <Wand2 size={11} />
             <span>AI</span>
           </button>
 
@@ -587,7 +581,6 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                             }}
                             className="flex-1 flex items-center gap-1.5 truncate text-left cursor-pointer"
                           >
-                            <FileCode size={13} className={file.name.endsWith('.tsx') ? 'text-red-500' : 'text-amber-500'} />
                             <span className="truncate">{file.name}</span>
                             {file.isModified && (
                               <span className="text-[10px] text-amber-500 font-bold ml-1">
@@ -765,7 +758,6 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
               <div className="absolute left-8 right-8 top-3 p-3 rounded-xl border border-red-500/40 bg-white/95 dark:bg-[#1e1e24]/95 shadow-xl backdrop-blur-md animate-fadeIn z-20">
                 <div className="flex items-center justify-between text-xs font-sans pb-1.5">
                   <div className="flex items-center gap-1.5 font-semibold text-red-700 dark:text-red-300">
-                    <Sparkles size={13} />
                     <span>Ask agent about {activeFile.name} (⌘K)</span>
                   </div>
                   <button

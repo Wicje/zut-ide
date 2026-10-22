@@ -1,24 +1,13 @@
 import React, { useState } from 'react';
 import {
-  GitBranch,
-  Sparkles,
-  Plus,
-  GitCommit,
-  ChevronDown,
   ChevronRight,
-  Copy,
+  ChevronDown,
   RotateCcw,
   Check,
-  FileCode,
-  Maximize2,
-  Minimize2,
-  MoreHorizontal,
-  Terminal,
-  Layers,
   CheckSquare,
   Square,
 } from 'lucide-react';
-import { DiffFile, DiffViewMode, RightPaneMode } from '../types';
+import { DiffFile, DiffViewMode } from '../types';
 import { CodeLine } from './CodeLine';
 import { SplitDiffViewer } from './SplitDiffViewer';
 import { TerminalDrawer } from './TerminalDrawer';
@@ -28,14 +17,8 @@ interface DiffReviewPaneProps {
   onAcceptFile: (fileId: string) => void;
   onRevertFile: (fileId: string) => void;
   onToggleStageFile: (fileId: string) => void;
-  onCreatePR: () => void;
-  onCommitPush: () => void;
   onAskComposer?: (codeSnippet: string) => void;
-  onSwitchToEditor?: () => void;
-  rightPaneMode?: RightPaneMode;
-  onSelectPaneMode?: (mode: RightPaneMode) => void;
   diffViewMode: DiffViewMode;
-  onToggleDiffViewMode: () => void;
   isTerminalOpen: boolean;
   onToggleTerminal: () => void;
   terminal?: {
@@ -56,10 +39,7 @@ interface DiffReviewPaneProps {
       onOpenFile?: (path: string) => void;
     };
   };
-  isMaximized?: boolean;
-  onToggleMaximize?: () => void;
   theme?: 'light' | 'dark';
-  branchName?: string;
 }
 
 export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
@@ -67,48 +47,16 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
   onAcceptFile,
   onRevertFile,
   onToggleStageFile,
-  onCreatePR,
-  onCommitPush,
   onAskComposer,
-  onSwitchToEditor,
-  rightPaneMode = 'diff',
-  onSelectPaneMode,
   diffViewMode,
-  onToggleDiffViewMode,
   isTerminalOpen,
   onToggleTerminal,
   terminal,
-  isMaximized,
-  onToggleMaximize,
   theme = 'light',
-  branchName,
 }) => {
   const isDark = theme === 'dark';
   const [collapsedFiles, setCollapsedFiles] = useState<Record<string, boolean>>({});
   const [expandedContext, setExpandedContext] = useState<Record<string, boolean>>({});
-  const [currentBranch, setCurrentBranch] = useState(branchName ?? 'workspace');
-  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-  const [copiedDiff, setCopiedDiff] = useState(false);
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
-
-  function copyFullDiff() {
-    const text = files
-      .map((f) => {
-        const body = [...(f.extraContextTop ?? []), ...f.lines]
-          .map((l) => `${l.type === 'add' ? '+' : l.type === 'delete' ? '-' : ' '}${l.content}`)
-          .join('\n');
-        return `--- a/${f.path}\n+++ b/${f.path}\n${body}`;
-      })
-      .join('\n\n');
-    if (!text) return;
-    navigator.clipboard?.writeText(text);
-    setCopiedDiff(true);
-    setTimeout(() => setCopiedDiff(false), 2000);
-  }
-
-  React.useEffect(() => {
-    if (branchName) setCurrentBranch(branchName);
-  }, [branchName]);
 
   const toggleCollapse = (fileId: string) => {
     setCollapsedFiles((prev) => ({
@@ -124,268 +72,12 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
     }));
   };
 
-  const totalAdditions = files.reduce((acc, f) => acc + f.additions, 0);
-  const totalDeletions = files.reduce((acc, f) => acc + f.deletions, 0);
-
   return (
     <div
-      className={`@container flex-1 flex flex-col justify-between overflow-hidden select-none text-[13px] transition-colors ${
+      className={`@container flex-1 flex flex-col overflow-hidden select-none text-[13px] transition-colors ${
         isDark ? 'bg-[#1e1e24] text-neutral-200' : 'bg-white text-[#1e1e24]'
       }`}
     >
-      {/* Top Header Bar (width-gated on the pane itself; never scrolls sideways) */}
-      <div
-        className={`h-10 px-3.5 border-b flex items-center justify-between gap-2 min-w-0 [overflow-x:clip] ${
-          isDark ? 'border-neutral-800 bg-[#18181b]' : 'border-[#e5e5e7] bg-white'
-        }`}
-      >
-        {/* Left cluster */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          <div className="h-3.5 w-px bg-neutral-200 dark:bg-neutral-800 hidden @[540px]:block" />
-
-          {/* SCM Branch selector */}
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-neutral-400">
-              <GitCommit size={14} />
-            </span>
-            <span
-              className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
-                isDark ? 'bg-neutral-800 text-neutral-300' : 'bg-[#f0f0f3] text-neutral-600'
-              }`}
-            >
-              Local
-            </span>
-
-            <div className="relative min-w-0">
-              <button
-                onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-                className={`flex items-center gap-1 text-[12px] font-normal px-1 py-0.5 rounded transition-colors cursor-pointer min-w-0 ${
-                  isDark
-                    ? 'text-neutral-300 hover:text-white hover:bg-neutral-800'
-                    : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100'
-                }`}
-              >
-                <span className="truncate max-w-[90px]">{currentBranch}</span>
-                <ChevronDown size={12} className="text-neutral-400" />
-              </button>
-
-              {isBranchDropdownOpen && (
-                <div
-                  className={`absolute left-0 top-full mt-1 w-56 border rounded-lg shadow-xl py-1 z-30 text-[12px] ${
-                isDark ? 'bg-[#222228] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
-                  }`}
-                >
-                  {[currentBranch, 'main'].filter((b, i, arr) => arr.indexOf(b) === i).map(
-                    (b) => (
-                      <button
-                        key={b}
-                        onClick={() => {
-                          setCurrentBranch(b);
-                          setIsBranchDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
-                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                        } ${currentBranch === b ? 'font-medium text-red-500' : ''}`}
-                      >
-                        <span>{b}</span>
-                        {currentBranch === b && <Check size={12} />}
-                      </button>
-                    )
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right actions: Save & deploy always; the rest inline when roomy */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden @[540px]:flex items-center gap-2">
-            <button
-              onClick={copyFullDiff}
-              className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 transition-colors cursor-pointer"
-              title={copiedDiff ? 'Diff copied!' : 'Copy full diff to clipboard'}
-            >
-              {copiedDiff ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-            </button>
-
-            <button
-              onClick={onCreatePR}
-              className={`px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
-                isDark
-                  ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
-                  : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
-              }`}
-            >
-              Create PR
-            </button>
-
-            {onToggleMaximize && (
-              <button
-                onClick={onToggleMaximize}
-                className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 transition-colors ml-1 cursor-pointer"
-                title={isMaximized ? 'Restore window size' : 'Expand window'}
-              >
-                <Maximize2 size={13} />
-              </button>
-            )}
-          </div>
-
-          <button
-            onClick={onCommitPush}
-            className={`flex items-center gap-1 px-2.5 py-1 text-[12px] font-medium rounded-md shadow-2xs transition-all cursor-pointer ${
-              isDark
-                ? 'bg-[#24242a] hover:bg-[#2c2c34] text-neutral-200'
-                : 'bg-[#f4f4f6] hover:bg-[#eaeaea] text-neutral-800'
-            }`}
-          >
-            <span>Save & deploy</span>
-            <ChevronDown size={12} className="text-neutral-500" />
-          </button>
-        </div>
-
-        {/* Overflow menu (narrow panes): hover or tap to reveal */}
-        <div
-          className="relative @[540px]:hidden shrink-0"
-          onMouseEnter={() => setIsMoreOpen(true)}
-          onMouseLeave={() => setIsMoreOpen(false)}
-        >
-          <button
-            onClick={() => setIsMoreOpen((v) => !v)}
-            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded transition-colors cursor-pointer"
-            title="More actions"
-            aria-label="More actions"
-          >
-            <MoreHorizontal size={15} />
-          </button>
-          {isMoreOpen && (
-            <div
-              className={`absolute right-0 top-full mt-1 w-48 rounded-lg border py-1 shadow-xl z-40 text-[12px] ${
-                isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
-              }`}
-            >
-              <button
-                onClick={() => {
-                  onToggleDiffViewMode();
-                  setIsMoreOpen(false);
-                }}
-                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                }`}
-              >
-                Switch to {diffViewMode === 'split' ? 'Unified' : 'Split'} view
-              </button>
-              {onSelectPaneMode && (
-                <div className="flex items-center gap-1 px-2 py-1.5">
-                  {(
-                    [
-                      ['diff', 'Diff'],
-                      ['editor', 'Editor'],
-                      ['preview', 'Preview'],
-                      ['tests', 'Checks'],
-                    ] as Array<[RightPaneMode, string]>
-                  ).map(([m, label]) => (
-                    <button
-                      key={m}
-                      onClick={() => {
-                        onSelectPaneMode(m);
-                        setIsMoreOpen(false);
-                      }}
-                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                        rightPaneMode === m
-                          ? isDark
-                            ? 'bg-neutral-700 text-white'
-                            : 'bg-neutral-200 text-neutral-900'
-                          : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => {
-                  onToggleTerminal();
-                  setIsMoreOpen(false);
-                }}
-                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                }`}
-              >
-                Telemetry drawer
-              </button>
-              <button
-                onClick={() => {
-                  copyFullDiff();
-                  setIsMoreOpen(false);
-                }}
-                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                }`}
-              >
-                {copiedDiff ? 'Diff copied!' : 'Copy full diff'}
-              </button>
-              <button
-                onClick={() => {
-                  onCreatePR();
-                  setIsMoreOpen(false);
-                }}
-                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                }`}
-              >
-                Create PR
-              </button>
-              <button
-                onClick={() => {
-                  onCommitPush();
-                  setIsMoreOpen(false);
-                }}
-                className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                }`}
-              >
-                Save & deploy
-              </button>
-              {onToggleMaximize && (
-                <button
-                  onClick={() => {
-                    onToggleMaximize();
-                    setIsMoreOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                    isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                  }`}
-                >
-                  {isMaximized ? 'Restore window size' : 'Expand window'}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Secondary Bar: Files Summary */}
-      <div
-        className={`h-8 px-4 border-b flex items-center justify-between text-[12px] ${
-          isDark ? 'border-neutral-800 bg-[#161618] text-neutral-300' : 'border-[#e5e5e7] bg-white text-neutral-700'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          <FileCode size={14} className="text-neutral-400" />
-          <span className={`font-medium ${isDark ? 'text-white' : 'text-neutral-800'}`}>
-            {files.length} Files Uncommitted
-          </span>
-          <span className="text-[#16a34a] font-medium">+{totalAdditions}</span>
-          <span className="text-[#dc2626] font-medium">-{totalDeletions}</span>
-        </div>
-
-        <div className="text-[11px] text-neutral-400 hidden md:block">
-          Click <span className="font-code text-red-500">+</span> on line gutter to comment
-        </div>
-      </div>
-
       {/* Code Diffs Scroll Area */}
       <div className="flex-1 overflow-y-auto divide-y divide-[#e5e5e7] dark:divide-neutral-800">
         {files.map((file) => {

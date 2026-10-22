@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import mark from '../assets/zut-mark-white.png';
 import { Github, X, Mail } from 'lucide-react';
 import {
   mudAuthConfigured,
   mudOAuthProviders,
   mudOAuthStart,
-  mudRegister,
 } from '../adapters/mudauth';
+import { accountsConfigured, createAccount, signInWithPassword } from '../lib/account';
 
 // A full-screen sign in / sign up page.
 //
@@ -22,6 +23,8 @@ interface AuthPageProps {
   authHint?: string | null;
   /** Shown when the user is already signed in. */
   signedInAs?: { name: string; email: string } | null;
+  /** Which form to open on: 'signup' when the user came to create an account. */
+  initialMode?: 'signin' | 'signup';
 }
 
 const SOCIAL: Array<{ id: 'github' | 'google'; label: string; icon: React.ReactNode }> = [
@@ -60,8 +63,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   signInError,
   authHint,
   signedInAs,
+  initialMode = 'signin',
 }) => {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -70,6 +74,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[] | null>(null);
   const mudReady = mudAuthConfigured();
+  const accounts = accountsConfigured();
 
   React.useEffect(() => {
     if (!mudReady) return;
@@ -110,24 +115,54 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setError(null);
     setNotice(null);
     try {
-      if (mode === 'signup' && mudReady) {
-        await mudRegister(address, password, name.trim() || undefined);
-        setNotice('Account created — check your email to verify, then sign in.');
-        setMode('signin');
+      // Creating an account: a password, then a verification mail if the
+      // provider sends one. Either way the account exists from here on.
+      if (mode === 'signup') {
+        if (!accounts) throw new Error('Accounts are not configured on this deployment.');
+        const r = await createAccount(address, password, name.trim() || undefined);
+        if (r.signedIn) {
+          onSignedIn?.({ name: name.trim() || address.split('@')[0], email: address });
+        } else {
+          setNotice('Account created — check your email to verify it, then sign in.');
+          setMode('signin');
+        }
         return;
       }
-      if (mode === 'signup' && onMagicLink) {
+      // Signing in: a password if we have one, a magic link if we do not.
+      if (password) {
+        const u = await signInWithPassword(address, password);
+        onSignedIn?.(u);
+        return;
+      }
+      if (onMagicLink) {
         const msg = await onMagicLink(address);
         if (msg === 'SIGNED_IN') onSignedIn?.({ name: address.split('@')[0] ?? '', email: address });
         else setNotice(msg);
         return;
       }
-      const send = onMagicLink
-        ? onMagicLink(address)
-        : onProviderSignIn
-          ? onProviderSignIn('email', address).then(() => 'SIGNED_IN')
-          : Promise.reject(new Error('Sign-in is not configured.'));
-      const msg = await send;
+      if (onProviderSignIn) {
+        await onProviderSignIn('email', address);
+        onSignedIn?.({ name: address.split('@')[0] ?? '', email: address });
+        return;
+      }
+      throw new Error('Sign-in is not configured.');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** The magic-link path: no password, a link in the inbox. */
+  const sendMagicLink = async () => {
+    const address = email.trim();
+    if (!address || busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (!onMagicLink) throw new Error('Sign-in is not configured.');
+      const msg = await onMagicLink(address);
       if (msg === 'SIGNED_IN') onSignedIn?.({ name: address.split('@')[0] ?? '', email: address });
       else setNotice(msg);
     } catch (err) {
@@ -170,9 +205,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <div className="flex-1 flex items-start justify-center px-6 pt-[12vh] pb-10">
         <div className="w-full max-w-[360px]">
           <h1 className="text-[26px] leading-tight font-semibold tracking-tight">
-            Welcome to Zut
+            {mode === 'signup' ? 'Create your account' : 'Welcome back'}
           </h1>
-          <p className="text-[15px] text-neutral-500 mt-1">The local-first way to build software</p>
+          <p className="text-[15px] text-neutral-500 mt-1">
+            {mode === 'signup'
+              ? 'One account, then the agent runs where you want it'
+              : 'Sign in to your Zut account'}
+          </p>
 
           <div className="flex gap-2 mt-7">
             {socialProviders.map((provider) => {
@@ -206,19 +245,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               autoComplete="email"
               className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#3a3a40]"
             />
-            {mode === 'signup' && mudReady && (
+            {mode === 'signup' && (
+              <label htmlFor="auth-name" className="block text-[12px] text-neutral-400 pt-2">
+                Name
+              </label>
+            )}
+            {mode === 'signup' && (
+              <input
+                id="auth-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Display name (optional)"
+                autoComplete="name"
+                className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#3a3a40]"
+              />
+            )}
+            {accounts && (
               <>
-                <label htmlFor="auth-name" className="block text-[12px] text-neutral-400 pt-2">
-                  Name
-                </label>
-                <input
-                  id="auth-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Display name (optional)"
-                  autoComplete="name"
-                  className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#3a3a40]"
-                />
                 <label htmlFor="auth-password" className="block text-[12px] text-neutral-400 pt-2">
                   Password
                 </label>
@@ -227,8 +270,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  autoComplete="new-password"
+                  placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                   className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#3a3a40]"
                 />
               </>
@@ -254,11 +297,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <button
             type="button"
             onClick={(e) => void submit(e as unknown as React.FormEvent)}
-            disabled={busy || !email.trim()}
+            disabled={busy || !email.trim() || (mode === 'signup' && password.length < 8)}
             className="mt-4 w-full h-10 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-[13px] font-medium transition-colors cursor-pointer"
           >
-            {busy ? 'Working…' : mode === 'signup' ? 'Create account' : 'Continue with email'}
+            {busy ? 'Working…' : mode === 'signup' ? 'Create account' : 'Sign in'}
           </button>
+
+          {mode === 'signin' && accounts && onMagicLink && (
+            <button
+              type="button"
+              onClick={() => void sendMagicLink()}
+              disabled={busy || !email.trim()}
+              className="mt-3 w-full text-[12px] text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer disabled:opacity-40"
+            >
+              Email me a sign-in link instead
+            </button>
+          )}
 
           <p className="mt-4 text-center text-[12px] text-neutral-500">
             {mode === 'signup' ? 'Already have an account? ' : "Don't have an account? "}
@@ -297,9 +351,7 @@ function AuthHeader({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex items-center justify-between px-6 py-5">
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-md bg-red-600 text-white flex items-center justify-center text-[12px] font-bold">
-          Z
-        </div>
+        <img src={mark} alt="Zut" className="h-4 w-4" />
         <span className="text-[13px] font-semibold tracking-wide">ZUT</span>
       </div>
       <button

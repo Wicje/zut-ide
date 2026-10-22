@@ -33,9 +33,6 @@ export interface DiffFile {
 export interface SidebarItem {
   id: string;
   title: string;
-  badge?: 'blue' | 'gray';
-  hasIcon?: boolean;
-  iconType?: 'card' | 'panel' | 'toast';
   isMore?: boolean;
   category?: string;
 }

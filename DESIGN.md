@@ -111,11 +111,20 @@ table above. Borders are for surfaces, not for buttons.
 - App window: `w-[96vw] max-w-[1240px] h-[88vh] max-h-[800px]`, wallpaper stage
   behind (macOS light/dark images in `src/assets/images/`), control pill centered
   above the window (never overlapping).
-- Pane headers `h-10 px-3.5 border-b`; resizers `w-1 cursor-col-resize`
+- Pane headers `h-9 px-2 border-b`; resizers `w-1 cursor-col-resize`
   (hover `red-500/50`, active `red-600`, double-click resets 210 / 380).
 - Modals: `fixed inset-0 z-50` backdrop `bg-black/50 backdrop-blur-xs`,
   `max-w-md` (simple) / `max-w-lg` / `max-w-2xl max-h-[85vh]` (PR studio).
 - Scrollbars: 6px, `rgba(0,0,0,0.15)` thumb, transparent track.
+
+## Brand
+
+- One mark everywhere: hand-drawn black "Z" (`src/assets/zut-mark.png`,
+  white variant `zut-mark-white.png`, generator `scripts/make-icons.py`,
+  source in `/home/zk3/mac/issues/`). Title bar / auth screens / gate use it
+  at 16-28px (invert filter on dark surfaces); PWA icons are the mark in
+  white on a `#141416` tile (192/512); the landing nav + footer use the black
+  mark with a CSS invert in dark theme.
 
 ## Layout grammar (Zut shell)
 
@@ -141,7 +150,8 @@ table above. Borders are for surfaces, not for buttons.
   Project files (click → opens in editor); user footer (avatar, account modal).
 - Composer: model picker, agent steps timeline, summary, follow-up bar with
   @-mention, commit/review buttons, rules modal entry.
-- Right: Diff = SCM header + per-file accept/revert + PR/deploy actions;
+- Right: Diff = per-file accept/revert under the pane header; the header carries
+  the switcher, the diff summary, copy-diff, PR and deploy actions;
   Editor = Monaco tree + tabs + inline prompt; Preview = sandboxed iframe +
   viewport switch + console drawer + inspect-to-composer; Checks = run history
   as pass/fail rows with agent auto-fix.

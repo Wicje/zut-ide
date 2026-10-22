@@ -1,33 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  GitBranch,
   PanelRightClose,
   Play,
   Copy,
   Check,
-  MoreHorizontal,
-  Plus,
   ChevronDown,
   ChevronRight,
   Mic,
-  Sparkles,
+  ArrowUp,
   Loader2,
-  RotateCcw,
-  FileCode,
-  CheckCircle2,
   AlertTriangle,
   AtSign,
-  Shield,
-  Layers,
-  Clock,
-  Brain,
-  Pause,
-  X,
-  XCircle,
-  ThumbsUp,
-  ThumbsDown,
   ImagePlus,
-  FileText,
+  File,
+  Bot,
+  Zap,
+  X,
 } from 'lucide-react';
 import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext, AttachedImage, ComposerMode } from '../types';
 import { answersPrompt, parseQuestions, stripQuestions } from '../lib/questions';
@@ -324,7 +312,6 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           <span className={isDark ? 'text-white' : 'text-neutral-800'}>
             {session.title}
           </span>
-          <GitBranch size={13} className="text-neutral-400 rotate-90" />
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -334,7 +321,6 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
               className="text-neutral-400 hover:text-red-500 transition-colors p-1 rounded text-[11px] flex items-center gap-1 cursor-pointer"
               title="Project Agent Guidelines"
             >
-              <FileCode size={13} />
               <span className="hidden sm:inline font-mono">.rules</span>
             </button>
           )}
@@ -453,7 +439,6 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                     {onRollbackCheckpoint && step.checkpointId && (
                       <div className="pt-1 flex items-center justify-between">
                         <span className="text-[10.5px] text-neutral-400 flex items-center gap-1">
-                          <CheckCircle2 size={11} className="text-emerald-500" />
                           <span>Snapshot: {step.checkpointId}</span>
                         </span>
                         <button
@@ -467,7 +452,6 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                               : 'bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-700'
                           }`}
                         >
-                          <RotateCcw size={10} />
                           <span>Roll back to step</span>
                         </button>
                       </div>
@@ -570,7 +554,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                     : 'border-[#e5e5e7] hover:bg-neutral-50'
                 }`}
               >
-                <FileText size={12} className="text-neutral-400 shrink-0" />
+                <File size={12} className="text-neutral-400 shrink-0" />
                 <span className="text-[12px] truncate flex-1">{file.path}</span>
                 {file.additions > 0 && (
                   <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
@@ -767,7 +751,11 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
               }`}
               title={mode === 'plan' ? 'Plan mode: write a plan first' : 'Agent mode: change the code'}
             >
-              <Sparkles size={11} className={mode === 'plan' ? 'text-amber-500' : 'text-neutral-400'} />
+              {mode === 'plan' ? (
+                <Zap size={11} className="text-amber-500" />
+              ) : (
+                <Bot size={11} className="text-neutral-400" />
+              )}
               <span>{mode === 'plan' ? 'Plan' : 'Agent'}</span>
               <ChevronDown size={11} className="text-neutral-400" />
             </button>
@@ -914,7 +902,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             {isGenerating ? (
               <Loader2 size={12} className="animate-spin" />
             ) : followUpText ? (
-              <Sparkles size={11} />
+              <ArrowUp size={12} />
             ) : (
               <Mic size={12} />
             )}

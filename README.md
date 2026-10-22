@@ -1,31 +1,36 @@
 # Zut — desktop-class coding in the browser. Nothing to install.
 
 A browser IDE (resizable 3-pane shell: sidebar, agent composer,
-diff / editor / preview / checks) + optional run broker. Edit files, hit Run,
-see the result. Heavy work (program runs, terminal, preview, AI file edits)
-runs on your private computer via the broker; the browser just renders the UI.
+diff / editor / preview / checks). The agent writes the files, the IDE shows
+you the diff, the preview runs live. The heavy part — installs, builds, runs
+— happens on Zut Compute (our servers) or on your own machine if you
+self-host, so a phone, a Chromebook or a 4GB laptop is enough.
 
-Your code lives in your private project. Editing is free — only runs use run time.
+You create an account (free) and pick where the agent runs. Editing is free
+— only runs use run time.
 
-AI is optional: plain code + Run works with no key, no sign-in, no server.
-When you want it, bring your own key or use the cloud agent.
+AI is optional: plain code + Run works with no key and no AI. When you want
+it, bring your own key or use the hosted agent.
 
 ## Why Zut
 
-Cursor and Replit put the agent in *their* cloud and meter it. Zut is the
-other way round:
+Cursor's agent writes your files — then `npm install` and the build run on
+*your* laptop, which is where a 4GB machine or a phone hits the wall.
+Lovable and Bolt build in their cloud but hand you a deploy, not an IDE.
+Zut keeps the agentic workflow and moves the heavy part to our machines:
 
-- **It runs on your machine.** The agent is [opencode](https://opencode.ai)
-  on your own box — your models, your keys, your quota. Your files are your
-  files; the terminal is a real PTY; git is real git. No account, no
-  waitlist, no limits, no telemetry.
+- **The build runs on Zut Compute, not on you.** Same agent-writes-files
+  workflow, except installs, builds and program runs happen on our servers
+  (or on your own box if you prefer) — so the machine you have is enough.
+- **A real IDE, not just prompts.** Hand-write code when you want — Monaco,
+  tabs, shortcuts, format, run. Let the agent type when you don't. Same
+  window, your choice every turn.
+- **Self-host is first-class.** The agent can be
+  [opencode](https://opencode.ai) on your own machine — your models, your
+  keys, your quota; a real PTY; real git; no telemetry.
 - **Bring your own agent, not a vendor's models.** The model picker lists
-  whatever your opencode server has connected — opencode zen, OpenRouter,
-  Cerebras, anything else you connect. Zut is a client of the agent, not a
-  locked-in product.
-- **The IDE lives in your terminal too.** The same app renders as real
-  pixels in a kitty / ghostty / wezterm window (kitty graphics protocol), so
-  you can work in the terminal without leaving it.
+  whatever your agent serves — opencode zen, OpenRouter, Cerebras, anything
+  else you connect. Zut is a client of the agent, not a locked-in product.
 - **The agent asks before it acts.** Plan mode writes a checklist you tick
   off; a question from the agent becomes a card you answer. Every turn is a
   per-file diff you accept or revert, with checkpoints.
@@ -214,25 +219,27 @@ not a user identity — run one host per person/workspace.
 npm run build && npm run preview
 ```
 
-## Landing page + waitlist (live)
+## Landing page + accounts (live)
 
 The marketing site in `landing/` is a dependency-free static page (dark Cursor-style,
 light/dark toggle, staggered entrances, cursor spotlight, scroll progress) that sells
-the IDE with screenshots of the actual product. Hero + final CTA carry a waitlist form:
+the IDE with screenshots of the actual product. Hero + final CTA carry an account form:
 
-- Signups POST to the `waitlist` table via the public anon key (insert-only RLS).
-- A Postgres trigger (`supabase/waitlist.sql`) sends a plain-text welcome email through
-  [Sendliberty](https://sendliberty.com) (Gmail-routed, no domain needed). The API key
-  lives in the vault, never in code; email failures can never block a signup.
+- Creating an account POSTs to Supabase Auth (`/auth/v1/signup`) with the public
+  publishable key — no library, no CLI.
+- When the project signs people in immediately, the session is stored under the
+  key supabase-js reads (`sb-<project-ref>-auth-token`) and the new user lands in
+  the IDE already signed in.
+- When email confirmation is on, the page says "check your email" and the IDE's
+  account page handles the sign-in.
+- The old waitlist capture (`join the waitlist`, `waitlist` table + welcome-mail
+  trigger) is retired; `supabase/waitlist.sql` can stay in the project but the
+  forms no longer use it.
 
-Setup (one SQL run, no CLI):
-
-1. Open the Supabase dashboard → SQL Editor, paste `supabase/waitlist.sql`, press Run.
-   (Fill the two placeholders first: your `sl_…` key and sending Gmail — or run as-is
-   and set them later; signups save either way.)
-2. Preview locally: `npx serve landing` (or open `landing/index.html` directly).
-3. Deploy: `npx vercel deploy --cwd landing --prod` (static, no build step).
-   Live: https://landing-two-beta-xy9r9089if.vercel.app
+Setup: none beyond Supabase Auth being enabled for the project (email provider,
+password sign-up). Preview locally: `npx serve landing`. Deploy:
+`npx vercel deploy --cwd landing --prod` (static, no build step).
+Live: https://landing-two-beta-xy9r9089if.vercel.app
 
 ## Keyboard shortcuts
 
@@ -428,7 +435,7 @@ src/
   components/ErrorBoundary.tsx # crash fallback (Reload IDE)
   components/Sidebar.tsx       # traffic lights, New Agent, search, agents, files, profile
   components/ComposerPane.tsx  # agent feed + follow-up bar + commit/review actions
-  components/DiffReviewPane.tsx# SCM header, file diffs, terminal drawer, PR/deploy entry
+  components/DiffReviewPane.tsx# file diffs, terminal drawer (the pane header lives in App.tsx)
   components/CodeEditorPane.tsx# Monaco tree + tabs + inline prompt + status bar
   components/LiveAppPreviewPane.tsx # sandboxed iframe + viewports + console drawer
   components/TestExplorerPane.tsx  # run checks (run history as pass/fail rows) + agent fix
@@ -445,7 +452,7 @@ src/
                          # opencode
   lib/                   # app model + broker URL + host client + debug client +
                          # connectors/secrets/terminal
-  hooks/                 # waitlist gate, remote shell, wallpaper, pane widths
+  hooks/                 # remote shell, wallpaper, pane widths
 terminal/                # zut-term: the IDE in the terminal (pixel, own package)
   bin/zut-term.mjs       # launcher entry → serves the app, execs pixel
   src/options.ts         # argument parsing (pure)

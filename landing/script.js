@@ -1,6 +1,5 @@
-// Zut landing interactions: mobile nav, reveal-on-scroll, footer year.
-// Launch buttons point at the local dev server when it is reachable,
-// otherwise they scroll back to the top CTA.
+// Zut landing interactions: mobile nav, theme, reveal-on-scroll, year, and
+// account creation (the door to the IDE).
 (function () {
   'use strict';
 
@@ -63,60 +62,92 @@
     });
   }
 
-  // Closed waitlist: no links to /app anywhere. The nav CTA scrolls to
-  // the join form; success messages never offer a launch link.
-  var WAIT_KEY = 'zut:waitlist-joined';
-  function markJoined(email) {
-    try { localStorage.setItem(WAIT_KEY, JSON.stringify({ email: email, at: Date.now() })); } catch (e) {}
-  }
-
-  // Waitlist capture: plain PostgREST insert, no SDK needed.
-  // Requires the `waitlist` table + anon-insert policy (see supabase/waitlist.sql).
+  // Accounts are the door. Creating one here signs you in (or asks for an
+  // email confirmation first) and drops you straight into the IDE.
   var SB_URL = 'https://tmajgvivaizcjpysggod.supabase.co';
   var SB_KEY = 'sb_publishable_mjeMCS-80ht6EV04Zdc7hA_VWiyssbs';
-  document.querySelectorAll('[data-waitlist]').forEach(function (form) {
+  // supabase-js reads the session from this exact key; storing it here is
+  // what lets the IDE open already signed-in after a signup on this page.
+  var AUTH_TOKEN_KEY = 'sb-tmajgvivaizcjpysggod-auth-token';
+  function storeSession(session) {
+    try { localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify(session)); } catch (e) {}
+  }
+  document.querySelectorAll('[data-signup]').forEach(function (form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      var input = form.querySelector('input[type="email"]');
-      var btn = form.querySelector('[data-wait-btn]');
+      var emailInput = form.querySelector('input[type="email"]');
+      var passInput = form.querySelector('input[type="password"]');
+      var btn = form.querySelector('[data-signup-btn]');
       var scope = form.closest('.hero, .cta') || document;
-      var msg = scope.querySelector('[data-wait-msg]');
-      var email = (input.value || '').trim().toLowerCase();
+      var msg = scope.querySelector('[data-signup-msg]');
+      var email = (emailInput.value || '').trim().toLowerCase();
+      var password = passInput.value || '';
       function say(text, cls) {
         if (msg) msg.textContent = text;
         if (msg) msg.className = 'wait-msg ' + (cls || '');
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        say('Enter a valid email to join.', 'err');
-        input.focus();
+        say('Enter a valid email.', 'err');
+        emailInput.focus();
+        return;
+      }
+      if (password.length < 8) {
+        say('Passwords need at least 8 characters.', 'err');
+        passInput.focus();
         return;
       }
       btn.disabled = true;
       var original = btn.textContent;
-      btn.textContent = 'Joining…';
-      fetch(SB_URL + '/rest/v1/waitlist', {
+      btn.textContent = 'Creating…';
+      var headers = { 'Content-Type': 'application/json', apikey: SB_KEY };
+      fetch(SB_URL + '/auth/v1/signup', {
         method: 'POST',
-        headers: {
-          apikey: SB_KEY,
-          Authorization: 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({ email: email }),
+        headers: headers,
+        body: JSON.stringify({ email: email, password: password }),
       })
         .then(function (res) {
-          btn.disabled = false;
-          btn.textContent = original;
-          if (res.status === 201 || res.status === 204) {
-            form.reset();
-            markJoined(email);
-            say('You are on the list. Watch your inbox.', 'ok');
-          } else if (res.status === 409) {
-            markJoined(email);
-            say('You are already on the list. Watch your inbox.', 'ok');
-          } else {
-            say('Could not join right now — please try again.', 'err');
+          return res.json().then(function (data) { return { status: res.status, data: data }; });
+        })
+        .then(function (r) {
+          if (r.status !== 200) {
+            btn.disabled = false;
+            btn.textContent = original;
+            var text = r.data && r.data.msg ? r.data.msg.toLowerCase() : '';
+            if (text.indexOf('already registered') !== -1) {
+              say('You already have an account — open Zut and sign in.');
+            } else {
+              say((r.data && r.data.msg) || 'Could not create the account — please try again.', 'err');
+            }
+            return null;
           }
+          if (r.data && r.data.session) {
+            storeSession(r.data.session);
+            btn.textContent = 'Welcome…';
+            window.location.href = '/app';
+            return null;
+          }
+          // Email confirmation is on for this project: try a plain sign-in
+          // anyway, then fall back to asking for the inbox.
+          return fetch(SB_URL + '/auth/v1/token?grant_type=password', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ email: email, password: password }),
+          })
+            .then(function (res) {
+              return res.json().then(function (data) { return { status: res.status, data: data }; });
+            })
+            .then(function (r2) {
+              if (r2.status === 200 && r2.data && r2.data.access_token) {
+                storeSession(r2.data);
+                btn.textContent = 'Welcome…';
+                window.location.href = '/app';
+                return null;
+              }
+              say('Account created — check your email to confirm, then sign in.', 'ok');
+              btn.disabled = false;
+              btn.textContent = original;
+              return null;
+            });
         })
         .catch(function () {
           btn.disabled = false;

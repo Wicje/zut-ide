@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0c0c0e" />
   <title>Zut — where sentences become software</title>
   <meta name="description" content="Zut is a browser-based AI IDE with agent workflow, diff review, and live preview. Runs on laptops and Chromebooks with zero install." />
-  <link rel="icon" type="image/svg+xml" href="images/icon.svg" />
+  <link rel="icon" type="image/png" sizes="512x512" href="images/icon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -25,12 +25,12 @@
 <body>
   <header class="nav">
     <a class="brand" href="#top" aria-label="Zut home">
-      <span class="brand-mark">Z</span>
+      <img class="brand-mark" src="images/zut-mark.png" alt="" width="20" height="20" />
       <span class="brand-word">Zut</span>
     </a>
     <nav class="nav-links" id="navLinks" aria-label="Primary">
       <a href="#features">Features</a>
-      <a href="#how">How it works</a>
+      <a href="#compute">Zut Compute</a>
       <a href="#models">Models</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
@@ -40,7 +40,7 @@
         <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
         <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       </button>
-      <a class="btn btn-light btn-sm" href="#join" id="joinBtn">Join the waitlist</a>
+      <a class="btn btn-light btn-sm" href="#join" id="joinBtn">Create account</a>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -51,15 +51,20 @@
     <!-- Hero -->
     <section class="hero">
       <h1>Where sentences<br />become <span class="grad">software</span></h1>
-      <p class="lede">Describe what you want in plain English. Zut writes the code, shows you the diff, and previews it live — in your browser, on any laptop or Chromebook. Nothing to install.</p>
+      <p class="lede">Describe what you want. The agent writes the code — and the heavy part, installs, builds and runs, happens on Zut's machines, not yours. A phone, a Chromebook, a 4GB laptop is enough. Nothing to install.</p>
       <div class="hero-actions">
-        <form class="waitlist" data-waitlist novalidate>
-          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email address" />
-          <button class="btn btn-light" type="submit" data-wait-btn>Join the waitlist</button>
+        <form class="signup" data-signup novalidate>
+          <div class="field">
+            <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email address" />
+          </div>
+          <div class="field">
+            <input type="password" name="password" placeholder="Password (8+ characters)" required minlength="8" autocomplete="new-password" aria-label="Password" />
+          </div>
+          <button class="btn btn-light" type="submit" data-signup-btn>Create account</button>
         </form>
+        <p class="wait-msg" data-signup-msg aria-live="polite"></p>
         <a class="btn btn-ghost" href="#features">See how it works <span aria-hidden="true">&rsaquo;</span></a>
       </div>
-      <p class="wait-msg" data-wait-msg aria-live="polite"></p>
       <div class="hero-visual">
         <figure class="shot shot-main">
           <img src="images/shot-app.jpg" alt="The Zut IDE: agent composer, editor and preview panes" width="1600" height="766" loading="eager" />
@@ -134,6 +139,25 @@
       </article>
     </section>
 
+    <section class="section" id="compute">
+      <p class="eyebrow">Zut Compute</p>
+      <h2 class="center">The build runs here, not on your laptop.</h2>
+      <div class="grid3">
+        <article class="card">
+          <h3>The gap, bridged</h3>
+          <p>In Cursor, the agent writes your files — then <code>npm install</code> and the build run on <em>your</em> machine. On a 4GB laptop that is the wall. Zut runs that part on our servers, so the machine you have is enough.</p>
+        </article>
+        <article class="card">
+          <h3>A real IDE, not just prompts</h3>
+          <p>Write code by hand when you want — Monaco, tabs, shortcuts, format, run. Let the agent type when you don't. Same window, your choice every turn.</p>
+        </article>
+        <article class="card">
+          <h3>No-install classroom</h3>
+          <p>One link for a whole bootcamp: teachers hand-write code on the projector, students prompt or type, everyone connects Supabase, Vercel and GitHub. No install day.</p>
+        </article>
+      </div>
+    </section>
+
     <!-- How it works -->
     <section class="section" id="how">
       <h2 class="center">Prompt to preview in four steps.</h2>
@@ -151,7 +175,7 @@
       <h2>Your key, your bill, your business.</h2>
       <p class="section-lede">Zut works with the providers you already pay — or none at all for plain code. Keys are stored only on your device and never leave it except to call the provider.</p>
       <div class="chips">
-        <span>Gemini</span><span>OpenRouter</span><span>Claude</span><span>ChatGPT</span><span>opencode (self-host)</span>
+        <span>Gemini</span><span>OpenRouter</span><span>Claude</span><span>ChatGPT</span><span>Zut Compute</span><span>opencode (self-host)</span>
       </div>
     </section>
 
@@ -245,8 +269,20 @@
       <h2>Asked, answered.</h2>
       <div class="faq">
         <details>
+          <summary>How is Zut different from Cursor?</summary>
+          <p>In Cursor the agent writes your files, but <code>npm install</code>, the build and the run all happen on your laptop — a 4GB machine or a phone runs out of road. Zut is the same agentic workflow with the heavy part on our machines (or yours, if you self-host). Same diffs, same review, none of the fan noise.</p>
+        </details>
+        <details>
+          <summary>How is it different from Lovable or Bolt?</summary>
+          <p>They generate an app in their cloud, then hand you a deploy. Zut keeps you in a real IDE: hand-write every line if you want to, review the agent's work as per-file diffs, connect your own Supabase, GitHub and Vercel. You are never locked out of your own code.</p>
+        </details>
+        <details>
+          <summary>Do I need an account?</summary>
+          <p>Yes — an account is how the product works now. Creating one is free, editing is free, and your keys stay in your browser. Your account ties your projects, your agent's home (your machine or ours) and your settings together.</p>
+        </details>
+        <details>
           <summary>Do I need to install anything?</summary>
-          <p>No. Zut runs entirely in your browser. Optional local helpers (run broker, opencode self-host) unlock more power on your own machine, but the IDE works without them.</p>
+          <p>No. Zut runs entirely in your browser. Optional self-hosting (run broker, opencode on your own machine) unlocks more power for free, but the IDE works without it — that is the point of Zut Compute.</p>
         </details>
         <details>
           <summary>Which AI models can I use?</summary>
@@ -273,25 +309,30 @@
 
     <!-- Final CTA -->
     <section class="cta" id="join">
-      <h2>Try Zut now.</h2>
-      <p class="cta-sub">Join the waitlist — pilot members get in first, free.</p>
-      <form class="waitlist waitlist-lg" data-waitlist novalidate>
-        <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email address" />
-        <button class="btn btn-light btn-lg" type="submit" data-wait-btn>Join the waitlist</button>
+      <h2>Create your account.</h2>
+      <p class="cta-sub">Editing is free. The agent runs on your machine or on Zut Compute.</p>
+      <form class="signup signup-lg" data-signup novalidate>
+        <div class="field">
+          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email address" />
+        </div>
+        <div class="field">
+          <input type="password" name="password" placeholder="Password (8+ characters)" required minlength="8" autocomplete="new-password" aria-label="Password" />
+        </div>
+        <button class="btn btn-light btn-lg" type="submit" data-signup-btn>Create account</button>
       </form>
-      <p class="wait-msg" data-wait-msg aria-live="polite"></p>
+      <p class="wait-msg" data-signup-msg aria-live="polite"></p>
     </section>
   </main>
 
   <footer>
     <div class="foot-grid">
       <div class="foot-brand">
-        <a class="brand" href="#top"><span class="brand-mark">Z</span><span class="brand-word">Zut</span></a>
+        <a class="brand" href="#top"><img class="brand-mark" src="images/zut-mark.png" alt="" width="20" height="20" /><span class="brand-word">Zut</span></a>
         <p>Browser-based AI IDE. Runs on laptops and Chromebooks with zero install.</p>
       </div>
       <nav aria-label="Product">
         <p class="foot-h">Product</p>
-        <a href="#features">Features</a><a href="#how">How it works</a><a href="#models">Models</a><a href="#pricing">Pricing</a>
+        <a href="#features">Features</a><a href="#compute">Zut Compute</a><a href="#how">How it works</a><a href="#models">Models</a><a href="#pricing">Pricing</a>
       </nav>
       <nav aria-label="Resources">
         <p class="foot-h">Resources</p>

@@ -111,13 +111,12 @@ img { max-width: 100%; }
   transition: background-color 0.35s ease;
 }
 .brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; font-weight: 700; }
+.brand { position: relative; }
 .brand-mark {
-  width: 1.7rem; height: 1.7rem; border-radius: 0.45rem;
-  background: var(--ink); color: var(--bg);
-  display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 1rem;
-  transition: background-color 0.35s ease, color 0.35s ease;
+  width: 1.15rem; height: 1.15rem;
+  display: block; object-fit: contain;
 }
+:root[data-theme="dark"] .brand-mark { filter: invert(1); }
 .brand-word { font-size: 1rem; }
 .nav-links { display: none; gap: 1.4rem; }
 .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.15s; }
@@ -512,31 +511,39 @@ footer .fineprint { max-width: var(--max-wide); margin: 2rem auto 0; }
   .nav-links a::after { transition: none; }
 }
 
-/* ---------- waitlist capture ---------- */
+/* ---------- account creation ---------- */
 :root,
 :root[data-theme="dark"] { --ok: #4ade80; --err: #f87171; }
 :root[data-theme="light"] { --ok: #15803d; --err: #b91c1c; }
 .hero-actions { flex-direction: column; align-items: center; }
-.waitlist {
+.signup {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  width: min(100%, 24rem);
+}
+.signup .field {
   display: flex; align-items: center; gap: 0.3rem;
-  width: min(100%, 27rem);
   background: var(--card); border: 1px solid var(--border);
-  border-radius: 999px; padding: 0.3rem 0.3rem 0.3rem 1.2rem;
+  border-radius: 999px; padding: 0.55rem 1.1rem;
   transition: border-color 0.25s, box-shadow 0.25s, background-color 0.35s ease;
 }
-.waitlist:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--spot); }
-.waitlist input {
+.signup .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--spot); }
+.signup .field input {
   flex: 1; min-width: 0;
   background: transparent; border: 0; outline: 0;
   color: var(--ink); font: inherit; font-size: 0.95rem;
 }
-.waitlist input::placeholder { color: var(--faint); }
-.waitlist .btn { flex-shrink: 0; }
-.waitlist .btn:disabled { opacity: 0.7; cursor: wait; transform: none; }
-.waitlist-lg { width: min(100%, 30rem); margin: 1.6rem auto 0; }
-.waitlist-lg input { font-size: 1rem; padding: 0.5rem 0; }
+.signup .field input::placeholder { color: var(--faint); }
+.signup .btn { width: 100%; }
+.signup .btn:disabled { opacity: 0.7; cursor: wait; transform: none; }
+.signup-lg { width: min(100%, 26rem); margin: 1.6rem auto 0; }
+.signup-lg .field input { font-size: 1rem; padding: 0.5rem 0; }
 .cta-sub { color: var(--muted); margin-top: 0.8rem; }
 .wait-msg { min-height: 1.6em; margin-top: 0.7rem; font-size: 0.9rem; color: var(--muted); }
 .cta .wait-msg { text-align: center; }
 .wait-msg.ok { color: var(--ok); font-weight: 600; }
 .wait-msg.err { color: var(--err); }
+code {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.85em; padding: 0.1em 0.35em;
+  background: var(--card); border: 1px solid var(--border-soft); border-radius: 0.35em;
+}

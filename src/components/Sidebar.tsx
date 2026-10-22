@@ -1,20 +1,7 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
-  Layers,
-  SlidersHorizontal,
   Search,
   PanelLeftClose,
-  MoreHorizontal,
-  FolderOpen,
-  Download,
-  Server,
-  FileText,
-  LayoutTemplate,
-  Bell,
-  Settings,
-  Sliders,
-  GitBranch,
   ChevronUp,
   ChevronDown,
   User,
@@ -129,7 +116,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Top actions */}
+        {/* Top actions — plain text rows, the way VS Code lists them.
+            An icon here would only repeat the label. */}
         <div className="px-2 pt-1 pb-2 space-y-0.5">
           <button
             onClick={onNewAgent}
@@ -137,10 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Sparkles size={15} className="text-neutral-500" />
-              <span>New project</span>
-            </div>
+            <span>New project</span>
             <span className="text-[11px] font-mono text-neutral-400">⌘N</span>
           </button>
 
@@ -152,10 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
               title="Open a folder on this device (Chrome/Edge/ChromeOS)"
             >
-              <div className="flex items-center gap-2">
-                <FolderOpen size={15} className="text-neutral-500" />
-                <span>Open folder</span>
-              </div>
+              <span>Open folder</span>
               <span className="text-[11px] font-mono text-neutral-400">⌘O</span>
             </button>
           )}
@@ -168,10 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
               title="Import a GitHub repository"
             >
-              <div className="flex items-center gap-2">
-                <Download size={15} className="text-neutral-500" />
-                <span>Import repo</span>
-              </div>
+              <span>Import repo</span>
             </button>
           )}
 
@@ -183,10 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
               title="Open the workspace on your zut host"
             >
-              <div className="flex items-center gap-2">
-                <Server size={15} className={hostConnected ? 'text-emerald-500' : 'text-neutral-500'} />
-                <span>{hostConnected ? 'Open host' : 'Connect host'}</span>
-              </div>
+              <span>{hostConnected ? 'Open host' : 'Connect host'}</span>
               {hostConnected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
             </button>
           )}
@@ -199,10 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
               title="Host git: status, diff, commit, branches"
             >
-              <div className="flex items-center gap-2">
-                <GitBranch size={15} className="text-neutral-500" />
-                <span>Git</span>
-              </div>
+              <span>Git</span>
               <span className="text-[10px] text-neutral-400">{hostConnected ? 'host' : ''}</span>
             </button>
           )}
@@ -213,20 +186,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Layers size={15} className="text-neutral-500" />
-              <span>Commands</span>
-            </div>
+            <span>Commands</span>
             <span className="text-[11px] font-mono text-neutral-400">⌘K</span>
           </button>
 
           <button
             onClick={onOpenRules}
-            className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
+            className={`w-full flex items-center px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
               isDark ? 'hover:bg-white/5 text-neutral-200' : 'hover:bg-black/5 text-neutral-800'
             }`}
           >
-            <SlidersHorizontal size={15} className="text-neutral-500" />
             <span>Customize</span>
           </button>
         </div>
@@ -246,10 +215,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               return (
                 <div key={state} className="space-y-0.5">
                   <div className="px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase flex items-center gap-1.5">
-                    {state === 'running' ? (
+                    {state === 'running' && (
                       <Loader2 size={10} className="animate-spin text-red-500" />
-                    ) : (
-                      <CheckCircle2 size={10} className="text-emerald-500" />
                     )}
                     <span>{state === 'running' ? 'In progress' : 'Ready for review'}</span>
                     <span className="text-neutral-400 font-mono">{group.length}</span>
@@ -269,8 +236,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[12px] font-medium truncate flex-1">
-                          {task.title}
+                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                          {state === 'running' ? (
+                            <Loader2 size={12} className="animate-spin text-red-500 shrink-0" />
+                          ) : (
+                            <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                          )}
+                          <span className="text-[12px] font-medium truncate">{task.title}</span>
                         </span>
                         {task.time && (
                           <span className="text-[10px] text-neutral-400 shrink-0">{task.time}</span>
@@ -323,7 +295,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         key={item.id}
                         className="w-full flex items-center gap-1.5 px-2.5 py-1 rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 text-[12px] transition-colors cursor-pointer"
                       >
-                        <MoreHorizontal size={13} />
                         <span>More</span>
                       </button>
                     );
@@ -344,27 +315,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
-                          {isActive ? (
-                            <MoreHorizontal size={13} className="text-neutral-400 shrink-0" />
-                          ) : item.badge === 'blue' ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#e5484d] shrink-0" />
-                          ) : (
-                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600 shrink-0" />
-                          )}
                           <span className="truncate">{item.title}</span>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0 ml-1">
-                          {isActive && <GitBranch size={12} className="text-neutral-400" />}
-                          {item.hasIcon && item.iconType === 'card' && (
-                            <FileText size={12} className="text-neutral-400" />
-                          )}
-                          {item.hasIcon && item.iconType === 'panel' && (
-                            <LayoutTemplate size={12} className="text-neutral-400" />
-                          )}
-                          {item.hasIcon && item.iconType === 'toast' && (
-                            <Bell size={12} className="text-neutral-400" />
-                          )}
                         </div>
                       </button>
 
@@ -448,21 +399,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {displaySub}
               </span>
             </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-neutral-400">
-            <button
-              className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5"
-              title="Filter & View"
-            >
-              <Sliders size={13} />
-            </button>
-            <button
-              className="hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-0.5"
-              title="Settings & Preferences"
-            >
-              <Settings size={13} />
-            </button>
           </div>
         </div>
       </div>
