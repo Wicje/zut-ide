@@ -1,5 +1,8 @@
 # Zut — desktop-class coding in the browser. Nothing to install.
 
+> Read `VISION.md` for the full product story: who this is for, the wall
+> Cursor/Lovable/Bolt run into, and how the classroom plan validates it.
+
 A browser IDE (resizable 3-pane shell: sidebar, agent composer,
 diff / editor / preview / checks). The agent writes the files, the IDE shows
 you the diff, the preview runs live. The heavy part — installs, builds, runs

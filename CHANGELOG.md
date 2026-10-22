@@ -5,6 +5,11 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-22 — the vision, written down)
+- `VISION.md`: the one line ("Cursor's agent working on a machine you don't
+  have to own"), the rival table, who the product is for and why the
+  classroom is a validation ground rather than a market.
+
 ### Changed (2026-10-22 — the mark, everywhere)
 - The hand-drawn Zut mark replaces the red "Z" placeholder: title bar, auth
   page, account gate, agent-home step, landing nav and footer, favicon and
