@@ -73,3 +73,11 @@ landing. This file is the honest backlog behind it.
 17. **Old localStorage flag** (`zut:waitlist-joined`) is harmless — ignore it.
 18. **E2E for the door.** playwright: landing → create account → gate
     passes; wrong password shows the error; agent-home choice renders.
+
+19. **Terminal paint perf.** On the 4GB reference machine the pixel client
+    is only smooth with a smaller window / larger font, and the dev-
+    server attach is heavier than the production build. Offer a `--prod`
+    switch in `zut term` (serve dist, port 4173) and measure frames rest.
+20. **The door on other hosts.** Vercel serves the gate, but the hosted
+    agent card is still "Coming soon"; until the VPS lands, the first
+    signed-in user has no agent unless they self-host from the same box.

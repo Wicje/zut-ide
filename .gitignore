@@ -12,3 +12,5 @@ broker-data/
 .zut-local/
 test-results/
 playwright-report/
+.vercel
+.env*

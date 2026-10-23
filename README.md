@@ -131,6 +131,21 @@ npm run local:down     # stop it
 npm run local:logs     # tail every service log
 ```
 
+Or just one word from any directory — the `zut` command (`scripts/zut.mjs`,
+symlinked into `~/.local/bin/zut`):
+
+```bash
+zut            # opens the IDE right here: pixel UI if the terminal can draw
+               # kitty graphics (kitty/ghostty/wezterm/foot), else the browser
+zut term       # force the pixel-in-terminal client
+zut web        # force the browser
+zut down       # stop the stack · zut status · zut logs
+```
+
+`zut` shares one stack: run it from two terminals and both attach to the
+same agent. On a tight machine, `npm run term` (production build, port
+4173) is lighter than attaching to the dev server.
+
 The IDE polls for the agent, so "opencode (self-host)" appears in the model
 picker as soon as the server is ready — no reload needed. When the VPS
 arrives, point the `VITE_*` URLs in `.env` at it and the same app talks to

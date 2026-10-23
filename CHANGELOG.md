@@ -5,6 +5,17 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Added (2026-10-23 — one word: zut, and the shots to prove it)
+- `scripts/zut.mjs` + a `~/.local/bin/zut` symlink: one command from any
+  directory brings the stack up and opens the IDE — pixel UI when the
+  terminal paints kitty graphics, browser otherwise; `zut term / web /
+  down / status / logs`. Run it from two terminals, both attach to the
+  same agent.
+- `scripts/ui-shots/`: the two puppeteer scripts behind the 34-shot
+  designer pack (gate, auth, first-open, a live agent turn, panes, the
+  Vercel deploy pill, landing light/dark/mobile). `ZUT_SHOTS` overrides
+  the output dir.
+
 ### Done (2026-10-22 — deployed)
 Deployed production (2026-10-22): `zut-ide.vercel.app` serves the new
 build: `/` = the landing copy, `/app/` = the IDE with the account gate and
