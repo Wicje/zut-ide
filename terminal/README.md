@@ -95,8 +95,9 @@ started twice.
 
 ## Notes
 
-- The app is served on `127.0.0.1`, which is what the waitlist gate lets
-  through — the terminal client is never blocked by the launch gate.
+- The app is served on `127.0.0.1`, which the account gate always lets
+  through (`accessBypassed()` in src/lib/account.ts) — signing in is never
+  required just to attach the terminal client to a local IDE.
 - The run backend (`VITE_BROKER_URL`) is baked into the build, so `Run` needs
   the broker configured at build time. Without it the IDE still previews web
   projects in-browser.
