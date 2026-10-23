@@ -5,6 +5,14 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Done (2026-10-22 — deployed)
+Deployed production (2026-10-22): `zut-ide.vercel.app` serves the new
+build: `/` = the landing copy, `/app/` = the IDE with the account gate and
+Supabase fallback baked in. The `landing` project (landing-two-beta) is
+git-connected and auto-deploys every push of `main`; the `zut-ide` app is
+now git-connected too (CLI `git connect`, 2026-10-22). Auth probe done via
+the Supabase Management API.
+
 ### Added (2026-10-22 — the vision, written down)
 - `VISION.md`: the one line ("Cursor's agent working on a machine you don't
   have to own"), the rival table, who the product is for and why the

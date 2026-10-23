@@ -22,9 +22,11 @@ landing. This file is the honest backlog behind it.
 
 ## Accounts — loose ends
 
-5. **Turn on email/password in the Supabase project** (Auth → Providers).
-   Decide whether email confirmation is required — the flow handles both,
-   but confirm-on makes the first run two steps on a phone.
+5. ~~**Turn on email/password in the Supabase project** (Auth → Providers).~~
+   Done via the Management API (2026-10-22): email provider on, signups on,
+   **auto-confirm on** — an account created from the landing is usable
+   immediately (no email round-trip on a phone). If deliverability abuse
+   ever shows up, flip auto-confirm off and the Confirmed-email flow just works.
 6. **Dev noise.** The fallback constants mean `npm run dev` signups land in
    the shared project with real confirmation emails. Eventually gate the
    fallback to production builds (import.meta.env.PROD) so dev stays env-only.
