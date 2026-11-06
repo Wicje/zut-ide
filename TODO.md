@@ -68,8 +68,12 @@ landing. This file is the honest backlog behind it.
     Customize, Guest unsigned-in, New agent composer with opencode
     self-host mode, Review / Code / Preview / Checks tabs). Shot via
     `scripts/ui-shots/shot-hero.mjs` against a static serve of `dist/`.
-    The other feature shots (shot-agent / shot-diff / shot-preview / shot-ship)
-    are still the old ones — next pass.
+    -> Done (2026-11-06): replaced `landing/images/shot-agent.jpg` with a real
+    composer-with-typed-prompt shot (`scripts/ui-shots/shot-features.mjs`).
+    The other feature shots (shot-diff / shot-preview / shot-ship) are still
+    the old ones: the feature-shot automation lands the agent turn
+    inconsistently and catches the right pane mid-turn (blank), so those three
+    still need a reliable agent turn or a manual re-shot pass.
 
 ## Validation loop (the classroom plan)
 

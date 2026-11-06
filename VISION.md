@@ -199,7 +199,11 @@ The biggest risk in the current repo is that the public story implies a billing/
 - Run the gate, auth page, and agent-home cards on a real phone. They were designed at desktop width; the product's point is phones and 4GB laptops.
 - Replace the landing hero shot with a screenshot of the current shell (title bar + mark + new chrome), not the old pill.
     -> Done (2026-11-06): `landing/images/shot-app.jpg` is now a real shot of
-    the current shell. The other feature-section shots are still the old set.
+    the current shell, and `landing/images/shot-agent.jpg` is now a real
+    composer shot. The other feature-section shots (shot-diff / shot-preview /
+    shot-ship) are still the old set — the feature-shot automation lands the
+    agent turn inconsistently and catches the right pane mid-turn, so those
+    three still need a reliable agent turn or a manual re-shot.
 
 ### 4. Decide the mobile truth and stop overselling the future
 
