@@ -4,7 +4,9 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { UsageError, parseArgs, usage } from './options.js';
+import os from 'node:os';
+import { UsageError, parseArgs, usage, withTerminalFlag } from './options.js';
+import { performanceEnv } from './performance.js';
 import {
   GRAPHICS_TERMINALS,
   isReachable,
@@ -61,7 +63,7 @@ export async function main(argv: string[]): Promise<number> {
     }
   }
 
-  const url = opts.url ?? server!.url;
+  const url = withTerminalFlag(opts.url ?? server!.url);
 
   // Say what is wrong instead of painting a broken picture.
   if (!(await isReachable(url))) {
@@ -84,12 +86,20 @@ export async function main(argv: string[]): Promise<number> {
   }
   const note = tmuxNote();
   if (note) console.error(note);
-  console.error(`zut-term: serving ${url}`);
+
+  // Kitty graphics is bandwidth-bound: cap the stream before the terminal
+  // has to swallow it. See performance.ts for what each preset means.
+  const perf = performanceEnv(process.env, opts, os.totalmem());
+  const budget = [
+    `${perf.fps} fps`,
+    perf.maxPixels ? `${Math.round(perf.maxPixels / 1000)}k px max` : 'full resolution',
+  ].join(' · ');
+  console.error(`zut-term: serving ${url} (${perf.quality} quality · ${budget})`);
 
   const child = spawn(process.execPath, [pixelEntry(), '.', '--', url], {
     cwd: TERMINAL_DIR,
     stdio: 'inherit',
-    env: { ...process.env, ZUT_TERM_URL: url },
+    env: { ...perf.env, ZUT_TERM_URL: url },
   });
 
   const shutdown = () => {

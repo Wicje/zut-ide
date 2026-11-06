@@ -5,6 +5,24 @@ moved to a version section on release.
 
 ## [Unreleased]
 
+### Fixed (2026-11-06 — mobile pass + terminal frame budget)
+- Mobile: the four bottom tabs (Files / Agent / Code / Preview) were pushed
+  off-screen by `h-full` panes; panes now share the column (`flex-1 min-h-0`).
+  The sidebar fills the width, "Code" opens the editor instead of the diff,
+  and the right-pane header keeps its tabs while secondary actions move into
+  the overflow menu.
+- Mobile: title bar is a normal flex row with safe-area padding (notch), its
+  buttons are 36px targets, and the redundant fullscreen control is hidden;
+  the duplicate desktop separator is gone. Landscape phones use the same
+  single-pane layout. Form controls are 16px on phones so iOS does not zoom.
+- Preview: the URL bar no longer overflows on narrow screens — history
+  arrows and the Inspect label drop, the address takes the space.
+- Terminal: `zut-term` now caps the kitty graphics stream (`--quality
+  low|balanced|high`, `--fps`, `--max-pixels`), defaults to low inside tmux
+  and on machines under 6 GB, and prints the chosen budget. The app is loaded
+  with `?terminal=1` so wallpaper, blur, transitions and Monaco's blinking
+  caret/smooth scrolling are off there. `PIXEL_*` env vars always win.
+
 ### Added (2026-10-23 — one word: zut, and the shots to prove it)
 - `scripts/zut.mjs` + a `~/.local/bin/zut` symlink: one command from any
   directory brings the stack up and opens the IDE — pixel UI when the

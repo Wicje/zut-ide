@@ -12,7 +12,31 @@
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
     overflow: hidden;
+    overscroll-behavior: none;
   }
+
+  /* iOS zooms the page when a form control receives focus at < 16px. The
+     desktop scale is deliberately smaller, so bump controls on phones only. */
+  @media (max-width: 767px), ((max-height: 560px) and (pointer: coarse)) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+}
+
+/* The terminal client (`zut term`) streams every frame to the terminal over
+   the kitty graphics protocol. Blur, transitions and looping animations all
+   add frames (and bytes) for no benefit there. */
+html[data-terminal] *,
+html[data-terminal] *::before,
+html[data-terminal] *::after {
+  transition-duration: 0.001ms !important;
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .font-code {

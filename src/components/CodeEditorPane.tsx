@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { ProjectFile } from '../types';
 import { isConnectorSet, uploadToCloudinary } from '../lib/connectors';
+import { isTerminalClient } from '../lib/runtime';
 
 interface CodeEditorPaneProps {
   files: ProjectFile[];
@@ -87,6 +88,9 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const isDark = theme === 'dark';
+  // The terminal client pays for every repaint; a blinking caret alone keeps
+  // the whole editor (and therefore the terminal stream) busy forever.
+  const terminalClient = isTerminalClient();
   const [openTabs, setOpenTabs] = useState<string[]>(() =>
     files.length > 0 ? [files[0].id] : [],
   );
@@ -736,14 +740,16 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                     lineHeight: 20,
                     glyphMargin: true,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-                    minimap: { enabled: true },
+                    minimap: { enabled: false },
                     wordWrap: 'on',
                     scrollBeyondLastLine: false,
                     automaticLayout: true,
                     tabSize: 2,
                     padding: { top: 8 },
                     scrollbar: { verticalScrollbarSize: 9 },
-                    smoothScrolling: true,
+                    smoothScrolling: !terminalClient,
+                    cursorBlinking: terminalClient ? 'solid' : 'blink',
+                    cursorSmoothCaretAnimation: terminalClient ? 'off' : 'on',
                   }}
                 />
               ) : (

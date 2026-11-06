@@ -43,6 +43,10 @@ Zut keeps the agentic workflow and moves the heavy part to our machines:
 - **Desktop shell**: resizable sidebar / composer / right-pane window on a wallpaper
   stage, with light + dark themes. The right pane switches Diff / Editor / Preview /
   Checks; every pane and modal follows one token system (see `DESIGN.md`).
+- **On a phone**: the same three panes become four bottom tabs — Files / Agent /
+  Code / Preview — one full-height pane at a time, with notch/safe-area margins,
+  ≥40px touch targets and 16px controls so iOS does not zoom on focus. The
+  right pane's Review / Checks tabs stay reachable in its own header.
 - **Web projects**: JS/TS files can `import`/`export` across files. `.ts`/`.tsx` is compiled in
   the browser with **esbuild-wasm**.
 - **Any language**: no language menu — describe what you want and the agent writes
@@ -185,8 +189,11 @@ npm run term           # launches (production build)
 npm run term:local     # launches the dev build, shared with the browser
 ```
 
-Needs kitty, ghostty, wezterm, foot, or tmux with graphics passthrough. See
-[`terminal/README.md`](terminal/README.md) for keys and options.
+Needs kitty, ghostty, wezterm, foot, or tmux with graphics passthrough. The
+client caps its frame budget by default (30 fps, 2M pixels) and drops to
+low-quality automatically in tmux or on a 4GB machine; `--quality`, `--fps`
+and `--max-pixels` tune it. See [`terminal/README.md`](terminal/README.md)
+for keys and options.
 
 ## Real workspace: local folder or host
 

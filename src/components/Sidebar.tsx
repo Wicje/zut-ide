@@ -70,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div
-      className={`w-[210px] shrink-0 border-r flex flex-col justify-between h-full select-none text-[13px] transition-colors ${
+      className={`w-full shrink-0 border-r flex flex-col justify-between h-full select-none text-[13px] transition-colors ${
         isDark
           ? 'bg-[#141416] text-neutral-300 border-neutral-800'
           : 'bg-[#f4f4f6] text-[#2b2b2f] border-[#e5e5e7]'
