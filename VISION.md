@@ -1,98 +1,223 @@
-# Zut — the vision
+# Zut — The Universal Agentic IDE
 
-Write this down so the next person picks it up without a meeting.
+> **The architectural manifesto:** How Zut bridges low-spec machines, self-hosters, mobile companions, and enterprise engineering teams into one unified, low-latency development fabric.
 
-## One line
+---
 
-**Cursor's agent working on a machine you don't have to own.** The agent
-writes the files — and the installs, builds and runs happen on *our*
-machines (or yours, if you prefer), so a phone, a Chromebook or a 4GB
-laptop can still build real software.
+## 1. The Core Thesis
 
-## Who it is for
+**Professional software development should not be gated by local hardware, installation hurdles, or device form factors.**
 
-People with capable networks and incapable machines:
+Traditional development forces a brutal compromise:
+- **Desktop IDEs (VS Code, Cursor)** provide power and keyboard flow, but require high-spec laptops, complex environment setup, and lock execution to local silicon.
+- **AI Web Builders (Bolt, Lovable)** offer zero-install creation, but produce black-box toys with no true IDE, no line-by-line code ownership, and severe vendor lock-in.
+- **Cloud Workspaces (Codespaces, Replit)** offload compute, but are often clunky, sluggish, and expensive to idle.
 
-- a phone,
-- a Chromebook,
-- a laptop with 4GB of RAM (8GB is "comfortable" here),
-- anyone who opens a browser and expects to work.
+**Zut’s breakthrough:** Decouple the **editing intelligence and interface** from the **execution compute**. 
+By unifying an adaptive compute runner (Localhost ↔ Private Server ↔ Cloud MicroVM), a Cursor-grade semantic context engine (Merkle tree + AST + LSP), and an ergonomic inline editing flow, Zut delivers desktop-grade development across M4 MacBooks, 4GB laptops, and smartphones.
 
-Nothing to install. If it has a browser, it has Zut. The IDE also renders
-in a terminal window (kitty graphics protocol), because some people live
-there.
+---
 
-We are **not** building for students. We happened to land in a student
-environment — academies, bootcamps, universities — so that is where the
-first testers come from. That is a *validation ground*, not a target
-market. It just happens to be the densest collection of (a) people whose
-machines are exactly the machines we serve, and (b) teachers who need a
-shared, zero-install editor today.
+## 2. Who Zut Is For: The Unified Spectrum
 
-## The wall everyone else runs into
+Zut serves four distinct personas through adaptive modalities without fragmenting into separate products:
 
-The new agent IDEs all hit the same wall, in different places:
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                              ZUT CLIENT                                │
+├──────────────────────────┬──────────────────────────┬──────────────────┤
+│   Desktop Power Devs     │   Non-Engineers / PMs    │  Phone Companion │
+│   • Keyboard-first flow  │   • Agent composer       │  • Voice / Chat  │
+│   • In-buffer Cmd+K diff │   • Live app preview     │  • Tap review    │
+│   • Full terminal & LSP  │   • 1-click Vercel push  │  • Hotfix & CI   │
+└────────────┬─────────────┴────────────┬─────────────┴─────────┬────────┘
+             │                          │                       │
+             ▼                          ▼                       ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ZUT ADAPTIVE ENGINE                             │
+│   Merkle Tree Sync  •  AST + Vector Index  •  Remote LSP Proxy Protocol │
+└──────────────────────────────────────┬─────────────────────────────────┘
+                                       │
+     ┌─────────────────────────────────┼──────────────────────────────┐
+     ▼                                 ▼                              ▼
+Localhost Engine               Self-Hosted Daemon               Zut Cloud Compute
+(M-Series / Linux / PC)     (Home Lab / Team Server)       (Firecracker MicroVMs)
+```
 
-| Product | Where the agent writes | Where the build runs | Where you hand-write code |
-| --- | --- | --- | --- |
-| Cursor | your machine | **your machine** | your machine, full IDE |
-| Lovable / Bolt | their cloud | their cloud | not really — you rent a result |
-| Replit | their cloud | their cloud | their cloud IDE |
-| Zut | your machine or ours | **our machines (Zut Compute)** or yours | anywhere, in the browser |
+### 1. Professional Engineers & Teams
+* **Need:** Sub-100ms editor latency, complete git branching, real language servers (`rust-analyzer`, `gopls`, `tsserver`), and full control over every diff.
+* **Experience:** In-buffer `Cmd+K` inline editing, ghost-text tab autocomplete, integrated terminal PTY, and collaborative review rooms.
 
-- **Cursor** is the rival we go after. Its agent is excellent — and then
-  `npm install` runs on your laptop, and a 4GB machine is the wall. The
-  fan spins, the swap thrashes, and the "effortless" part is over.
-- **Lovable and Bolt** generate an app in their cloud and hand you a
-  deploy. You are a renter of a result, not a builder: no hand-written
-  code, no real repo, no diff you can own line by line.
-- **Zut** keeps the agentic workflow and moves the heavy part to Zut
-  Compute. The gap between "what the agent can write" and "what your
-  machine can build" is the product.
+### 2. Low-Spec Laptops & Students (4GB RAM, Chromebooks)
+* **Need:** The ability to build modern, memory-heavy frameworks (Next.js, Vite, Docker, Rust) without thermal throttling or out-of-memory crashes.
+* **Experience:** The lightweight web shell renders Monaco locally at 60fps; compilation, bundling, and tests execute entirely on cloud or remote hosts.
 
-## The ecosystem we want
+### 3. Self-Hosters & Privacy-First Enterprises
+* **Need:** Zero telemetry, complete code custody, and air-gapped or internal LLM routing (Ollama, vLLM, OpenCode).
+* **Experience:** Single binary (`zut host`) running on personal hardware, local clusters, or VPCs. API keys and data never transit third-party clouds.
 
-Exactly like Cursor or VS Code, in the browser or the terminal:
+### 4. Non-Engineers & Builders
+* **Need:** Natural language to live application with zero setup friction.
+* **Experience:** High-level Composer, interactive live preview with responsive breakpoints, visual feedback inspector, and instant deployment.
 
-- **Hand-write code when you want.** Monaco editor, file tabs, keyboard
-  shortcuts, formatter. The agent is a choice per turn, not a cage.
-- **Let the agent type when you don't.** Prompt in plain language; plan
-  mode writes a checklist you tick off; every turn lands as a per-file
-  diff you accept or revert, with checkpoints.
-- **Connectors, not lock-in.** Your Supabase, your GitHub, your Vercel.
-  Your keys stay in your browser. AI is optional: plain code + Run works
-  with no key at all.
+### 5. Mobile & On-the-Go Developers
+* **Need:** Unlocking the phone as an active software creation tool without trying to emulate a 27-inch monitor.
+* **Experience:** Designed for **Voice-to-Agent instructions**, **one-tap diff reviews**, **live build monitoring**, and **emergency hotfixes**.
 
-## Where the code runs
+---
 
-Two homes for the agent, one choice at signup (switchable later):
+## 3. The Dual-Engine Compute Architecture: Localhost ↔ Cloud
 
-1. **Self-host** — opencode or a `zut host` on your own machine. Your
-   models, your keys, your quota, a real PTY, real git. Available today,
-   free.
-2. **Zut Compute** — the same workflow, paid for by run time, on our
-   servers. Coming online with the VPS. This is the default dream for the
-   phone-and-Chromebook crowd: install nothing, run anything.
+Zut operates on an **Adaptive Compute Protocol**. The client does not care where the code executes:
 
-Editing is free. Only runs use run time.
+| Mode | Where Compute Runs | Best For | Cost & Network |
+| :--- | :--- | :--- | :--- |
+| **Localhost Mode** | User's local machine via `zut host` daemon | Devs with high-spec machines; offline work | $0 cloud cost; instant file I/O |
+| **Cloud Runner Mode** | Ephemeral Zut MicroVMs (Firecracker / Docker) | 4GB laptops, Chromebooks, non-engineers | On-demand billing; zero local install |
+| **Self-Hosted Remote** | Private VPS, home lab, or team cluster | Self-hosters, teams, regulated data | Self-managed; access via WireGuard/Tailscale |
 
-## How we will know it works
+The IDE transitions transparently between these engines. A project started on an office workstation can be inspected and run from a phone via the cloud proxy, syncing state in real time.
 
-Before going outside the university environment:
+---
 
-1. A teacher hand-writes code from the browser on the projector — no
-   install day, no "run this script first".
-2. A student on a Chromebook prompts the agent, reviews the diff, ticks
-   off a plan, deploys to Vercel.
-3. A whole bootcamp works off one link, and nobody asks for admin rights.
+## 4. The Cursor-Class Context & Intelligence System
 
-If those three happen without anyone installing anything, the idea is
-validated — then we go find the rest of the market.
+Frontier coding agents fail when they lack repository context. Zut implements a deep 4-layer context engine:
 
-## What we are not
+```
+[Merklized File Tree] ──> Fast incremental delta sync across client & runner
+         │
+[Tree-Sitter AST]     ──> Syntactic structure (functions, classes, call graphs)
+         │
+[Hybrid Vector Index] ──> Semantic similarity & intent retrieval
+         │
+[Remote LSP Engine]   ──> Type accuracy, go-to-definition, and diagnostics
+```
 
-- Not a model vendor. Bring your own key; the model picker lists whatever
-  your agent serves.
-- Not a walled garden. Your code is your code: real files, real git, real
-  deploys, share links when you want them.
-- Not "AI-only". The IDE works with no AI configured at all.
+1. **Merkle Tree Incremental Sync:**
+   The workspace maintains an in-memory Merkle tree. Only mutated byte ranges are transmitted between the browser, cloud runner, and self-hosted host, ensuring ultra-fast synchronization even over mobile connections.
+2. **AST Parsing via Tree-Sitter:**
+   Codebases are decomposed into precise syntactic trees, enabling the agent to target exact symbol boundaries rather than blunt line chunks.
+3. **Hybrid Embeddings & Symbol Retrieval:**
+   Combines dense semantic embeddings with sparse keyword search (BM25/ripgrep) to surface relevant reference files, configuration schemas, and utility functions in multi-thousand-file repositories.
+4. **Remote Language Server Protocol (LSP) Proxy:**
+   Real LSPs run on the compute runner (`tsserver`, `pyright`, `gopls`). Diagnostic red squiggles, type signatures, and hover cards stream into the browser Monaco editor over lightweight WebSockets.
+
+---
+
+## 5. Editing Ergonomics: In-Buffer Flow & Sub-100ms Speed
+
+### 1. In-Buffer Inline Diffing (`Cmd+K`)
+* Deprecates cumbersome separate review panes for routine modifications.
+* Code suggestions stream directly into the active editor buffer using inline line decorations (green additions, red removals).
+* Accept with `Tab` or `Cmd+Enter`; reject with `Esc`. Review happens in flow.
+
+### 2. Zut Tab (High-Velocity Speculative Autocomplete)
+* Specialized, fine-tuned lightweight models (3B–7B parameters) deployed on high-throughput inference endpoints.
+* Sub-100ms time-to-first-token.
+* Predictive cursor positioning and multi-line ghost completions based on active file history.
+
+### 3. Frontier Model Routing
+* **Fast Tier:** Low-latency speculative models for completions and inline refactors.
+* **Deep Reasoning Tier:** Claude 3.7 Sonnet, OpenAI o3-mini, and Gemini 2.0 Flash for multi-file architectural planning and complex debugging.
+* **BYO-Key & Local Tier:** Full support for OpenRouter, Ollama, and local vLLM instances for complete cost and privacy control.
+
+---
+
+## 6. The Mobile Companion Strategy
+
+We do not force developers to type code on touchscreens. The phone experience is designed around the gestures and workflows that actually work on mobile:
+
+1. **Voice-to-Agent Dispatch:** Speak natural language tasks while away from your desk (*"Fix the mobile drawer navigation z-index and run tests"*). The remote runner builds and verifies the patch.
+2. **Swipe-to-Approve Diff Review:** Review multi-file pull requests and agent changes with Tinder-style or side-by-side swipe gestures (Swipe right to accept, swipe left to reject).
+3. **Live Sandbox Preview:** Interact directly with responsive web apps, test touch gestures natively, and view real-time runtime console logs.
+4. **Emergency Hotfixes:** One-tap rollbacks, automated CI check triggers, and Vercel/GitHub production redeployments.
+
+---
+
+## 7. How We Know We Won
+
+1. **The Pro Engineer Test:** An engineer on an M-series Mac uses Zut with `localhost` compute for daily work because the inline agent and indexing are faster and cleaner than their current setup.
+2. **The 4GB Laptop / Student Test:** A student on a low-end Chromebook or second-hand laptop opens Zut, writes full-stack TypeScript, builds a Next.js app on Zut Compute without spinning a fan, and deploys to production in 60 seconds.
+3. **The Phone Companion Test:** A lead developer riding transit receives an alert, speaks a bug fix prompt into the Zut phone app, reviews the agent's inline diff with three taps, passes CI, and merges the PR before reaching their stop.
+4. **The Self-Host / Enterprise Test:** An enterprise runs `zut host` on their private VPC, connecting their team with zero telemetry, using on-prem models with full LSP type-safety.
+
+---
+
+## 8. What Is Built vs What Is Not
+
+This manifesto is the target. The shipped product is parts of it. We write the gap plainly so the roadmap, the landing copy, and the code stay honest with each other.
+
+### Built now
+
+- **Adaptive compute split is real, not just philosophy.** The IDE talks to local opencode, a self-hosted `zut host` workspace, the broker (runs/terminal/preview), and the cloud agent server through one client. The UI says Run / Terminal / Preview; the backend is not named in the product.
+- **Bring-your-own-agent is the default posture.** The model picker lists whatever the connected agent serves; BYOK chat transports (OpenRouter, Anthropic, ChatGPT, Gemini) talk straight from the browser to the provider; self-hosted opencode is the free-first default when it is up. Zut is a client of the agent.
+- **Accounts are the door.** Supabase or Mudbase; email+password plus OAuth where configured; the landing can hand a session into the IDE. Local dev and `?nowait` still walk straight in.
+- **Editor + preview + review are real.** Monaco, file tabs, breadcrumbs, inline prompt, ghost-text completion toggle, breakpoints; esbuild-wasm in-browser web bundling with a cloud build fallback; sandboxed preview iframe with console drawer; per-file accept/revert diffs with checkpoints.
+- **Safety is a first-class behavior, not a feature flag.** New / Import / Restore / revert / rollback all snapshot first; local draft, snapshots, sessions, rules, and usage are persisted locally; secrets are redacted before render; the host token is documented as a shared secret, not a user identity; `VITE_*` values are called out as public bundle content.
+- **Mobile and terminal are real paths, with budgets.** The phone layout is a real single-pane four-tab adaptation with safe-area, 16px controls, and >=40px targets; `zut-term` paints the same app over kitty graphics with a capped frame budget and drops wallpaper/blur/animations/caret blink under `?terminal=1`.
+- **The style system is a contract.** One accent per meaning, four type sizes, three surfaces, a theme mechanism keyed off `[data-theme]`, and an explicit rule that infra words do not leak into the UI.
+
+### Not built yet
+
+- **Zut Compute is the headline feature that is not online yet.** `hostedAgentAvailable()` is false until the VPS is up and `VITE_OPENCODE_URL` points at it. The hosted agent card says "Coming soon" on purpose.
+- **The Cursor-class context engine in Section 4 is a spec, not shipped code.** Merkle tree incremental sync, Tree-Sitter AST decomposition, hybrid embedding + keyword retrieval, and a remote LSP proxy are described here as the future intelligence layer. The current agent context is file list + active file + rules + connectors, not a synced merkle index or an ast-aware symbol graph.
+- **Sub-100ms Tab completion is a target, not a live latency.** Ghost-text completion exists and is wired to the provider the user already has a key for; the low-latency specialized-model autocomplete described here is future work.
+- **Mobile as an active companion is partial.** Voice input and the mobile shell exist; swipe-to-approve review, tap-only multi-file review, and the "transit hotfix" flow in Section 6 are future product, not current behavior.
+- **Self-host first-run card is built.** After the agent-home step on any surface the IDE now shows the self-host first-run card (`showSelfHostCard` in `src/App.tsx`) with the copy-paste host command, connected/disconnected status, and a Connect host action that opens `HostModal`. The card exists; the hosted-agent path behind it is still the "Coming soon" gate from Section 8's first bullet.
+- **Pricing / quota for hosted turns is not wired.** Runs are metered server-side, but hosted usage is not yet tied to the signed-in account's quota/pricing in the way the landing copy implies. Before Zut Compute goes public, that gap has to close.
+
+### The honest line
+
+The product today is: **a real IDE shell that keeps the editing workflow local and moves the heavy compute off-device, with a self-hosted agent as the working default and a hosted agent coming later.** The Cursor-grade context engine and the sub-100ms Tab are what we are building toward, not what a new user gets on day one.
+
+---
+
+## 9. What We Are Fixing Next
+
+This is the work behind the current critique, in priority order.
+
+### 1. Make the hosted-agent launch a real product gate, not a docs flip
+
+The biggest risk in the current repo is that the public story implies a billing/quota relationship the backend does not yet enforce. Before Zut Compute goes public:
+
+- Get the VPS up and point `VITE_OPENCODE_URL` at it.
+- Wire hosted usage to the signed-in account (token → quota row), not to anon runs. The usage meter that exists today is local-only.
+- Decide what a free account gets and put the real numbers in the pricing copy and in the in-app quota line.
+- Treat the FAQ sentence and the AgentSetup card as launch copy that must change on the same day the server flips, not as separate tasks.
+
+### 2. Close the account loose ends before real users arrive
+
+- Add a "forgot password" path. The helper exists (`mudResetPassword`); the UI does not yet expose it.
+- Verify that social/OAuth sign-in actually lands the user in the "where should the agent run" step, or fix the handoff. The team's own note is that this needs a real-account check.
+- Gate the Supabase fallback so dev signups do not keep landing in the shared project with real confirmation emails.
+- Treat the landing's `sb-<ref>-auth-token` session handoff as a compatibility detail worth an e2e test, because it depends on a SDK storage shape.
+
+### 3. Finish the first-run story on real devices
+
+- Give self-host mode a real first-run card after "On your machine" — copy-paste commands, what to run, what "connected" looks like — not just a toast.
+- Run the gate, auth page, and agent-home cards on a real phone. They were designed at desktop width; the product's point is phones and 4GB laptops.
+- Replace the landing hero shot with a screenshot of the current shell (title bar + mark + new chrome), not the old pill.
+    -> Done (2026-11-06): `landing/images/shot-app.jpg` is now a real shot of
+    the current shell. The other feature-section shots are still the old set.
+
+### 4. Decide the mobile truth and stop overselling the future
+
+The mobile shell and voice input are real. Swipe-to-approve review and the "transit hotfix" story are not. If the near-term phone product is "open the IDE on a phone and review diffs," say that plainly in the roadmap and keep the swipe/tap review section where it belongs: future work, not the current promise.
+
+### 5. Hold the design contract against the density we actually shipped
+
+- Keep one accent per meaning. Red is the primary action and the error color; that is a real tension in an IDE whose main button is "Run," so it has to stay deliberate, not drift.
+- Round the small sizes to the scale. `10.5 / 11.5 / 12.5` and body at `12.5` are the recurring drift; the contract says body is 13 and the small sizes round to the nearest step.
+- Even out empty-state and placeholder voice. The quiet tone is mostly there; the gaps are the first place the app stops feeling like one product.
+- Watch the cumulative chrome. The shell is now dense in a good way, but density is where first-time users go to understand nothing. The classroom walk-through is the right test for whether the density is earned.
+
+### 6. Clean up the engineering hygiene that makes this look like a fork
+
+- Pick one localStorage namespace and use it consistently. The repo currently mixes `gpide:*` and `zut:*` keys for the same kinds of state (draft, snapshots, sessions, rules, usage, agent mode, opencode model, AI completion, step ratings, wallpaper, host config). That is the shape of a rewrite sitting next to an older app; it should be one naming convention before more state is added.
+- Stop leaking legacy internal names into code and keys. The public product is Zut. Internal identifiers, comments, and any remaining `chisom_ide` / `gpide` artifacts should not keep pointing at older names once the public name is settled.
+- Add focused coverage around the parts that turn into user-visible data corruption fastest: broker/adapter contracts, file diff/build path, and the account→agent-home handoff. The existing unit tests are fine for where the repo is; the next layer is the layers that silently lose user data.
+
+### 7. Keep the self-host story simple
+
+BYOK + self-hosted opencode + host workspace + broker + cloud is a lot of ways to run the same IDE. The product is better for having all of them. The onramp has to stay dead simple, because the options will confuse a first-time user fast. One Primary path per surface, and the first-run card is where that discipline gets tested.

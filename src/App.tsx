@@ -97,6 +97,7 @@ import { useRemoteShell } from './hooks/useRemoteShell';
 import { useWallpaper } from './hooks/useWallpaper';
 import { usePaneWidths, SIDEBAR_WIDTH, COMPOSER_WIDTH } from './hooks/usePaneWidths';
 import { useMediaQuery } from './lib/useMediaQuery';
+import { isTerminalClient } from './lib/runtime';
 import {
   STARTER,
   GEMINI_MODELS,
@@ -199,8 +200,16 @@ export default function App() {
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
-  const isMobile = useMediaQuery('(max-width: 767px)');
-  const [mobileTab, setMobileTab] = useState<'files' | 'agent' | 'code' | 'preview'>('agent');
+  // Portrait phones, and landscape phones (wide but short, coarse pointer).
+  // A desktop window narrowed below 768px gets the same single-pane layout.
+  const isMobile = useMediaQuery('(max-width: 767px), ((max-height: 560px) and (pointer: coarse))');
+  const [mobileTab, setMobileTab] = useState<'files' | 'agent' | 'code' | 'preview'>(
+    isTerminalClient ? 'code' : 'agent',
+  );
+  const [firstAgentShow, setFirstAgentShow] = useState<boolean | null>(null);
+  // True once the user has passed the agent-home step on any surface; used so
+  // the self-host first-run card shows for desktop too, not only mobile.
+  const [showSelfHostCard, setShowSelfHostCard] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const {
     containerRef,
@@ -1137,6 +1146,26 @@ export default function App() {
     };
   }, [runs]);
 
+  // ---- Self-host first-run card ----
+  // After "On your machine" the IDE should show the actual commands to run,
+  // and what "connected" looks like, not just a toast.
+  const selfHostHelp = useMemo(
+    () => ({
+      caption:
+        'Zut runs your code on your own machine — open a second terminal on this device and start the host.',
+      commands: [
+        'npx zut host --port 4176',
+        '',
+        'The IDE will keep files in sync with that server. No account needed for the host itself; the host token is the shared secret between the IDE and your machine.',
+      ],
+      connected: hostConfig != null,
+      connectedLabel: hostConfig != null
+        ? 'Host connected — edits sync to your machine in the background.'
+        : 'Next save will open the host connection dialog.',
+    }),
+    [hostConfig],
+  );
+
   const termCompletions = useMemo(
     () => ['run', 'status', 'ls', 'cat', 'open', 'help', 'clear', ...Object.keys(files).sort()],
     [files],
@@ -1619,8 +1648,12 @@ export default function App() {
   }
 
   const isDark = theme === 'dark';
+  // The terminal client repaints the whole window for every frame; a photo
+  // wallpaper and colour transitions turn that into a slideshow. Keep the
+  // flat stage there.
+  const terminalClient = isTerminalClient();
   const currentWallpaper = isDark ? darkWallpaperImg : lightWallpaperImg;
-  const effectiveWallpaper = !wallpaperOn
+  const effectiveWallpaper = terminalClient || !wallpaperOn
     ? undefined
     : wallpaperChoice === 'custom' && customWallpaper
     ? customWallpaper
@@ -1632,7 +1665,9 @@ export default function App() {
 
   return (
     <div
-      className="relative w-screen h-dvh overflow-hidden flex flex-col items-center justify-center bg-cover bg-center select-none transition-colors duration-500"
+      className={`relative w-screen h-dvh overflow-hidden flex flex-col items-center justify-center bg-cover bg-center select-none ${
+        terminalClient ? '' : 'transition-colors duration-500'
+      }`}
       style={{
         backgroundImage: effectiveWallpaper ? `url(${effectiveWallpaper})` : undefined,
         backgroundColor: isDark ? '#141416' : '#6c798a',
@@ -1654,8 +1689,15 @@ export default function App() {
             : '0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.12)',
         }}
       >
-      {/* Window title bar — the app name, the project, the actions */}
-      <div className="absolute top-0 left-0 right-0 z-30 h-11 flex items-center justify-between gap-3 px-3 border-b border-black/10 dark:border-white/10 bg-[#f4f4f6]/85 dark:bg-[#18181b]/85 backdrop-blur-md text-xs">
+      {/* Window title bar — the app name, the project, the actions.
+          On phones it is a normal flex row (not an overlay) so the notch and
+          the safe area push it down instead of covering it. */}
+      <div
+        className={`${
+          isMobile ? 'relative shrink-0 min-h-11' : 'absolute top-0 left-0 right-0 h-11'
+        } z-30 flex items-center justify-between gap-3 px-3 border-b border-black/10 dark:border-white/10 bg-[#f4f4f6]/85 dark:bg-[#18181b]/85 backdrop-blur-md text-xs`}
+        style={isMobile ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}
+      >
         <div className="flex items-center gap-2 shrink-0">
           <img src={mark} alt="Zut" className={`h-4 w-4 ${isDark ? 'brightness-0 invert' : ''}`} />
           <span className={`font-medium ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>Zut</span>
@@ -1672,18 +1714,18 @@ export default function App() {
         <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={() => setIsCommandPaletteOpen(true)}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Command Palette (⌘K)"
         >
           <Command size={11} />
           <span className="text-[11px] font-medium hidden sm:inline">⌘K</span>
         </button>
 
-        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
+        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setIsVercelDeployOpen(true)}
-          className="flex items-center gap-1.5 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Deploy to the web"
         >
           <svg viewBox="0 0 76 65" fill="currentColor" className="w-2.5 h-2.5">
@@ -1692,43 +1734,41 @@ export default function App() {
           <span className="text-[11px] font-medium hidden md:inline">Deploy</span>
         </button>
 
-        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
-
-        {!isMobile && <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>}
+        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={toggleTheme}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
         >
           {isDark ? <Sun size={12} className="text-amber-400" /> : <Moon size={12} className="text-red-300" />}
         </button>
 
-        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
+        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setWallpaperMenuOpen((v) => !v)}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Wallpaper"
         >
           <Image size={12} className={wallpaperMenuOpen ? 'text-white' : wallpaperOn ? 'text-neutral-600 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-600'} />
         </button>
 
-        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
+        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setIsMaximized(!isMaximized)}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1 max-sm:hidden max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title={isMaximized ? 'Restore Window' : 'Full Screen'}
         >
           {isMaximized ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
         </button>
 
-        <span className="text-neutral-300 dark:text-neutral-600 text-xs">|</span>
+        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={handleReset}
-          className="flex items-center gap-1 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Refresh workspace from saved state"
         >
           <RefreshCw size={11} />
@@ -1785,8 +1825,12 @@ export default function App() {
         {/* Left Column: Sidebar with Dynamic Width */}
         <div
           style={isMobile ? undefined : { width: `${sidebarCollapsed ? 44 : sidebarWidth}px` }}
-          className={`shrink-0 overflow-hidden flex flex-col pt-11 ${
-            isMobile ? (mobileTab === 'files' ? 'w-full h-full' : 'hidden') : 'h-full'
+          className={`overflow-hidden flex flex-col ${
+            isMobile
+              ? mobileTab === 'files'
+                ? 'flex-1 min-h-0 w-full'
+                : 'hidden'
+              : 'shrink-0 h-full pt-11'
           }`}
         >
           {sidebarCollapsed && !isMobile ? (
@@ -1857,8 +1901,12 @@ export default function App() {
         {/* Middle Column: Composer Ghost Chat Pane with Dynamic Width */}
         <div
           style={isMobile ? undefined : { width: `${composerWidth}px` }}
-          className={`shrink-0 overflow-hidden flex flex-col pt-11 ${
-            isMobile ? (mobileTab === 'agent' ? 'w-full h-full' : 'hidden') : 'h-full'
+          className={`overflow-hidden flex flex-col ${
+            isMobile
+              ? mobileTab === 'agent'
+                ? 'flex-1 min-h-0 w-full'
+                : 'hidden'
+              : 'shrink-0 h-full pt-11'
           }`}
         >
           <ComposerPane
@@ -1924,8 +1972,12 @@ export default function App() {
 
         {/* Right Column: Dynamic Pane Selection (flex-1) */}
         <div
-          className={`@container flex-1 overflow-hidden flex flex-col pt-11 ${
-            isMobile ? (mobileTab === 'code' || mobileTab === 'preview' ? 'w-full h-full' : 'hidden') : 'h-full'
+          className={`@container overflow-hidden flex flex-col ${
+            isMobile
+              ? mobileTab === 'code' || mobileTab === 'preview'
+                ? 'flex-1 min-h-0 w-full'
+                : 'hidden'
+              : 'flex-1 h-full pt-11'
           }`}
         >
           {/* Right pane header — one row: the pane's switcher on the left,
@@ -1938,7 +1990,7 @@ export default function App() {
               } ${isMobile ? 'py-1.5' : 'h-9'}`}
             >
               <div
-                className="flex items-center gap-0.5 shrink-0"
+                className={`flex items-center gap-0.5 ${isMobile ? 'flex-1 min-w-0' : 'shrink-0'}`}
                 role="tablist"
                 aria-label="Right pane mode"
               >
@@ -1955,8 +2007,8 @@ export default function App() {
                     role="tab"
                     aria-selected={rightPaneMode === id}
                     onClick={() => setRightPaneMode(id)}
-                    className={`rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
-                      isMobile ? 'flex-1 min-h-[40px]' : 'px-2.5 py-1'
+                    className={`rounded-md font-medium transition-colors cursor-pointer ${
+                      isMobile ? 'flex-1 min-w-0 min-h-[40px] px-1 text-[11px]' : 'px-2.5 py-1 text-[12px]'
                     } ${
                       rightPaneMode === id
                         ? isDark
@@ -1974,7 +2026,7 @@ export default function App() {
 
               {/* What the pane can do right now — one row, no second header. */}
               <div className="ml-auto flex items-center gap-1 shrink-0">
-                {rightPaneMode === 'diff' && (
+                {!isMobile && rightPaneMode === 'diff' && (
                   <>
                     <span className="hidden @[520px]:inline text-[11px] text-neutral-400 tabular-nums">
                       {activeFiles.length} {activeFiles.length === 1 ? 'file' : 'files'}{' '}
@@ -2433,7 +2485,11 @@ export default function App() {
               <button
                 key={id}
                 onClick={() => {
+                  // The bottom tabs and the right pane's own tabs are the same
+                  // four modes — keep them in sync so "Code" never lands on
+                  // the diff view.
                   if (id === 'preview') setRightPaneMode('preview');
+                  if (id === 'code') setRightPaneMode('editor');
                   setMobileTab(id);
                 }}
                 className={`flex flex-col items-center gap-0.5 min-w-[64px] min-h-[48px] justify-center px-4 py-1.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
@@ -2595,6 +2651,13 @@ export default function App() {
           setUser(u);
           showToast(`Signed in as ${u.name}`);
           if (!getAgentMode()) setNeedsAgentSetup(true);
+
+          // Present the self-host first-run card after the agent-home step on
+          // mobile, so new users see the actual host commands before they start.
+          if (!showSelfHostCard && needsAgentSetup && user && getAgentMode()) {
+            setShowSelfHostCard(true);
+            setFirstAgentShow(true);
+          }
         }}
         onLogout={() => {
           void getSupabase()?.auth.signOut();
@@ -2758,7 +2821,10 @@ export default function App() {
 
       <HostModal
         isOpen={isHostModalOpen}
-        onClose={() => setIsHostModalOpen(false)}
+        onClose={() => {
+          setIsHostModalOpen(false);
+          setShowSelfHostCard(false);
+        }}
         onSaved={(config) => {
           setHostConfig(config);
           if (config) showToast('Host connected — open Terminal for a real shell.');
@@ -2766,6 +2832,48 @@ export default function App() {
         }}
         theme={theme}
       />
+
+      {showSelfHostCard && (
+        <div className="fixed inset-x-4 bottom-20 z-40 mx-auto max-w-xl">
+          <div className="rounded-xl border border-neutral-700/70 bg-neutral-900/95 backdrop-blur-md shadow-xl">
+            <div className="px-4 py-3">
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                {selfHostHelp.caption}
+              </p>
+              <pre className="mt-2 mb-2 text-xs text-neutral-200 leading-relaxed font-mono bg-neutral-950/70 rounded-lg p-3 border border-neutral-700/50 overflow-x-auto">
+                {selfHostHelp.commands.map((c, i) => (
+                  <div key={i}>{c}</div>
+                ))}
+              </pre>
+              <p className="text-xs mt-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${selfHostHelp.connected ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                  />
+                  {selfHostHelp.connectedLabel}
+                </span>
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  className="text-xs rounded-lg bg-neutral-800 px-3 py-1.5 text-neutral-200 hover:bg-neutral-700 transition"
+                  onClick={() => {
+                    setShowSelfHostCard(false);
+                    setIsHostModalOpen(true);
+                  }}
+                >
+                  Connect host
+                </button>
+                <button
+                  className="text-xs rounded-lg bg-neutral-800/60 px-3 py-1.5 text-neutral-400 hover:bg-neutral-800/90 transition"
+                  onClick={() => setShowSelfHostCard(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <HostGitModal
         isOpen={isHostGitModalOpen}
@@ -2786,7 +2894,10 @@ export default function App() {
                 : 'Using our hosted agent.',
             );
           }}
-          onClose={() => setNeedsAgentSetup(false)}
+          onClose={() => {
+        setNeedsAgentSetup(false);
+        setShowSelfHostCard(false);
+      }}
         />
       )}
 

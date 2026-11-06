@@ -51,12 +51,25 @@ landing. This file is the honest backlog behind it.
     shows a toast about connecting opencode, and that's all. The host modal
     / `npm run dev:opencode` deserves a first-run card with copy-paste
     commands (see scripts/install-local-service.mjs for what exists).
+    -> Done (2026-11-06): `src/App.tsx` shows the self-host first-run card
+    (`showSelfHostCard`) after the agent-home step on any surface, with the
+    host command, connected/disconnected status, and a Connect host / Close
+    action. `firstAgentShow` records that the step happened so the card does
+    not re-trigger.
 12. **Mobile pass on the new screens.** The gate, auth page and agent-home
     cards were designed at desktop width; test on a real phone (the whole
     point of the product).
 13. **Landing screenshots.** The hero still shows the old pill-shell shot;
     re-screenshot the real IDE (title bar with the mark, new chrome) and
     replace the images.
+    -> Done (2026-11-06): replaced `landing/images/shot-app.jpg` with a real
+    screenshot of the current shell (dark title bar, Zut mark, sidebar with
+    New project / Open folder / Import repo / Open host / Git / Commands /
+    Customize, Guest unsigned-in, New agent composer with opencode
+    self-host mode, Review / Code / Preview / Checks tabs). Shot via
+    `scripts/ui-shots/shot-hero.mjs` against a static serve of `dist/`.
+    The other feature shots (shot-agent / shot-diff / shot-preview / shot-ship)
+    are still the old ones — next pass.
 
 ## Validation loop (the classroom plan)
 
@@ -74,10 +87,31 @@ landing. This file is the honest backlog behind it.
 18. **E2E for the door.** playwright: landing → create account → gate
     passes; wrong password shows the error; agent-home choice renders.
 
-19. **Terminal paint perf.** On the 4GB reference machine the pixel client
-    is only smooth with a smaller window / larger font, and the dev-
-    server attach is heavier than the production build. Offer a `--prod`
-    switch in `zut term` (serve dist, port 4173) and measure frames rest.
+19. ~~**Terminal paint perf.**~~ Done (2026-11-06): `zut-term` now caps the
+    frame budget (`--quality low|balanced|high`, `--fps`, `--max-pixels`),
+    defaults to low inside tmux and on machines under 6 GB, and marks the
+    URL with `?terminal=1` so the app drops wallpaper/blur/transitions and
+    Monaco's blinking caret and smooth scrolling. The production preview
+    (dist, port 4173) remains the default; `--dev` is opt-in.
 20. **The door on other hosts.** Vercel serves the gate, but the hosted
     agent card is still "Coming soon"; until the VPS lands, the first
     signed-in user has no agent unless they self-host from the same box.
+
+## Hygiene the critique asked for
+
+21. **One localStorage namespace.** The repo mixes `gpide:*` and `zut:*`
+    keys for the same kinds of state. Pick one convention and make it
+    consistent before adding more persisted state. Current split:
+    - `gpide:*` in adapters/zut + adapters/mudauth + adapters/providers +
+      adapters/gemini + lib/connectors + lib/secrets
+    - `zut:*` for agent mode, opencode model, AI completion toggle, step
+      ratings, wallpaper, and host config
+    - `zut:ai:key:` is already swept by `revokeAllLocalKeys`, but it is the
+      kind of split that causes opaque migration bugs.
+22. **Legacy internal names.** The public product is Zut. Sweep remaining
+    `chisom_ide` / `gpide` artifacts out of code, keys, and comments where
+    they are just legacy naming, not active contracts.
+23. **Coverage where data corruption would be invisible.** Add focused tests
+    around broker/adapter contracts, the diff/build path, and the
+    account → agent-home handoff. The current unit tests are fine for where
+    the repo is; the next layer is the layers that silently lose user data.
