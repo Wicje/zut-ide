@@ -55,6 +55,8 @@ interface LoginAndAccountModalProps {
   onProviderSignIn?: (provider: 'github' | 'google' | 'email', email?: string) => Promise<{ name: string; email: string }>;
   /** Magic-link channel. Resolves with the confirmation notice to display. */
   onMagicLink?: (email: string) => Promise<string>;
+  /** Password-reset channel (Supabase resetPasswordForEmail). Resolves with the confirmation notice to display. */
+  onResetPassword?: (email: string) => Promise<string>;
   signInError?: string | null;
   /** Shown when auth has no backend (self-hosted mode hint). */
   authHint?: string | null;
@@ -159,6 +161,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
   theme = 'light',
   onProviderSignIn,
   onMagicLink,
+  onResetPassword,
   signInError,
   authHint,
   teamLine,
@@ -393,7 +396,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-medium">
                   <Zap size={13} className="text-amber-500" />
-                  <span>Fast Model Requests</span>
+                  <span>Agent turns</span>
                 </div>
                 <span className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
                   {currentUser.fastRequestsUsed} / {currentUser.fastRequestsLimit}
@@ -741,6 +744,33 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                 {busy ? 'Working…' : 'Continue'}
               </button>
             </form>
+
+            {onResetPassword && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (busy) return;
+                  const email = emailInput.trim();
+                  if (!email) {
+                    setNotice('Enter your email address first.');
+                    return;
+                  }
+                  setBusy(true);
+                  setNotice(null);
+                  try {
+                    const msg = await onResetPassword(email);
+                    setNotice(msg ?? 'Check your email for a reset link.');
+                  } catch {
+                    /* error surfaces via signInError prop (set by handleResetPassword before it throws) */
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="w-full text-[10.5px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+              >
+                Forgot password? Send a reset link
+              </button>
+            )}
 
             <div className="flex items-center gap-2 my-2">
               <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />

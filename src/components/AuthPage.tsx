@@ -18,6 +18,10 @@ interface AuthPageProps {
   onClose: () => void;
   onProviderSignIn?: (provider: 'github' | 'google' | 'email', email?: string) => Promise<{ name: string; email: string }>;
   onMagicLink?: (email: string) => Promise<string>;
+  onResetPassword?: (email: string) => Promise<string>;
+  /** Called before each sign-in/sign-up attempt so the app can mark a fresh
+      sign-in (vs a page-load session restore) for the agent-setup gate. */
+  onSignInStart?: () => void;
   onSignedIn?: (user: { name: string; email: string }) => void;
   signInError?: string | null;
   authHint?: string | null;
@@ -59,6 +63,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   onClose,
   onProviderSignIn,
   onMagicLink,
+  onResetPassword,
+  onSignInStart,
   onSignedIn,
   signInError,
   authHint,
@@ -73,6 +79,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[] | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
   const mudReady = mudAuthConfigured();
   const accounts = accountsConfigured();
 
@@ -114,6 +125,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setBusy(true);
     setError(null);
     setNotice(null);
+    onSignInStart?.();
     try {
       // Creating an account: a password, then a verification mail if the
       // provider sends one. Either way the account exists from here on.
@@ -160,6 +172,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setBusy(true);
     setError(null);
     setNotice(null);
+    onSignInStart?.();
     try {
       if (!onMagicLink) throw new Error('Sign-in is not configured.');
       const msg = await onMagicLink(address);
@@ -213,8 +226,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               : 'Sign in to your Zut account'}
           </p>
 
+          {!accounts && !mudReady && (
+            <div className="mt-6 rounded-lg border border-[#26262b] bg-[#121214] px-4 py-3 text-[13px] text-neutral-400 space-y-1">
+              <p className="font-medium text-neutral-300">Sign-in is not configured on this deployment.</p>
+              <p className="text-neutral-500">
+                This copy of Zut has no account backend wired up, so there is nowhere to sign in to yet.
+              </p>
+              <p className="text-neutral-500">
+                To enable it, set {`VITE_SUPABASE_URL`} + {`VITE_SUPABASE_ANON_KEY`} (your own Supabase project) and restart — or configure Mudbase.
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-2 mt-7">
-            {socialProviders.map((provider) => {
+              {socialProviders.map((provider) => {
               const known = SOCIAL.find((s) => s.id === provider);
               return (
                 <button
@@ -283,7 +308,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {notice}
             </div>
           )}
-          {(error || signInError) && (
+          {(error || signInError) && !resetError && (
             <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
               {error ?? signInError}
             </div>
@@ -297,11 +322,79 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <button
             type="button"
             onClick={(e) => void submit(e as unknown as React.FormEvent)}
-            disabled={busy || !email.trim() || (mode === 'signup' && password.length < 8)}
+            disabled={busy || !email.trim() || (mode === 'signup' && password.length < 8) || !accounts}
             className="mt-4 w-full h-10 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-[13px] font-medium transition-colors cursor-pointer"
           >
             {busy ? 'Working…' : mode === 'signup' ? 'Create account' : 'Sign in'}
           </button>
+
+          {mode === 'signin' && accounts && onResetPassword && (
+            resetOpen ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-[13px] text-neutral-400">
+                  Enter the email for your account and we'll send a link to set a new password.
+                </p>
+                <label htmlFor="auth-reset-email" className="block text-[12px] text-neutral-400">
+                  Email
+                </label>
+                <input
+                  id="auth-reset-email"
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  autoComplete="email"
+                  className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#363a3f]"
+                />
+                {resetNotice && (
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[12px] text-emerald-300">
+                    {resetNotice}
+                  </div>
+                )}
+                {resetError && (
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
+                    {resetError}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!resetEmail.trim() || resetBusy) return;
+                    setResetBusy(true);
+                    setResetNotice(null);
+                    setResetError(null);
+                    try {
+                      const msg = await onResetPassword(resetEmail.trim());
+                      setResetNotice(msg ?? 'If that email is in your account, we sent a reset link. Check your inbox (and spam) and follow the link to set a new password.');
+                    } catch (err) {
+                      setResetError((err as Error).message);
+                    } finally {
+                      setResetBusy(false);
+                    }
+                  }}
+                  disabled={resetBusy || !resetEmail.trim()}
+                  className="w-full h-10 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-[13px] font-medium transition-colors cursor-pointer"
+                >
+                  {resetBusy ? 'Sending…' : 'Send reset link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setResetOpen(false); setResetEmail(''); setResetNotice(null); setResetError(null); }}
+                  className="w-full text-[12px] text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setResetOpen(true)}
+                className="text-[12px] text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+              >
+                Forgot password?
+              </button>
+            )
+          )}
 
           {mode === 'signin' && accounts && onMagicLink && (
             <button

@@ -34,12 +34,26 @@ const SUPABASE_ENV_SET = Boolean(import.meta.env.VITE_SUPABASE_URL as string | u
 export function accountProvider(): AccountProvider {
   if (SUPABASE_ENV_SET) return 'supabase';
   if (mudAuthConfigured()) return 'mudbase';
-  if (authConfigured()) return 'supabase';
+  // The hardcoded Supabase fallback is the public project's credentials.
+  // It is fine on a deployed build (the public signup door), but on localhost
+  // it would let `npm run dev` signups land in the shared project with real
+  // confirmation emails — gate it so dev stays env-only.
+  if (authConfigured() && !isLocalhost()) return 'supabase';
   return null;
 }
 
 export function accountsConfigured(): boolean {
   return accountProvider() !== null;
+}
+
+/** Is this browser on localhost / 127.0.0.1 / [::1]? Browser-only. */
+export function isLocalhost(): boolean {
+  try {
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  } catch {
+    return false;
+  }
 }
 
 /** ---- The agent's home -------------------------------------------------- */

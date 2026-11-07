@@ -197,6 +197,9 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   // A signed-in user picks where the agent runs (their machine, or ours).
   const [needsAgentSetup, setNeedsAgentSetup] = useState(false);
+  // True while a sign-in attempt is in flight (magic link / OAuth / sign-up),
+  // so onAuthStateChange can tell a fresh sign-in from a page-load session restore.
+  const wasSigningInRef = useRef(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -275,6 +278,10 @@ export default function App() {
       } else {
         setUser(null);
       }
+      if (wasSigningInRef.current && !getAgentMode()) {
+        setNeedsAgentSetup(true);
+      }
+      wasSigningInRef.current = false;
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -463,6 +470,8 @@ export default function App() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3200);
   };
+
+  const runsToday = runs.filter((r) => Date.now() - r.at < 86_400_000).length;
 
   const {
     wallpaperOn,
@@ -1220,12 +1229,27 @@ export default function App() {
     const sb = getSupabase();
     if (!sb) throw new Error('Sign-in is not configured (VITE_SUPABASE_URL).');
     setSignInError(null);
+    wasSigningInRef.current = true;
     const { error } = await sb.auth.signInWithOtp({ email });
     if (error) {
       setSignInError(error.message);
       throw new Error(error.message);
     }
     return 'Check your email for the sign-in link — it lands you straight back here.';
+  }
+
+  async function handleResetPassword(email: string): Promise<string> {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Sign-in is not configured (VITE_SUPABASE_URL).');
+    setSignInError(null);
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) {
+      setSignInError(error.message);
+      throw new Error(error.message);
+    }
+    return 'If that email is in your account, we sent a reset link. Check your inbox (and spam) and follow the link to set a new password.';
   }
 
   /** Social sign-in, shared by the account modal and the full sign-in page. */
@@ -1236,6 +1260,7 @@ export default function App() {
     const sb = getSupabase();
     if (!sb) throw new Error('Sign-in is not configured (VITE_SUPABASE_URL).');
     setSignInError(null);
+    wasSigningInRef.current = true;
     if (provider !== 'github' && provider !== 'google') {
       throw new Error('Use a magic link for email sign-in.');
     }
@@ -2626,10 +2651,12 @@ export default function App() {
           signedInAs={user ? { name: user.name, email: user.email } : null}
           signInError={signInError}
           authHint={
-            getSupabase()
+            accountsConfigured()
               ? null
-              : 'Running local-only: add VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY and restart to enable sign-in.'
+              : 'Sign-in is not configured on this deployment — set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY (your own project) to enable it.'
           }
+          onResetPassword={accountsConfigured() ? handleResetPassword : undefined}
+          onSignInStart={() => { wasSigningInRef.current = true; }}
         />
       )}
 
@@ -2667,15 +2694,20 @@ export default function App() {
         }}
         onProviderSignIn={handleProviderSignIn}
         onMagicLink={handleMagicLink}
+        onResetPassword={accountsConfigured() ? handleResetPassword : undefined}
         signInError={signInError}
         authHint={
-          getSupabase()
+          accountsConfigured()
             ? null
-            : 'Running local-only: add VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY and restart to enable sign-in.'
+            : 'Sign-in is not configured on this deployment — set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY (your own project) to enable it.'
         }
         teamLine="Personal workspace"
-        quotaLine={`${runs.filter((r) => Date.now() - r.at < 86_400_000).length} runs in the last 24h (broker cap enforced server-side)`}
-        resetLine={`Resets ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString([], { month: 'short', day: 'numeric' })}`}
+        quotaLine={
+          brokerEnabled() && user
+            ? `${runsToday} runs this device today — broker caps runs per signed-in account server-side`
+            : `${runsToday} runs this device today`
+        }
+        resetLine={`Local agent-turn count · resets ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString([], { month: 'short', day: 'numeric' })}`}
         geminiKeySet={geminiKeySet}
         onSaveGeminiKey={(key) => {
           setGeminiKey(key);
