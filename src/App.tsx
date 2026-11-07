@@ -144,11 +144,11 @@ import {
 
 // Which workspace was open last, so a reload can reconnect it without
 // silently moving files between disk/host/device.
-const SOURCE_KEY = 'zut:workspace-source';
+import { K, readKey, writeKey, removeKey } from './lib/storage-keys';
 
 function rememberSource(kind: WorkspaceSourceKind): void {
   try {
-    localStorage.setItem(SOURCE_KEY, kind);
+    writeKey(K.workspaceSource, kind);
   } catch {
     /* private mode */
   }
@@ -156,7 +156,7 @@ function rememberSource(kind: WorkspaceSourceKind): void {
 
 function savedSource(): string | null {
   try {
-    return localStorage.getItem(SOURCE_KEY);
+    return readKey(K.workspaceSource);
   } catch {
     return null;
   }
@@ -204,7 +204,7 @@ export default function App() {
   // A desktop window narrowed below 768px gets the same single-pane layout.
   const isMobile = useMediaQuery('(max-width: 767px), ((max-height: 560px) and (pointer: coarse))');
   const [mobileTab, setMobileTab] = useState<'files' | 'agent' | 'code' | 'preview'>(
-    isTerminalClient ? 'code' : 'agent',
+    isTerminalClient() ? 'code' : 'agent',
   );
   const [firstAgentShow, setFirstAgentShow] = useState<boolean | null>(null);
   // True once the user has passed the agent-home step on any surface; used so
@@ -2684,7 +2684,7 @@ export default function App() {
         }}
         onClearGeminiKey={() => {
           try {
-            localStorage.removeItem('gpide:gemini:key');
+            removeKey(K.geminiKey);
           } catch {
             /* ignore */
           }

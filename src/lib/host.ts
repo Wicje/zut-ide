@@ -1,7 +1,9 @@
 // Connection to a `zut host` process: workspace sync, git, and the real
 // terminal. The token is a shared host secret (not a user identity): keep it
 // in localStorage on self-hosted instances, or inject it at build time.
-const KEY = 'zut:host:v1';
+import { K, readKey, writeKey, removeKey } from './storage-keys';
+
+export const HOST_KEY = K.host;
 
 export interface HostConfig {
   url: string;
@@ -33,24 +35,16 @@ export function getHostConfig(): HostConfig | null {
   const envUrl = (import.meta.env.VITE_ZUT_HOST_URL as string | undefined) ?? '';
   const envToken = (import.meta.env.VITE_ZUT_HOST_TOKEN as string | undefined) ?? '';
   if (envUrl.trim()) return { url: normalizeUrl(envUrl), token: envToken.trim() };
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<HostConfig>;
-    if (!parsed.url) return null;
-    return { url: normalizeUrl(String(parsed.url)), token: String(parsed.token ?? '') };
-  } catch {
-    return null;
-  }
+  const raw = readKey(K.host);
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as Partial<HostConfig>;
+  if (!parsed.url) return null;
+  return { url: normalizeUrl(String(parsed.url)), token: String(parsed.token ?? '') };
 }
 
 export function setHostConfig(config: HostConfig | null): void {
-  try {
-    if (!config || !config.url.trim()) localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, JSON.stringify({ url: normalizeUrl(config.url), token: config.token.trim() }));
-  } catch {
-    /* private mode */
-  }
+  if (!config || !config.url.trim()) removeKey(K.host);
+  else writeKey(K.host, JSON.stringify({ url: normalizeUrl(config.url), token: config.token.trim() }));
 }
 
 export function isEnvHost(): boolean {

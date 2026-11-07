@@ -49,10 +49,10 @@ interface ComposerPaneProps {
 }
 
 /** Turn ratings (pilot signal: which turns actually helped). Capped, local-only. */
-const RATINGS_LS = 'zut:step-ratings';
+import { K, readKey, writeKey } from '../lib/storage-keys';
 function readRatings(): Record<string, 1 | -1> {
   try {
-    const j = JSON.parse(localStorage.getItem(RATINGS_LS) ?? '{}') as Record<string, unknown>;
+    const j = JSON.parse(readKey(K.stepRatings) ?? '{}') as Record<string, unknown>;
     const out: Record<string, 1 | -1> = {};
     for (const [k, v] of Object.entries(j)) {
       if (v === 1 || v === -1) out[k] = v;
@@ -145,7 +145,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
       const next = { ...prev, [id]: v };
       try {
         const ids = Object.keys(next).slice(-200);
-        localStorage.setItem(RATINGS_LS, JSON.stringify(Object.fromEntries(ids.map((k) => [k, next[k]]))));
+        writeKey(K.stepRatings, JSON.stringify(Object.fromEntries(ids.map((k) => [k, next[k]]))));
       } catch {
         /* ignore */
       }

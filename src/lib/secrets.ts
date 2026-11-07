@@ -1,17 +1,21 @@
 // P0 secrets hygiene: keys live in this browser only (BYOK), so the UI must
 // never echo them into logs/previews, and the user needs one "remove all"
-// escape hatch. Storage keys use the `gpide:` prefix (see providers,
-// gemini, connectors); legacy `zut:` prefixes are swept too.
+// escape hatch. All persisted credentials now live under the `zut:` namespace;
+// revoke sweeps those canonical credential prefixes and the per-key clear funcs
+// also drop their legacy `gpide:*` counterparts (migrated on first load).
 
 import { clearProviderKey, clearVercelToken } from '../adapters/providers';
+import { clearGeminiKey } from '../adapters/gemini';
 import { clearConnectorKey, type ConnectorId } from './connectors';
 
+// Canonical credential prefixes (the active `zut:` namespace). The per-key
+// clear funcs (clearProviderKey / clearVercelToken / clearGeminiKey /
+// clearConnectorKey) also drop their legacy `gpide:*` counterparts, so a stray
+// legacy key left by an older build or another tab is still revoked.
 const SWEPT_PREFIXES = [
-  'gpide:key:',
-  'gpide:gemini:',
-  'gpide:connector:',
-  'gpide:supabase',
-  'gpide:cloudinary',
+  'zut:key:',
+  'zut:gemini:key',
+  'zut:connector:',
   'zut:ai:key:',
 ];
 
@@ -76,8 +80,7 @@ export function revokeAllLocalKeys(): string[] {
     }
   }
   try {
-    localStorage.removeItem('gpide:gemini:key');
-    removed.push('gpide:gemini:key');
+    clearGeminiKey();
   } catch {
     /* ignore */
   }

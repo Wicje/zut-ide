@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { K, readKey, writeKey } from '../lib/storage-keys';
 import Editor, { type OnMount, type Monaco } from '@monaco-editor/react';
 import { completeInline, completionProvider } from '../adapters/inlineComplete';
 import type { editor, IDisposable, Position } from 'monaco-editor';
@@ -112,7 +113,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   // AI completion (ghost text, Tab to accept) — on when a provider key exists.
-  const [aiCompleteOn, setAiCompleteOn] = useState(() => localStorage.getItem('zut:ai-complete') !== 'off');
+  const [aiCompleteOn, setAiCompleteOn] = useState(() => readKey(K.aiComplete) !== 'off');
   const aiCompleteOnRef = useRef(aiCompleteOn);
   const inlineCompletionRef = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -400,7 +401,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
               const next = !aiCompleteOn;
               setAiCompleteOn(next);
               try {
-                localStorage.setItem('zut:ai-complete', next ? 'on' : 'off');
+                writeKey(K.aiComplete, next ? 'on' : 'off');
               } catch {
                 /* ignore */
               }

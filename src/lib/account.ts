@@ -14,10 +14,11 @@
 
 import { getSupabase, authConfigured } from '../adapters/zut';
 import { mudAuthConfigured, mudLogin, mudRegister, mudSession } from '../adapters/mudauth';
+import { K, readKey, writeKey, removeKey } from './storage-keys';
 
 export type AgentMode = 'self' | 'hosted';
 
-export const AGENT_MODE_KEY = 'zut:agent-mode';
+export const AGENT_MODE_KEY = K.agentMode;
 
 export type AccountProvider = 'supabase' | 'mudbase' | null;
 
@@ -44,28 +45,16 @@ export function accountsConfigured(): boolean {
 /** ---- The agent's home -------------------------------------------------- */
 
 export function getAgentMode(): AgentMode | null {
-  try {
-    const raw = localStorage.getItem(AGENT_MODE_KEY);
-    return raw === 'self' || raw === 'hosted' ? raw : null;
-  } catch {
-    return null;
-  }
+  const raw = readKey(K.agentMode);
+  return raw === 'self' || raw === 'hosted' ? raw : null;
 }
 
 export function setAgentMode(mode: AgentMode): void {
-  try {
-    localStorage.setItem(AGENT_MODE_KEY, mode);
-  } catch {
-    /* private mode — the choice is a convenience, not a requirement */
-  }
+  writeKey(K.agentMode, mode);
 }
 
 export function clearAgentMode(): void {
-  try {
-    localStorage.removeItem(AGENT_MODE_KEY);
-  } catch {
-    /* ignore */
-  }
+  removeKey(K.agentMode);
 }
 
 /**

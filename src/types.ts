@@ -147,9 +147,9 @@ export interface TestCase {
   error?: string;
 }
 
-// ---- Preserved chisom_ide backend contracts (lib/hooks/store) ----
-// The GPIDE UI above uses adapters/filemap FileMap; the backend below
-// keeps the original zut-ide types byte-identical so lib/* still compiles.
+// ---- Backend contracts preserved from the earlier zut-ide codebase ----
+// The UI above uses adapters/filemap FileMap; the types below stay byte-
+// identical to the earlier codebase so lib/* still compiles.
 export type FileMap = Record<string, string>;
 
 export type ConsoleLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';

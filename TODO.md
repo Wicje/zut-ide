@@ -103,19 +103,26 @@ landing. This file is the honest backlog behind it.
 
 ## Hygiene the critique asked for
 
-21. **One localStorage namespace.** The repo mixes `gpide:*` and `zut:*`
-    keys for the same kinds of state. Pick one convention and make it
-    consistent before adding more persisted state. Current split:
-    - `gpide:*` in adapters/zut + adapters/mudauth + adapters/providers +
-      adapters/gemini + lib/connectors + lib/secrets
-    - `zut:*` for agent mode, opencode model, AI completion toggle, step
-      ratings, wallpaper, and host config
-    - `zut:ai:key:` is already swept by `revokeAllLocalKeys`, but it is the
-      kind of split that causes opaque migration bugs.
-22. **Legacy internal names.** The public product is Zut. Sweep remaining
-    `chisom_ide` / `gpide` artifacts out of code, keys, and comments where
-    they are just legacy naming, not active contracts.
-23. **Coverage where data corruption would be invisible.** Add focused tests
-    around broker/adapter contracts, the diff/build path, and the
-    account → agent-home handoff. The current unit tests are fine for where
-    the repo is; the next layer is the layers that silently lose user data.
+21. **One localStorage namespace — DONE (d4185d9).** Every persisted browser
+    value now lives under the `zut:*` namespace via a single `K` object in
+    `src/lib/storage-keys.ts`. A `migrateStorage()` call in `main.tsx` copies
+    any legacy `gpide:*` value into its `zut:*` counterpart once and drops the
+    legacy key; all readers use `readKey`/`writeKey`/`removeKey` helpers with
+    an in-memory fallback, so the first load is safe before migration has run
+    and the code also works in private mode and in Node test runners without
+    localStorage. Legacy `gpide:*` keys remain only inside the migration map
+    (the documented legacy-key source) and in transition comments.
+22. **Legacy internal names — DONE (d4185d9).** No `chisom_ide` or
+    `gpide` artifacts remain as active storage contracts, key literals, or
+    code comments. The `src/types.ts` backend-contract comment and the
+    `src/lib/secrets.ts` hygiene comment were rewritten to drop the old
+    names. The only `gpide:` strings left are the migration map in
+    `src/lib/storage-keys.ts` (the single documented legacy-key source) and
+    brief transition comments there and in `secrets.ts`.
+23. **Coverage where data corruption would be invisible — next hygiene item
+    (not started).** Add focused tests around broker/adapter contracts, the
+    diff/build path, and the account → agent-home handoff. The current unit
+    tests are fine for where the repo is; the next layer is the layers that
+    silently lose user data. The storage layer is now one module
+    (`src/lib/storage-keys.ts`) with migration + helpers, which is easier to
+    cover than the per-module `store()` fallbacks it replaced.

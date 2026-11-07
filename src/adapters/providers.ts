@@ -1,5 +1,7 @@
 // Bring-your-own-key chat transports: browser -> provider directly.
 // Keys live only in this browser (localStorage). No server, no proxy.
+import { K, readKey, writeKey, removeKey } from '../lib/storage-keys';
+
 export type DirectProvider = 'openrouter' | 'anthropic' | 'chatgpt';
 
 export const PROVIDER_MODELS: Record<DirectProvider, string[]> = {
@@ -20,81 +22,35 @@ export const PROVIDER_LABEL: Record<DirectProvider, string> = {
   chatgpt: 'ChatGPT',
 };
 
-const KEY_LS = (p: DirectProvider) => `gpide:key:${p}`;
-
-function store() {
-  const mem = new Map<string, string>();
-  try {
-    if (typeof localStorage !== 'undefined') {
-      return {
-        get: (k: string) => localStorage.getItem(k),
-        set: (k: string, v: string) => localStorage.setItem(k, v),
-        del: (k: string) => localStorage.removeItem(k),
-      };
-    }
-  } catch {
-    /* fall through */
-  }
-  return {
-    get: (k: string) => mem.get(k) ?? null,
-    set: (k: string, v: string) => {
-      mem.set(k, v);
-    },
-    del: (k: string) => {
-      mem.delete(k);
-    },
-  };
-}
+const PROVIDER_KEY: Record<DirectProvider, string> = {
+  openrouter: K.openrouterKey,
+  anthropic: K.anthropicKey,
+  chatgpt: K.chatgptKey,
+};
 
 export function getProviderKey(p: DirectProvider): string | null {
-  try {
-    return store().get(KEY_LS(p));
-  } catch {
-    return null;
-  }
+  return readKey(PROVIDER_KEY[p]);
 }
 
 export function setProviderKey(p: DirectProvider, key: string): void {
-  try {
-    store().set(KEY_LS(p), key);
-  } catch {
-    /* ignore */
-  }
+  writeKey(PROVIDER_KEY[p], key);
 }
 
 export function clearProviderKey(p: DirectProvider): void {
-  try {
-    store().del(KEY_LS(p));
-  } catch {
-    /* ignore */
-  }
+  removeKey(PROVIDER_KEY[p]);
 }
 
 // Deploy key (Vercel personal token, BYOK like the chat keys).
-const VERCEL_LS = 'gpide:key:vercel';
-
 export function getVercelToken(): string | null {
-  try {
-    return store().get(VERCEL_LS);
-  } catch {
-    return null;
-  }
+  return readKey(K.vercelKey);
 }
 
 export function setVercelToken(key: string): void {
-  try {
-    store().set(VERCEL_LS, key);
-  } catch {
-    /* ignore */
-  }
+  writeKey(K.vercelKey, key);
 }
 
 export function clearVercelToken(): void {
-  try {
-    store().del(VERCEL_LS);
-  } catch {
-    /* ignore */
-  }
+  removeKey(K.vercelKey);
 }
 
 export interface ChatMsg {

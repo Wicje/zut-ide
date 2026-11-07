@@ -9,23 +9,20 @@ import { connectorsPromptBlock } from '../lib/connectors';
 
 export const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] as const;
 
-const KEY_LS = 'gpide:gemini:key';
+import { K, readKey, writeKey, removeKey } from '../lib/storage-keys';
+
 const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) || (import.meta.env.GEMINI_API_KEY as string | undefined);
 
 export function getGeminiKey(): string | null {
-  try {
-    return localStorage.getItem(KEY_LS) ?? envKey ?? null;
-  } catch {
-    return envKey ?? null;
-  }
+  return readKey(K.geminiKey) ?? envKey ?? null;
 }
 
 export function setGeminiKey(key: string): void {
-  try {
-    localStorage.setItem(KEY_LS, key);
-  } catch {
-    /* ignore */
-  }
+  writeKey(K.geminiKey, key);
+}
+
+export function clearGeminiKey(): void {
+  removeKey(K.geminiKey);
 }
 
 const EDIT_PROTOCOL = [

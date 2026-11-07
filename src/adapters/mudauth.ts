@@ -5,10 +5,7 @@
 const BASE = (import.meta.env.VITE_MUDBASE_URL as string | undefined)?.replace(/\/+$/, '') ?? 'https://api.mudbase.dev';
 const PROJECT_ID = import.meta.env.VITE_MUDBASE_PROJECT_ID as string | undefined;
 
-const TOKEN_KEY = 'gpide:mud:token';
-const REFRESH_KEY = 'gpide:mud:refresh';
-const EXP_KEY = 'gpide:mud:exp';
-const USER_KEY = 'gpide:mud:user';
+import { K, readKey, writeKey, removeKey } from '../lib/storage-keys';
 
 export interface MudUser {
   id?: string;
@@ -18,30 +15,6 @@ export interface MudUser {
 
 export function mudAuthConfigured(): boolean {
   return Boolean(PROJECT_ID);
-}
-
-function store() {
-  const mem = new Map<string, string>();
-  try {
-    if (typeof localStorage !== 'undefined') {
-      return {
-        get: (k: string) => localStorage.getItem(k),
-        set: (k: string, v: string) => localStorage.setItem(k, v),
-        del: (k: string) => localStorage.removeItem(k),
-      };
-    }
-  } catch {
-    /* fall through */
-  }
-  return {
-    get: (k: string) => mem.get(k) ?? null,
-    set: (k: string, v: string) => {
-      mem.set(k, v);
-    },
-    del: (k: string) => {
-      mem.delete(k);
-    },
-  };
 }
 
 async function call<T>(path: string, body: unknown, token?: string): Promise<T> {
@@ -64,11 +37,10 @@ async function call<T>(path: string, body: unknown, token?: string): Promise<T> 
 }
 
 function persistSession(s: { token: string; refreshToken?: string; expiresIn?: number; user?: MudUser }) {
-  const st = store();
-  st.set(TOKEN_KEY, s.token);
-  if (s.refreshToken) st.set(REFRESH_KEY, s.refreshToken);
-  st.set(EXP_KEY, String(Date.now() + (s.expiresIn ?? 86400) * 1000));
-  if (s.user) st.set(USER_KEY, JSON.stringify(s.user));
+  writeKey(K.mudToken, s.token);
+  if (s.refreshToken) writeKey(K.mudRefresh, s.refreshToken);
+  writeKey(K.mudExp, String(Date.now() + (s.expiresIn ?? 86400) * 1000));
+  if (s.user) writeKey(K.mudUser, JSON.stringify(s.user));
 }
 
 /** Register a new end-user (verification email is sent automatically). */
@@ -98,12 +70,11 @@ export async function mudLogin(email: string, password: string): Promise<MudUser
 
 /** Current token, refreshing once when expired (docs: refresh on 401). */
 export async function mudToken(): Promise<string | null> {
-  const st = store();
-  const token = st.get(TOKEN_KEY);
+  const token = readKey(K.mudToken);
   if (!token) return null;
-  const exp = Number(st.get(EXP_KEY) ?? '0');
+  const exp = Number(readKey(K.mudExp) ?? '0');
   if (Date.now() < exp - 60_000) return token;
-  const refreshToken = st.get(REFRESH_KEY);
+  const refreshToken = readKey(K.mudRefresh);
   if (!refreshToken) {
     mudLogout();
     return null;
@@ -122,12 +93,8 @@ export async function mudToken(): Promise<string | null> {
 }
 
 export function mudUser(): MudUser | null {
-  try {
-    const raw = store().get(USER_KEY);
-    return raw ? (JSON.parse(raw) as MudUser) : null;
-  } catch {
-    return null;
-  }
+  const raw = readKey(K.mudUser);
+  return raw ? (JSON.parse(raw) as MudUser) : null;
 }
 
 /** Validate the stored session against the server (null = signed out). */
@@ -144,22 +111,17 @@ export async function mudSession(): Promise<MudUser | null> {
   const data = (await res.json().catch(() => null)) as { user?: MudUser } | MudUser | null;
   const user = (data as { user?: MudUser })?.user ?? (data as MudUser | null);
   if (user && (user as MudUser).email) {
-    try {
-      store().set(USER_KEY, JSON.stringify(user));
-    } catch {
-      /* ignore */
-    }
+    writeKey(K.mudUser, JSON.stringify(user));
     return user as MudUser;
   }
   return mudUser();
 }
 
 export function mudLogout(): void {
-  const st = store();
-  st.del(TOKEN_KEY);
-  st.del(REFRESH_KEY);
-  st.del(EXP_KEY);
-  st.del(USER_KEY);
+  removeKey(K.mudToken);
+  removeKey(K.mudRefresh);
+  removeKey(K.mudExp);
+  removeKey(K.mudUser);
 }
 
 /** Re-send the verification email (no auth). For users stuck at sign-in

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { K, readKey, writeKey } from '../lib/storage-keys'
 
 export type WallpaperChoice = 'auto' | 'light' | 'dark' | 'custom'
 
@@ -10,7 +11,7 @@ export type WallpaperChoice = 'auto' | 'light' | 'dark' | 'custom'
 export function useWallpaper(showToast: (message: string) => void) {
   const [wallpaperOn, setWallpaperOn] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('zut:wallpaper') !== 'off'
+      return readKey(K.wallpaper) !== 'off'
     } catch {
       return true
     }
@@ -18,7 +19,7 @@ export function useWallpaper(showToast: (message: string) => void) {
 
   const [wallpaperChoice, setWallpaperChoice] = useState<WallpaperChoice>(() => {
     try {
-      const choice = localStorage.getItem('zut:wallpaper-choice')
+      const choice = readKey(K.wallpaperChoice)
       return choice === 'light' || choice === 'dark' || choice === 'custom' ? choice : 'auto'
     } catch {
       return 'auto'
@@ -27,7 +28,7 @@ export function useWallpaper(showToast: (message: string) => void) {
 
   const [customWallpaper, setCustomWallpaper] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('zut:wallpaper-custom')
+      return readKey(K.wallpaperCustom)
     } catch {
       return null
     }
@@ -39,7 +40,7 @@ export function useWallpaper(showToast: (message: string) => void) {
     setWallpaperOn((value) => {
       const next = !value
       try {
-        localStorage.setItem('zut:wallpaper', next ? 'on' : 'off')
+        writeKey(K.wallpaper, next ? 'on' : 'off')
       } catch {
         /* private mode / quota — keep the in-memory choice */
       }
@@ -50,7 +51,7 @@ export function useWallpaper(showToast: (message: string) => void) {
   const chooseWallpaper = (choice: WallpaperChoice) => {
     setWallpaperChoice(choice)
     try {
-      localStorage.setItem('zut:wallpaper-choice', choice)
+      writeKey(K.wallpaperChoice, choice)
     } catch {
       /* ignore */
     }
@@ -69,7 +70,7 @@ export function useWallpaper(showToast: (message: string) => void) {
       const url = String(reader.result ?? '')
       if (!url) return
       try {
-        localStorage.setItem('zut:wallpaper-custom', url)
+        writeKey(K.wallpaperCustom, url)
       } catch {
         showToast('Image too large to keep — try a smaller one.')
         return

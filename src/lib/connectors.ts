@@ -20,41 +20,18 @@ export const CONNECTOR_DEFS: ConnectorDef[] = [
   { id: 'pexels', label: 'Pexels', help: 'Stock photos for landing pages.' },
 ];
 
-const LS = (id: string) => `gpide:connector:${id}`;
-const memFallback = new Map<string, string>();
+import { K, readKey, writeKey, removeKey } from './storage-keys';
 
-function rawGet(id: string): string | null {
-  try {
-    const v = localStorage.getItem(LS(id));
-    if (v !== null) return v;
-  } catch {
-    /* fall through to memory */
-  }
-  return memFallback.get(id) ?? null;
-}
-
-function rawSet(id: string, value: string): void {
-  try {
-    localStorage.setItem(LS(id), value);
-  } catch {
-    memFallback.set(id, value);
-    return;
-  }
-  memFallback.delete(id);
-}
-
-function rawDel(id: string): void {
-  try {
-    localStorage.removeItem(LS(id));
-  } catch {
-    /* ignore */
-  }
-  memFallback.delete(id);
-}
+const CONNECTOR_KEY: Record<Exclude<ConnectorId, 'vercel'>, string> = {
+  github: K.connectorGithub,
+  cloudinary: K.connectorCloudinary,
+  supabase: K.connectorSupabase,
+  pexels: K.connectorPexels,
+};
 
 export function getConnectorKey(id: ConnectorId): string | null {
   if (id === 'vercel') return getVercelToken();
-  return rawGet(id);
+  return readKey(CONNECTOR_KEY[id]);
 }
 
 export function setConnectorKey(id: ConnectorId, value: string): void {
@@ -62,7 +39,7 @@ export function setConnectorKey(id: ConnectorId, value: string): void {
     setVercelToken(value);
     return;
   }
-  rawSet(id, value);
+  writeKey(CONNECTOR_KEY[id], value);
 }
 
 export function clearConnectorKey(id: ConnectorId): void {
@@ -70,7 +47,7 @@ export function clearConnectorKey(id: ConnectorId): void {
     clearVercelToken();
     return;
   }
-  rawDel(id);
+  removeKey(CONNECTOR_KEY[id]);
 }
 
 export function isConnectorSet(id: ConnectorId): boolean {
@@ -83,7 +60,7 @@ export interface CloudinaryConfig {
 }
 
 export function getCloudinaryConfig(): CloudinaryConfig | null {
-  const raw = rawGet('cloudinary');
+  const raw = readKey(K.connectorCloudinary);
   if (!raw) return null;
   try {
     const j = JSON.parse(raw) as Partial<CloudinaryConfig>;
@@ -95,7 +72,7 @@ export function getCloudinaryConfig(): CloudinaryConfig | null {
 }
 
 export function setCloudinaryConfig(cloudName: string, preset: string): void {
-  rawSet('cloudinary', JSON.stringify({ cloudName, preset }));
+  writeKey(K.connectorCloudinary, JSON.stringify({ cloudName, preset }));
 }
 
 export interface SupabaseLink {
@@ -104,7 +81,7 @@ export interface SupabaseLink {
 }
 
 export function getSupabaseLink(): SupabaseLink | null {
-  const raw = rawGet('supabase');
+  const raw = readKey(K.connectorSupabase);
   if (!raw) return null;
   try {
     const j = JSON.parse(raw) as Partial<SupabaseLink>;
@@ -116,18 +93,18 @@ export function getSupabaseLink(): SupabaseLink | null {
 }
 
 export function setSupabaseLink(url: string, anon: string): void {
-  rawSet('supabase', JSON.stringify({ url, anon }));
+  writeKey(K.connectorSupabase, JSON.stringify({ url, anon }));
 }
 
 export function clearSupabaseLink(): void {
-  rawDel('supabase');
+  removeKey(K.connectorSupabase);
 }
 
 /** One line per connected tool, for the agent system prompt. Empty when none. */
 export function connectorsPromptBlock(): string {
   const lines: string[] = [];
   if (getVercelToken()) lines.push('- Vercel: connected — offer to deploy when the user wants it live (they confirm in the Deploy dialog).');
-  if (rawGet('github')) lines.push('- GitHub: connected — offer to push (they confirm repo + visibility in the GitHub dialog).');
+  if (readKey(K.connectorGithub)) lines.push('- GitHub: connected — offer to push (they confirm repo + visibility in the GitHub dialog).');
   const cl = getCloudinaryConfig();
   if (cl) {
     lines.push(
@@ -140,7 +117,7 @@ export function connectorsPromptBlock(): string {
       `- Supabase: linked project ${sb.url} — propose SQL/RLS/table designs for it; the user runs them in their own dashboard. Never invent credentials.`,
     );
   }
-  if (rawGet('pexels')) lines.push('- Pexels: API key saved — suggest exact search terms for stock photos; the user fetches them.');
+  if (readKey(K.connectorPexels)) lines.push('- Pexels: API key saved — suggest exact search terms for stock photos; the user fetches them.');
   if (lines.length === 0) return '';
   return ['Connected dev tools (prefer them when relevant; never invent access):', ...lines].join('\n');
 }
@@ -172,7 +149,7 @@ export interface PexelsPhoto {
 
 /** Stock photo search (key from the connectors section). */
 export async function searchPexels(query: string, perPage = 6): Promise<PexelsPhoto[]> {
-  const key = rawGet('pexels');
+  const key = readKey(K.connectorPexels);
   if (!key) throw new Error('Add a Pexels API key first (account settings).');
   const res = await fetch(
     `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${Math.min(12, Math.max(1, perPage))}`,

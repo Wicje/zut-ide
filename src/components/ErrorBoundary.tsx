@@ -1,5 +1,6 @@
 import React from 'react';
 import * as Sentry from '@sentry/react';
+import { K, writeKey } from '../lib/storage-keys';
 
 interface ErrorBoundaryState {
   error: Error | null;
@@ -21,8 +22,8 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
       } catch {
         /* sentry optional (no-op without DSN) */
       }
-      localStorage.setItem(
-        'zut:last-crash',
+      writeKey(
+        K.lastCrash,
         JSON.stringify({
           message: error?.message ?? String(error),
           stack: String(error?.stack ?? '').slice(0, 2000),

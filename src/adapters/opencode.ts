@@ -94,27 +94,19 @@ export async function listOpencodeModels(): Promise<OpencodeModelOption[]> {
   return out;
 }
 
-const MODEL_LS = 'zut:opencode-model';
+import { K, readKey, writeKey, removeKey } from '../lib/storage-keys';
 
 export function getOpencodeModel(): { providerID: string; modelID: string } | null {
-  try {
-    const raw = localStorage.getItem(MODEL_LS);
-    if (!raw) return null;
-    const j = JSON.parse(raw) as { providerID?: string; modelID?: string };
-    if (j.providerID && j.modelID) return { providerID: j.providerID, modelID: j.modelID };
-    return null;
-  } catch {
-    return null;
-  }
+  const raw = readKey(K.opencodeModel);
+  if (!raw) return null;
+  const j = JSON.parse(raw) as { providerID?: string; modelID?: string };
+  if (j.providerID && j.modelID) return { providerID: j.providerID, modelID: j.modelID };
+  return null;
 }
 
 export function setOpencodeModel(m: { providerID: string; modelID: string } | null): void {
-  try {
-    if (!m) localStorage.removeItem(MODEL_LS);
-    else localStorage.setItem(MODEL_LS, JSON.stringify(m));
-  } catch {
-    /* ignore */
-  }
+  if (!m) removeKey(K.opencodeModel);
+  else writeKey(K.opencodeModel, JSON.stringify(m));
 }
 
 /** Write the IDE's virtual project files to the disk workspace opencode edits. */

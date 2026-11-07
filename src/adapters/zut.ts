@@ -5,6 +5,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { FileMap } from './filemap';
 import type { SessionData } from '../types';
 import { resolveBrokerUrl, type BrokerEnv } from '../lib/brokerUrl';
+import { K, readKey, writeKey, removeKey } from '../lib/storage-keys';
 
 export interface StoredProject {
   id: string;
@@ -195,56 +196,36 @@ export async function cloudAgentTurn(
 }
 
 // ---- local draft (offline editing; syncs to broker on save) ----
-const DRAFT_KEY = 'gpide:draft';
 
 export function loadDraft(): { name: string; files: FileMap } | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    return raw ? (JSON.parse(raw) as { name: string; files: FileMap }) : null;
-  } catch {
-    return null;
-  }
+  const raw = readKey(K.draft);
+  return raw ? (JSON.parse(raw) as { name: string; files: FileMap }) : null;
 }
 
 export function saveDraft(name: string, files: FileMap): void {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, files }));
-  } catch {
-    /* storage unavailable */
-  }
-}
+  writeKey(K.draft, JSON.stringify({ name, files }));
+}// ---- snapshots for rollback (local; broker persists runs server-side) ----
 
-// ---- snapshots for rollback (local; broker persists runs server-side) ----
 export interface Snapshot {
   id: string;
   createdAt: number;
   files: FileMap;
 }
 
-const SNAPS_KEY = 'gpide:snapshots';
-
 export function listSnapshots(): Snapshot[] {
-  try {
-    const raw = localStorage.getItem(SNAPS_KEY);
-    const arr = raw ? (JSON.parse(raw) as Snapshot[]) : [];
-    return Array.isArray(arr) ? arr.sort((a, b) => b.createdAt - a.createdAt).slice(0, 20) : [];
-  } catch {
-    return [];
-  }
+  const raw = readKey(K.snapshots);
+  const arr = raw ? (JSON.parse(raw) as Snapshot[]) : [];
+  return Array.isArray(arr) ? arr.sort((a, b) => b.createdAt - a.createdAt).slice(0, 20) : [];
 }
 
 export function takeSnapshot(files: FileMap): Snapshot {
   const snap: Snapshot = { id: `cp-${Date.now().toString(36)}`, createdAt: Date.now(), files: { ...files } };
-  try {
-    localStorage.setItem(SNAPS_KEY, JSON.stringify([snap, ...listSnapshots()].slice(0, 20)));
-  } catch {
-    /* ignore */
-  }
+  writeKey(K.snapshots, JSON.stringify([snap, ...listSnapshots()].slice(0, 20)));
   return snap;
 }
 
+
 // ---- agent session backup (sidebar + chats survive reload) ----
-const SESS_KEY = 'gpide:sessions';
 
 export interface SessionBackup {
   sessions: Record<string, SessionData>;
@@ -264,12 +245,12 @@ export function saveSessionBackup(
     const ids = Object.keys(sessions).sort().slice(-MAX_BACKUP_SESSIONS);
     const slimSessions = Object.fromEntries(ids.map((id) => [id, sessions[id]]));
     const slimChats = Object.fromEntries(ids.map((id) => [id, chats[id] ?? []]));
-    localStorage.setItem(SESS_KEY, JSON.stringify({ sessions: slimSessions, chats: slimChats, activeId }));
+    writeKey(K.sessions, JSON.stringify({ sessions: slimSessions, chats: slimChats, activeId }));
   } catch {
     try {
       const ids = Object.keys(sessions).sort().slice(-5);
       const slimSessions = Object.fromEntries(ids.map((id) => [id, sessions[id]]));
-      localStorage.setItem(SESS_KEY, JSON.stringify({ sessions: slimSessions, chats: {}, activeId }));
+      writeKey(K.sessions, JSON.stringify({ sessions: slimSessions, chats: {}, activeId }));
     } catch {
       /* leave the previous backup intact */
     }
@@ -277,65 +258,43 @@ export function saveSessionBackup(
 }
 
 export function loadSessionBackup(): SessionBackup | null {
-  try {
-    const raw = localStorage.getItem(SESS_KEY);
-    if (!raw) return null;
-    const j = JSON.parse(raw) as Partial<SessionBackup>;
-    if (!j || typeof j.sessions !== 'object' || !j.sessions) return null;
-    return {
-      sessions: j.sessions as Record<string, SessionData>,
-      chats: (j.chats ?? {}) as Record<string, Array<{ role: string; content: string }>>,
-      activeId: typeof j.activeId === 'string' ? j.activeId : '',
-    };
-  } catch {
-    return null;
-  }
+  const raw = readKey(K.sessions);
+  if (!raw) return null;
+  const j = JSON.parse(raw) as Partial<SessionBackup>;
+  if (!j || typeof j.sessions !== 'object' || !j.sessions) return null;
+  return {
+    sessions: j.sessions as Record<string, SessionData>,
+    chats: (j.chats ?? {}) as Record<string, Array<{ role: string; content: string }>>,
+    activeId: typeof j.activeId === 'string' ? j.activeId : '',
+  };
 }
 
 // ---- agent usage meter (this device; server enforces) ----
-const USAGE_KEY = 'gpide:agent-use';
 
 export function agentUseThisMonth(): number {
-  try {
-    const raw = localStorage.getItem(USAGE_KEY);
-    if (!raw) return 0;
-    const { month, count } = JSON.parse(raw) as { month: string; count: number };
-    return month === new Date().toISOString().slice(0, 7) ? count : 0;
-  } catch {
-    return 0;
-  }
+  const raw = readKey(K.agentUse);
+  if (!raw) return 0;
+  const { month, count } = JSON.parse(raw) as { month: string; count: number };
+  return month === new Date().toISOString().slice(0, 7) ? count : 0;
 }
 
 export function bumpAgentUse(): number {
   const month = new Date().toISOString().slice(0, 7);
   const count = agentUseThisMonth() + 1;
-  try {
-    localStorage.setItem(USAGE_KEY, JSON.stringify({ month, count }));
-  } catch {
-    /* ignore */
-  }
+  writeKey(K.agentUse, JSON.stringify({ month, count }));
   return count;
 }
 
 export const AGENT_MONTHLY_CAP = 50;
 
 // ---- project rules (prepended to agent prompts; real effect) ----
-const RULES_KEY = 'gpide:rules';
 
 export function loadRules(): string {
-  try {
-    return localStorage.getItem(RULES_KEY) ?? '';
-  } catch {
-    return '';
-  }
+  return readKey(K.rules) ?? '';
 }
 
 export function saveRules(rules: string): void {
-  try {
-    localStorage.setItem(RULES_KEY, rules);
-  } catch {
-    /* ignore */
-  }
+  writeKey(K.rules, rules);
 }
 
 // ---- Vercel deploy via our edge function (signed-in users only, never anonymous) ----
