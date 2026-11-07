@@ -243,10 +243,10 @@
       <div class="price-grid">
         <article class="card price">
           <h3>Pilot</h3>
-          <p class="price-line"><strong>Free</strong> while we're in pilot</p>
+          <p class="price-line"><strong>Free</strong> — 50 agent turns a month</p>
           <ul>
             <li>Full IDE, all panes</li>
-            <li>Agent turns included</li>
+            <li>50 agent turns a month, resets on the 1st</li>
             <li>Share links included</li>
           </ul>
         </article>
@@ -300,9 +300,12 @@
           <summary>How do I publish a site?</summary>
           <p>Connect your Vercel token once in account settings, hit Deploy, and you get a live URL. No anonymous deploys, ever.</p>
         </details>
+        <!-- LAUNCH-GATED COPY (update on the same day VITE_OPENCODE_URL is set / the VPS is up):
+             the sentence below must flip from "local until then" to "counted server-side" when Zut Compute goes live.
+             Keep it in sync with the AgentSetup "On our server" card (src/components/AgentSetup.tsx) and the pricing card above. -->
         <details>
           <summary>What does it cost?</summary>
-          <p>Editing is free. While we're in pilot, agent turns are on us; afterwards you either bring your own key or cover raw compute — never more.</p>
+          <p>Editing is free. During pilot, each signed-in account gets 50 agent turns a month (resets on the 1st) — counted locally until Zut Compute is live, then server-side. After pilot, you either bring your own key or cover raw compute — never more.</p>
         </details>
       </div>
     </section>
@@ -343,7 +346,7 @@
         <a href="#features">Vercel</a><a href="#features">GitHub</a><a href="#features">Supabase</a>
       </nav>
     </div>
-    <p class="fineprint">&copy; <span id="year">2026</span> Zut. Editing is free — only runs use run time.</p>
+    <p class="fineprint">&copy; <span id="year">2026</span> Zut. Editing is free — agent turns are capped during pilot, and runs always use run time.</p>
   </footer>
 
   <script src="script.js"></script>

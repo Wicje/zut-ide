@@ -181,17 +181,17 @@ This is the work behind the current critique, in priority order.
 
 The biggest risk in the current repo is that the public story implies a billing/quota relationship the backend does not yet enforce. Before Zut Compute goes public:
 
-- Get the VPS up and point `VITE_OPENCODE_URL` at it.
-- Wire hosted usage to the signed-in account (token → quota row), not to anon runs. The usage meter that exists today is local-only.
-- Decide what a free account gets and put the real numbers in the pricing copy and in the in-app quota line.
-- Treat the FAQ sentence and the AgentSetup card as launch copy that must change on the same day the server flips, not as separate tasks.
+- Get the VPS up and point `VITE_OPENCODE_URL` at it — **blocked on ops / no VPS access yet**. Until then `hostedAgentAvailable()` is false and the AgentSetup "On our server" card reads "Coming soon". This is the single real blocker for this item; nothing else here is useful until the server exists.
+- Wire hosted usage to the signed-in account (token → quota row), not to anon runs. The usage meter that exists today is local-only — **not done**. The IDE's agent-turn meter is still a local count (`agentUseThisMonth()`); the broker only caps code runs per uid, not agent turns. The honest fix landed: the meter is now labelled "Agent turns (this device)" with a local count, and the runs line says when the broker caps runs server-side vs local. Full wiring needs the VPS + a broker endpoint that counts agent turns per signed-in user.
+- Decide what a free account gets and put the real numbers in the pricing copy and in the in-app quota line — **done**. Pilot = 50 agent turns a month, resets on the 1st, in the pricing card + FAQ + footer (landing/index.html); the in-app meter shows the local count with a clear "local" label and monthly reset date.
+- Treat the FAQ sentence and the AgentSetup card as launch copy that must change on the same day the server flips — **done**. The AgentSetup card auto-flips via `hostedAgentAvailable()`; the FAQ + pricing copy is marked with an HTML comment as launch-gated and must be flipped same-day with the AgentSetup card when `VITE_OPENCODE_URL` is set.
 
 ### 2. Close the account loose ends before real users arrive
 
-- Add a "forgot password" path. The helper exists (`mudResetPassword`); the UI does not yet expose it.
-- Verify that social/OAuth sign-in actually lands the user in the "where should the agent run" step, or fix the handoff. The team's own note is that this needs a real-account check.
-- Gate the Supabase fallback so dev signups do not keep landing in the shared project with real confirmation emails.
-- Treat the landing's `sb-<ref>-auth-token` session handoff as a compatibility detail worth an e2e test, because it depends on a SDK storage shape.
+- Add a "forgot password" path — **done**. Added a "Forgot password?" link under the sign-in form in AuthPage.tsx (full-screen sign-in page) and a "Forgot password? Send a reset link" link in the account modal's sign-in tab; both call `sb.auth.resetPasswordForEmail(email, { redirectTo: origin })` through `handleResetPassword` in App.tsx. Mudbase already exposed `mudResetPassword` in the modal's Reset tab; the gap was the Supabase side in AuthPage. The link is hidden on localhost (item 2c), so it only appears once a real Supabase project is wired.
+- Fix the OAuth → agent-setup handoff — **done (code; not verifiable in dev)**. Added `wasSigningInRef` (App.tsx) + an `onSignInStart` prop on AuthPage + a check inside `onAuthStateChange` so a fresh sign-in — magic link, OAuth, or sign-up whose confirmation mail lands a session — sets `needsAgentSetup(true)` when `getAgentMode()` is null. Magic-link sign-in no longer skips the "where should the agent run" step. Verifies on a real Supabase account; blocked in dev because `VITE_OPENCODE_URL` / `VITE_SUPABASE_URL` are unset and the Supabase path is gated on localhost (item 2c).
+- Gate the Supabase fallback so dev signups do not keep landing in the shared project with real confirmation emails — **done**. `accountProvider()` (src/lib/account.ts) returns `'supabase'` only when `authConfigured() && !isLocalhost()`, so `npm run dev` signups stay env-only; the AuthPage shows a "not configured" notice and disables submit when no backend is wired (`accounts` false).
+- Treat the landing's `sb-<ref>-auth-token` session handoff as a compatibility detail — **done (documented; e2e not written)**. The landing writes the session under `sb-<project-ref>-auth-token` by hand; supabase-js v2 reads sessions from that same key, so the landing → IDE handoff works by construction (TODO item 9). Worth an e2e test that survives SDK upgrades (TODO item 18); not fatal if skipped.
 
 ### 3. Finish the first-run story on real devices
 

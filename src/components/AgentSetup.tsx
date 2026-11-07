@@ -13,6 +13,13 @@ import { type AgentMode, getAgentMode, hostedAgentAvailable, setAgentMode } from
 //
 // The choice is a starting point, not a lock: the other one stays available
 // from the account menu afterwards.
+//
+// LAUNCH-GATED COPY: the "On our server" card flips between "Coming soon" and
+// "Online" based on hostedAgentAvailable() (which checks VITE_OPENCODE_URL).
+// When the VPS comes up and VITE_OPENCODE_URL is set, update this card's in-app
+// copy AND the landing FAQ "What does it cost?" sentence AND the pricing card
+// (landing/index.html) on the same day — all three are launch-gated and must
+// stay in sync. See the HTML comment above the FAQ details in index.html.
 
 interface AgentSetupProps {
   onDone: (mode: AgentMode) => void;
@@ -83,7 +90,8 @@ export const AgentSetup: React.FC<AgentSetupProps> = ({ onDone, onClose }) => {
               </div>
             </button>
 
-            {/* Our hosted agent: coming online with the VPS. */}
+            {/* Our hosted agent — launch-gated copy (flips to "Online" when the VPS is up
+                and VITE_OPENCODE_URL is set). Keep in sync with the landing FAQ + pricing. */}
             <div className="w-full rounded-xl border border-[#232327] bg-[#0f0f11] p-4 opacity-70">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 w-8 h-8 rounded-lg bg-[#1c1c20] border border-[#2a2a30] flex items-center justify-center shrink-0">
@@ -92,7 +100,9 @@ export const AgentSetup: React.FC<AgentSetupProps> = ({ onDone, onClose }) => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[14px] font-medium text-neutral-300">On our server</span>
-                    <span className="text-[10px] uppercase tracking-[0.08em] text-neutral-500">
+                    <span className="text-[10px] uppercase tracking-[0.08em] text-neutral-500"
+                      title={hostedUp ? 'Zut Compute is live — server-enforced quota is on.' : 'Zut Compute is not live yet — quota is counted locally until it is.'}
+                    >
                       {hostedUp ? 'Online' : 'Coming soon'}
                     </span>
                   </div>

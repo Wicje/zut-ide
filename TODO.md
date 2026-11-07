@@ -5,20 +5,30 @@ landing. This file is the honest backlog behind it.
 
 ## Zut Compute — the product's headline, not online yet
 
-1. **Get the VPS.** Everything below keys off one env var:
-   `VITE_OPENCODE_URL` pointed at the public opencode server. Until then
-   `hostedAgentAvailable()` (src/lib/account.ts) returns false and the
-   AgentSetup card honestly says "Coming soon"; self-host is the default.
-2. **Auth for hosted turns.** The broker already runs turns server-side
-   (`POST /run`, `/agent/turn`, quota per day), but nothing ties a turn to
-   the *account* paying for it. Before Zut Compute goes public, hosted
-   usage must be metered against the Supabase user (token → quota row;
-   `supabase/usage_meter.sql` exists — wire it to accounts, not anon runs).
-3. **Pricing/quota copy.** "Editing is free, only runs use run time" holds;
-   decide what a free account gets on Zut Compute (e.g. N build-minutes/day)
-   and put the real numbers in the pricing section.
-4. **Flip the card.** When the server is up: `hostedAgentAvailable()` flips
-   by itself; also swap the FAQ sentence ("coming online" → real offer).
+1. **Get the VPS — blocked on ops, no VPS access.** Everything below keys
+   off one env var: `VITE_OPENCODE_URL` pointed at the public opencode
+   server. Until then `hostedAgentAvailable()` (src/lib/account.ts) returns
+   false and the AgentSetup card honestly says "Coming soon"; self-host is
+   the default. This is the single real blocker for Section 9 item 1; the
+   other sub-items are not useful until the server exists.
+2. **Auth for hosted turns — not done (needs VPS + broker endpoint).** The
+   broker already runs turns server-side (`POST /run`, `/agent/turn`, daily
+   quota per uid), but nothing ties an *agent turn* to the account paying
+   for it — only code runs are capped, per uid. The IDE's agent-turn meter
+   is still a local count (`agentUseThisMonth()`); the honest local-label
+   fix landed (meter now says "Agent turns (this device)", runs line says
+   when the broker caps server-side). Full wiring needs the VPS up + a
+   broker endpoint that counts agent turns per signed-in Supabase user
+   (`supabase/usage_meter.sql` exists — wire it to accounts, not anon).
+3. **Pricing/quota copy — done.** Pilot = 50 agent turns a month, resets
+   on the 1st, in the pricing card + FAQ + footer
+   (landing/index.html); the in-app meter shows the local count with a clear
+   "local" label and monthly reset date. Real numbers are now in the copy.
+4. **Flip the card — done (card auto-flips; FAQ marked launch-gated).**
+   When the server is up: `hostedAgentAvailable()` flips the AgentSetup card
+   by itself; the FAQ + pricing copy is marked with an HTML comment as
+   launch-gated copy that must be flipped the same day with the card when
+   `VITE_OPENCODE_URL` is set.
 
 ## Accounts — loose ends
 
@@ -27,14 +37,23 @@ landing. This file is the honest backlog behind it.
    **auto-confirm on** — an account created from the landing is usable
    immediately (no email round-trip on a phone). If deliverability abuse
    ever shows up, flip auto-confirm off and the Confirmed-email flow just works.
-6. **Dev noise.** The fallback constants mean `npm run dev` signups land in
-   the shared project with real confirmation emails. Eventually gate the
-   fallback to production builds (import.meta.env.PROD) so dev stays env-only.
+6. **Dev noise — done.** The hardcoded Supabase fallback would let `npm run dev`
+   signups land in the shared project with real confirmation emails. `accountProvider()`
+   (src/lib/account.ts) now returns `'supabase'` only when `authConfigured() && !isLocalhost()`,
+   so dev signups stay env-only: `isLocalhost()` (browser-only: localhost / 127.0.0.1 /
+   [::1]) gates the fallback, and the AuthPage shows a "not configured" notice and
+   disables submit when no backend is wired (`accounts` false). Migration footguns
+   (storage keys, legacy names) are a separate hygiene item (TODO 21/22).
 7. **Google/GitHub OAuth.** The buttons render only when Mudbase OAuth is
    configured. Decide if Supabase social providers should light them up too.
-8. **Password reset.** Mudbase has `mudResendVerification`/`mudResetPassword`
-   helpers; the auth page has no "forgot password" UI yet. Add it (one link
-   under the sign-in form) before real users arrive.
+8. **Password reset — done.** Added a "Forgot password?" link under the sign-in
+   form in AuthPage.tsx (full-screen sign-in page) and a "Forgot password? Send
+   a reset link" link in the account modal's sign-in tab; both call
+   `sb.auth.resetPasswordForEmail(email, { redirectTo: origin })` via
+   `handleResetPassword` in App.tsx. Mudbase already exposed
+   `mudResetPassword`/`mudResendVerification` in the modal's Reset tab; the gap
+   was the Supabase side in AuthPage. The link is hidden on localhost (item 6),
+   so it only appears once a real Supabase project is wired.
 9. **The `-user` note.** The landing stores the session under
    `sb-<ref>-auth-token` manually. It matches the current supabase-js
    (verified against the installed version); if the SDK changes its storage
@@ -43,10 +62,15 @@ landing. This file is the honest backlog behind it.
 
 ## The IDE's first-run story
 
-10. **AgentSetup after OAuth.** Social sign-in callbacks skip AuthPage's
-    onSignedIn path — check the Mudbase/OAuth flow also triggers the
-    "where should the agent run" step (it should, via `user` state + a
-    `getAgentMode()` check; verify on a real account).
+10. **AgentSetup after OAuth — done (code; not verifiable in dev).** Social
+    sign-in callbacks skip AuthPage's onSignedIn path (OAuth returns before the
+    redirect lands a session). Fixed by adding `wasSigningInRef` (App.tsx) + an
+    `onSignInStart` prop on AuthPage + a check inside `onAuthStateChange` so a
+    fresh sign-in — magic link, OAuth, or sign-up whose confirmation mail lands a
+    session — sets `needsAgentSetup(true)` when `getAgentMode()` is null. The
+    "where should the agent run" step now fires for magic-link sign-in too. Verifies
+    on a real Supabase account; blocked in dev because `VITE_SUPABASE_URL` is unset
+    and the Supabase path is gated on localhost (TODO item 6).
 11. **Connect hint in self-host mode.** After "On your machine" the IDE
     shows a toast about connecting opencode, and that's all. The host modal
     / `npm run dev:opencode` deserves a first-run card with copy-paste
