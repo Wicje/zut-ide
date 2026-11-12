@@ -171,7 +171,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
         <div className="flex flex-col items-center gap-3 text-center max-w-xs">
           <div
             className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
-              isDark ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-neutral-500'
+              isDark ? 'bg-neutral-800 text-neutral-300' : 'bg-[#f4f4f6] text-neutral-500'
             }`}
           >
             <FileCode size={20} />
@@ -197,8 +197,8 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                 onClick={() => onSuggestPrompt('Create a starter index.html landing page')}
                 className={`px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
                   isDark
-                    ? 'border-neutral-700 text-neutral-300 hover:bg-neutral-800'
-                    : 'border-neutral-300 text-neutral-600 hover:bg-neutral-100'
+                    ? 'border-neutral-800 text-neutral-300 hover:bg-neutral-800'
+                    : 'border-neutral-300 text-neutral-600 hover:bg-[#f4f4f6]'
                 }`}
               >
                 Build a landing page
@@ -389,7 +389,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
 
           <div
             className={`flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded ${
-              isDark ? 'bg-[#24242a] text-neutral-400' : 'bg-neutral-100 text-neutral-600'
+              isDark ? 'bg-[#24242a] text-neutral-400' : 'bg-[#f4f4f6] text-neutral-600'
             }`}
           >
             <span>{activeFile.language}</span>
@@ -410,7 +410,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
               aiCompleteOn
                 ? isDark
                   ? 'bg-[#24242a] text-neutral-200'
-                  : 'bg-neutral-100 text-neutral-800'
+                  : 'bg-[#f4f4f6] text-neutral-800'
                 : isDark
                   ? 'text-neutral-500 hover:text-neutral-300'
                   : 'text-neutral-400 hover:text-neutral-700'
@@ -444,7 +444,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
             }`}
           >
             <div className="p-2 space-y-1">
-              <div className="px-1.5 py-1 text-[10.5px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+              <div className="px-1.5 py-1 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
                 <ChevronDown size={12} />
                 <span className="flex-1">workspace / src</span>
                 {onCreateFile && (
@@ -574,7 +574,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                             onClick={(e) => e.stopPropagation()}
                             aria-label="Rename file"
                             className={`flex-1 min-w-0 px-1 py-0.5 rounded border text-[12px] focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                              isDark ? 'bg-neutral-900 border-neutral-700 text-white' : 'bg-white border-neutral-300 text-neutral-900'
+                              isDark ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-300 text-neutral-900'
                             }`}
                           />
                         ) : (
@@ -600,13 +600,13 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                           title="File actions"
                           aria-label="File actions"
                         >
-                          <span className="text-sm leading-none px-0.5">⋯</span>
+                          <span className="text-[13px] leading-none px-0.5">⋯</span>
                         </button>
                       </div>
                       {menuOpen && !renaming && (
                         <div
                           className={`absolute right-1 top-full mt-0.5 z-30 w-32 rounded-lg border py-1 shadow-xl text-[12px] ${
-                            isDark ? 'bg-[#222228] border-neutral-700' : 'bg-white border-neutral-200'
+                            isDark ? 'bg-[#222228] border-neutral-800' : 'bg-white border-neutral-200'
                           }`}
                         >
                           {onRenameFile && (
@@ -616,7 +616,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                                 setRenamingId(file.id);
                               }}
                               className={`w-full text-left px-3 py-1.5 cursor-pointer ${
-                                isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                                isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                               }`}
                             >
                               Rename
@@ -629,7 +629,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                                 setMenuFor(null);
                               }}
                               className={`w-full text-left px-3 py-1.5 cursor-pointer ${
-                                isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                                isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                               }`}
                             >
                               Duplicate
@@ -644,7 +644,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                                 setMenuFor(null);
                               }}
                               className={`w-full text-left px-3 py-1.5 text-red-500 cursor-pointer ${
-                                isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                                isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                               }`}
                             >
                               Delete
@@ -671,7 +671,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
           {/* Tab Bar */}
           <div
             className={`h-8 border-b flex items-center overflow-x-auto ${
-              isDark ? 'bg-[#18181c] border-neutral-800' : 'bg-[#f4f4f6] border-[#e5e5e7]'
+              isDark ? 'bg-[#18181b] border-neutral-800' : 'bg-[#f4f4f6] border-[#e5e5e7]'
             }`}
           >
             {openTabs.map((tabId) => {
@@ -690,7 +690,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                         : 'bg-white text-neutral-900 border-b-2 border-b-red-500 border-r-[#e5e5e7] font-medium'
                       : isDark
                       ? 'text-neutral-400 hover:bg-neutral-800/40 border-r-neutral-800'
-                      : 'text-neutral-600 hover:bg-neutral-100 border-r-[#e5e5e7]'
+                      : 'text-neutral-600 hover:bg-[#f4f4f6] border-r-[#e5e5e7]'
                   }`}
                 >
                   <FileCode size={12} className="text-red-500" />
@@ -712,7 +712,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
           {/* Hierarchical Breadcrumbs Bar */}
           <div
             className={`h-6 px-3 border-b flex items-center gap-1.5 text-[11px] font-mono select-none ${
-              isDark ? 'bg-[#18181c] border-neutral-800/60 text-neutral-400' : 'bg-[#fafafc] border-[#e5e5e7]/60 text-neutral-500'
+              isDark ? 'bg-[#18181b] border-neutral-800/60 text-neutral-400' : 'bg-[#fafafc] border-[#e5e5e7]/60 text-neutral-500'
             }`}
           >
             {activeFile.path.split('/').map((seg, i, arr) => (
@@ -782,7 +782,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                     placeholder="e.g. Memoize icon size calculation with useMemo"
                     className={`flex-1 px-3 py-1.5 text-xs font-sans rounded-lg border focus:outline-none focus:ring-1 focus:ring-red-500 ${
                       isDark
-                        ? 'bg-[#1e1e24] border-neutral-700 text-white'
+                        ? 'bg-[#1e1e24] border-neutral-800 text-white'
                         : 'bg-white border-neutral-300 text-neutral-900'
                     }`}
                     autoFocus

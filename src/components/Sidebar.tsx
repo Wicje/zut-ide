@@ -7,8 +7,12 @@ import {
   User,
   Loader2,
   CheckCircle2,
+  FolderOpen,
+  X,
 } from 'lucide-react';
 import { SidebarSection, SidebarItem, SidebarTask } from '../types';
+import { timeAgo } from '../lib/appModel';
+import type { RecentProject } from '../lib/recent-projects';
 
 interface SidebarProps {
   sections: SidebarSection[];
@@ -30,6 +34,10 @@ interface SidebarProps {
   onToggleSidebar?: () => void;
   user?: { name: string; email: string } | null;
   theme?: 'light' | 'dark';
+  /** Device projects stashed by "new project" / switching — one click back. */
+  recents?: RecentProject[];
+  onOpenRecent?: (id: string) => void;
+  onRemoveRecent?: (id: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -51,6 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleSidebar,
   user,
   theme = 'light',
+  recents,
+  onOpenRecent,
+  onRemoveRecent,
 }) => {
   const isDark = theme === 'dark';
   const displayName = user?.name
@@ -71,9 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div
       className={`w-full shrink-0 border-r flex flex-col justify-between h-full select-none text-[13px] transition-colors ${
-        isDark
-          ? 'bg-[#141416] text-neutral-300 border-neutral-800'
-          : 'bg-[#f4f4f6] text-[#2b2b2f] border-[#e5e5e7]'
+        'bg-[var(--zut-canvas)] text-[var(--zut-text)] border-[var(--zut-border)]'
       }`}
     >
       {/* Top area */}
@@ -109,16 +118,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Filter sessions..."
               className={`w-full px-2 py-1 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                isDark ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-300 text-neutral-800'
+                isDark ? 'bg-neutral-800 border-neutral-800 text-white' : 'bg-white border-neutral-300 text-neutral-800'
               }`}
               autoFocus
             />
           </div>
         )}
 
-        {/* Top actions — plain text rows, the way VS Code lists them.
-            An icon here would only repeat the label. */}
+        {/* Top actions — plain text rows, grouped with quiet micro-labels. */}
         <div className="px-2 pt-1 pb-2 space-y-0.5">
+          <div className="px-2.5 pb-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase">Start</div>
           <button
             onClick={onNewAgent}
             className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
@@ -154,6 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
+          <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase">Connect</div>
           {onOpenHost && (
             <button
               onClick={onOpenHost}
@@ -180,6 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
+          <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase">Tools</div>
           <button
             onClick={onOpenCommandPalette}
             className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left font-normal cursor-pointer ${
@@ -201,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {workspaceLabel && (
-          <div className="px-2.5 pb-1 text-[10.5px] text-neutral-400 truncate" title={`Workspace: ${workspaceLabel}`}>
+          <div className="px-2.5 pb-1 text-[11px] text-neutral-400 truncate" title={`Workspace: ${workspaceLabel}`}>
             Workspace · {workspaceLabel}
           </div>
         )}
@@ -249,12 +260,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         )}
                       </div>
                       {task.subtitle && (
-                        <div className="text-[10.5px] text-neutral-400 truncate mt-0.5">
+                        <div className="text-[11px] text-neutral-400 truncate mt-0.5">
                           {task.subtitle}
                         </div>
                       )}
                       {(task.additions || task.deletions) ? (
-                        <div className="text-[10.5px] font-mono mt-0.5">
+                        <div className="text-[11px] font-mono mt-0.5">
                           {task.additions ? (
                             <span className="text-emerald-600 dark:text-emerald-400">+{task.additions}</span>
                           ) : null}
@@ -274,6 +285,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Sections list */}
         <div className="px-2 space-y-3.5 overflow-y-auto flex-1 min-h-0 pb-4">
+          {recents && recents.length > 0 && (
+            <div className="space-y-0.5">
+              <div className="px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase">
+                Recents
+              </div>
+              {recents.slice(0, 5).map((r) => (
+                <div key={r.id} className="group/recent relative flex items-center">
+                  <button
+                    onClick={() => onOpenRecent?.(r.id)}
+                    title={`Reopen “${r.name}” (${r.fileCount} files)`}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    <FolderOpen size={12} className="shrink-0 text-neutral-400" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12px] font-medium truncate">{r.name}</span>
+                      <span className="block text-[10px] text-neutral-400 truncate">
+                        {r.fileCount} file{r.fileCount === 1 ? '' : 's'} · {timeAgo(r.savedAt)}
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => onRemoveRecent?.(r.id)}
+                    title="Remove from recents"
+                    aria-label={`Remove ${r.name} from recents`}
+                    className="absolute right-1.5 p-1 rounded opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-opacity cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {sections.map((section) => {
             const filteredItems = section.items.filter((item) =>
               item.title.toLowerCase().includes(searchFilter.toLowerCase())
@@ -283,9 +327,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             return (
               <div key={section.title} className="space-y-0.5">
-                <div className="px-2.5 py-0.5 text-[11px] font-medium text-neutral-400 tracking-tight flex items-center justify-between">
+                <div className="px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase flex items-center justify-between">
                   <span>{section.title}</span>
                 </div>
+
+                {filteredItems.length === 0 && (
+                  <div className="px-2.5 py-1.5 text-[11px] leading-[1.45] text-neutral-400">
+                    {section.title === 'Project'
+                      ? 'No files yet — start a new project or open a folder.'
+                      : 'Nothing here yet.'}
+                  </div>
+                )}
 
                 {filteredItems.map((item, index) => {
                   const isActive = activeItem === item.id;
@@ -304,7 +356,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div key={item.id} className="group/item relative flex items-center">
                       <button
                         onClick={() => onSelectItem(item.id)}
-                        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-[12.5px] transition-all cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-[13px] transition-all cursor-pointer ${
                           isActive
                             ? isDark
                               ? 'bg-[#242429] text-white font-medium shadow-xs'
@@ -395,7 +447,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 {displayName}
               </span>
-              <span className="text-[10.5px] text-neutral-500 truncate">
+              <span className="text-[11px] text-neutral-500 truncate">
                 {displaySub}
               </span>
             </div>

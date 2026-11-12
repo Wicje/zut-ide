@@ -135,10 +135,10 @@ function ProviderKeyRow({
           onChange={(e) => onInput(e.target.value)}
           placeholder={placeholder}
           autoComplete="off"
-          className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
+          className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
         />
         <button
-          className="h-8 px-2.5 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-[11px] font-semibold disabled:opacity-40"
+          className="h-8 px-2.5 rounded-md bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 text-[11px] font-semibold disabled:opacity-40"
           disabled={!input.trim()}
           onClick={() => {
             onSave(input.trim());
@@ -299,21 +299,21 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 max-sm:p-2 animate-fadeIn"
       onClick={onClose}
     >
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark
-            ? 'bg-[#18181c] border-neutral-700 text-neutral-100'
-            : 'bg-white border-neutral-200 text-neutral-800'
+            ? 'bg-[#18181b] border-neutral-800 text-neutral-100'
+            : 'bg-white border-[#e5e5e7] text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Tabs */}
         <div
           className={`h-11 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-[#fbfbfd]'
           }`}
         >
           <div className="flex items-center gap-3 text-xs font-medium">
@@ -363,7 +363,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
         {activeTab === 'account' && (
           <div className="p-4 space-y-4 text-xs">
             {/* User Profile Card */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-[#222228] border border-neutral-200 dark:border-neutral-700">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[#fafafc] dark:bg-[#1e1e24] border border-[#e5e5e7] dark:border-neutral-800">
               <div className="flex items-center gap-3">
                 {currentUser.avatar ? (
                   <img
@@ -377,7 +377,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                   </div>
                 )}
                 <div>
-                  <div className="font-semibold text-sm leading-tight">
+                  <div className="text-[13px] font-semibold leading-tight">
                     {currentUser.name}
                   </div>
                   <div className="text-[11px] text-neutral-500">
@@ -386,16 +386,16 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                 </div>
               </div>
 
-              <span className="px-2 py-0.5 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 rounded text-[10px] font-semibold tracking-wide uppercase">
+              <span className="px-2 py-0.5 bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 rounded text-[10px] font-semibold tracking-wide uppercase">
                 {currentUser.plan}
               </span>
             </div>
 
             {/* Usage Quota Meter */}
-            <div className="space-y-1.5 p-3 rounded-xl border border-neutral-200 dark:border-neutral-700">
+            <div className="space-y-1.5 p-3 rounded-xl border border-[#e5e5e7] dark:border-neutral-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-medium">
-                  <Zap size={13} className="text-amber-500" />
+                  <Zap size={13} className="text-neutral-400" />
                   <span>Agent turns</span>
                 </div>
                 <span className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
@@ -410,17 +410,17 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between text-[10.5px] text-neutral-400 pt-0.5">
+              <div className="flex items-center justify-between text-[10px] text-neutral-400 pt-0.5">
                 <span>{resetLine ?? 'Resets monthly'}</span>
                 <span>{usagePercent}% utilized</span>
               </div>
               {quotaLine && (
-                <div className="text-[10.5px] text-neutral-500 font-mono">{quotaLine}</div>
+                <div className="text-[10px] text-neutral-500 font-mono">{quotaLine}</div>
               )}
             </div>
 
             {/* Team & Workspace */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700">
+            <div className="flex items-center justify-between p-2.5 rounded-lg border border-[#e5e5e7] dark:border-neutral-800">
               <div className="flex items-center gap-2">
                 <Users size={14} className="text-neutral-400" />
                 <span className="font-medium">Team Workspace</span>
@@ -431,7 +431,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
             </div>
 
             {/* API Keys Configuration Toggle */}
-            <div className="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 space-y-2">
+            <div className="p-2.5 rounded-lg border border-[#e5e5e7] dark:border-neutral-800 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Key size={14} className="text-neutral-400" />
@@ -499,7 +499,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
             </div>
 
             {/* Dev connectors */}
-            <div className="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 space-y-2">
+            <div className="p-2.5 rounded-lg border border-[#e5e5e7] dark:border-neutral-800 space-y-2">
               <div className="flex items-center gap-2">
                 <Plug size={14} className="text-neutral-400" />
                 <div>
@@ -563,14 +563,14 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                       onChange={(e) => setClCloud(e.target.value)}
                       placeholder="cloud-name"
                       autoComplete="off"
-                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
                     />
                     <input
                       value={clPreset}
                       onChange={(e) => setClPreset(e.target.value)}
                       placeholder="preset"
                       autoComplete="off"
-                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
                     />
                     <button
                       disabled={!clCloud.trim() || !clPreset.trim()}
@@ -580,7 +580,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                         setClPreset('');
                         setClSaved(true);
                       }}
-                      className="h-8 px-2.5 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-[11px] font-semibold disabled:opacity-40 cursor-pointer"
+                      className="h-8 px-2.5 rounded-md bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 text-[11px] font-semibold disabled:opacity-40 cursor-pointer"
                     >
                       Save
                     </button>
@@ -612,7 +612,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                       placeholder="https://xyz.supabase.co"
                       autoComplete="off"
                       spellCheck={false}
-                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
                     />
                     <input
                       value={sbAnon}
@@ -620,7 +620,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                       placeholder="anon key"
                       autoComplete="off"
                       spellCheck={false}
-                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="h-8 flex-1 rounded-md border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
                     />
                     <button
                       disabled={!sbUrl.trim().startsWith('http') || !sbAnon.trim()}
@@ -630,7 +630,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                         setSbAnon('');
                         setSbSaved(true);
                       }}
-                      className="h-8 px-2.5 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-[11px] font-semibold disabled:opacity-40 cursor-pointer"
+                      className="h-8 px-2.5 rounded-md bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 text-[11px] font-semibold disabled:opacity-40 cursor-pointer"
                     >
                       Save
                     </button>
@@ -642,11 +642,11 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
             {/* Danger zone: one escape hatch for shared devices */}
             <div className="p-2.5 rounded-lg border border-red-500/30 bg-red-500/5 flex items-center justify-between gap-2">
               <div>
-                <div className="font-medium text-[12px]">Remove all keys from this device</div>
+                <div className="font-medium text-[13px]">Remove all keys from this device</div>
                 <div className="text-[10px] text-neutral-400">AI keys, deploy tokens and connectors — sign-in stays</div>
               </div>
               <button
-                className="shrink-0 px-2.5 py-1.5 rounded-md border border-red-500/40 text-red-600 dark:text-red-400 text-[11px] font-semibold hover:bg-red-500/10 cursor-pointer"
+                className="shrink-0 px-2.5 py-1.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-semibold hover:bg-red-500/15 cursor-pointer"
                 onClick={() => {
                   revokeAllLocalKeys();
                   setGhSaved(false);
@@ -673,7 +673,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                     if (onLogout) onLogout();
                     setActiveTab('signin');
                   }}
-                  className="flex items-center gap-1.5 text-neutral-400 hover:text-red-500 transition-colors text-[11.5px] cursor-pointer"
+                  className="flex items-center gap-1.5 text-neutral-400 hover:text-red-500 transition-colors text-[11px] cursor-pointer"
                 >
                   <LogOut size={12} />
                   <span>Sign Out</span>
@@ -684,7 +684,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
 
               <button
                 onClick={onClose}
-                className="px-3.5 py-1.5 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 rounded-lg font-medium text-xs shadow-xs cursor-pointer hover:opacity-90"
+                className="px-3.5 py-1.5 bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 rounded-lg font-medium text-xs shadow-xs cursor-pointer hover:opacity-90"
               >
                 Close Settings
               </button>
@@ -695,17 +695,17 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
           /* Tab 2: Sign In / Authentication Portal */
           <div className="p-5 space-y-4 text-xs">
             <div className="text-center space-y-1">
-              <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black mx-auto flex items-center justify-center font-bold text-base shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black mx-auto flex items-center justify-center text-[15px] font-semibold shadow-sm">
                 Z
               </div>
-              <h3 className="font-extrabold text-lg mt-2 tracking-tight">Your AI workspace.</h3>
+              <h3 className="text-[15px] font-semibold mt-2 tracking-tight">Your AI workspace.</h3>
               <p className="text-[13px] text-neutral-400 font-medium">
                 Log in to your Zut account
               </p>
             </div>
 
             {authHint && !signInError && !notice && (
-              <div className="rounded-lg bg-neutral-500/10 border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-[11px] text-neutral-600 dark:text-neutral-300">
+              <div className="rounded-lg bg-[#fafafc]0/10 border border-neutral-300 dark:border-neutral-800 px-3 py-2 text-[11px] text-neutral-600 dark:text-neutral-300">
                 {authHint}
               </div>
             )}
@@ -734,7 +734,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 placeholder="Enter your email address…"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] focus:outline-none focus:ring-1 focus:ring-red-500"
               />
               <button
                 type="submit"
@@ -766,7 +766,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                     setBusy(false);
                   }
                 }}
-                className="w-full text-[10.5px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                className="w-full text-[10px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
               >
                 Forgot password? Send a reset link
               </button>
@@ -774,7 +774,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
 
             <div className="flex items-center gap-2 my-2">
               <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
-              <span className="text-[10.5px] text-neutral-400">or continue with</span>
+              <span className="text-[10px] text-neutral-400">or continue with</span>
               <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
             </div>
 
@@ -782,7 +782,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
               <button
                 onClick={() => handleDemoSignIn('github')}
                 disabled={busy}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 font-semibold text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Github size={15} />
                 <span>{busy ? 'Working…' : 'GitHub'}</span>
@@ -791,7 +791,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
               <button
                 disabled={busy}
                 onClick={() => handleDemoSignIn('google')}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 font-semibold text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                   <path
@@ -828,7 +828,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                 Create an account
               </button>
             </p>
-            <p className="text-center text-[10.5px] text-neutral-400">
+            <p className="text-center text-[10px] text-neutral-400">
               Keys stay in this browser. Editing is free — only runs use run time.
             </p>
           </div>
@@ -837,7 +837,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
           /* Tab 3: Mudbase email + password */
           <div className="p-5 space-y-3 text-xs">
             <div className="text-center space-y-1">
-              <h3 className="font-bold text-base">Mudbase account</h3>
+              <h3 className="text-[15px] font-semibold">Mudbase account</h3>
               <p className="text-xs text-neutral-500">
                 {mudMode === 'register'
                   ? 'Create an account for this project. A verification email follows.'
@@ -846,7 +846,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                     : 'Sign in with your project account.'}
               </p>
             </div>
-            <div className="flex rounded-lg bg-neutral-100 dark:bg-neutral-800 p-0.5 text-[11px] font-medium">
+            <div className="flex rounded-lg bg-[#f4f4f6] dark:bg-neutral-800 p-0.5 text-[11px] font-medium">
               {(['signin', 'register', 'reset'] as const).map((m) => (
                 <button
                   key={m}
@@ -880,7 +880,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                   onChange={(e) => setMudName(e.target.value)}
                   placeholder="Display name (optional)"
                   autoComplete="name"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
               )}
               <input
@@ -889,7 +889,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                 onChange={(e) => setMudEmail(e.target.value)}
                 placeholder="name@company.com"
                 autoComplete="email"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] focus:outline-none focus:ring-1 focus:ring-red-500"
               />
               {mudMode !== 'reset' && (
                 <input
@@ -898,13 +898,13 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                   onChange={(e) => setMudPassword(e.target.value)}
                   placeholder={mudMode === 'register' ? 'Choose a password (8+ chars)' : 'Your password'}
                   autoComplete={mudMode === 'register' ? 'new-password' : 'current-password'}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
               )}
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full py-2 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs rounded-xl hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full py-2 bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 font-semibold text-xs rounded-xl hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-50"
               >
                 {busy ? 'Working…' : mudMode === 'register' ? 'Create account' : mudMode === 'reset' ? 'Send reset email' : 'Sign in'}
               </button>
@@ -951,7 +951,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                   <>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
-                      <span className="text-[10.5px] text-neutral-400">or continue with</span>
+                      <span className="text-[10px] text-neutral-400">or continue with</span>
                       <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
                     </div>
                     <div className="flex gap-2">
@@ -969,7 +969,7 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                                 setMudError((err as Error).message);
                               }
                             }}
-                            className="flex-1 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 font-semibold text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors disabled:opacity-40"
+                            className="flex-1 py-2 rounded-xl bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#24242a] dark:hover:bg-[#2c2c34] text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-colors disabled:opacity-40"
                           >
                             {p === 'github' ? 'GitHub' : 'Google'}
                           </button>

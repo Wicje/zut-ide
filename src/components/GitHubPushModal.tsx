@@ -118,13 +118,13 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
     >
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
-          isDark ? 'bg-[#18181c] border-neutral-700 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
+          isDark ? 'bg-[#18181b] border-neutral-800 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className={`h-11 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-[#fbfbfd]'
           }`}
         >
           <div className="flex items-center gap-2 text-xs font-semibold">
@@ -177,7 +177,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
                 onChange={(e) => setRepo(e.target.value)}
                 placeholder="my-project"
                 aria-label="Repository name"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
               />
               <label className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300">
                 <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="size-3.5 accent-emerald-600" />
@@ -191,7 +191,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
                   aria-label="Branch name"
                   spellCheck={false}
                   list="zut-branches"
-                  className="flex-1 min-w-0 px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="flex-1 min-w-0 px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
                 <datalist id="zut-branches">
                   {branches.map((b) => (
@@ -204,7 +204,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
                   placeholder="feat: what changed"
                   aria-label="Commit message"
                   spellCheck={false}
-                  className="flex-[2] min-w-0 px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="flex-[2] min-w-0 px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-transparent focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
                   type="button"
                   onClick={() => void lookup()}
                   disabled={lookupBusy || !repo.trim() || !token.trim()}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neutral-300 dark:border-neutral-800 text-xs font-medium hover:bg-[#f4f4f6] dark:hover:bg-neutral-800 disabled:opacity-40 cursor-pointer"
                   title="List branches + recent commits (read-only)"
                 >
                   <RefreshCw size={12} className={lookupBusy ? 'animate-spin' : ''} />
@@ -230,8 +230,8 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
                 </div>
               )}
               {commitsFor && commits.length > 0 && (
-                <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-50 dark:bg-neutral-800/60 text-[11px] font-medium text-neutral-500">
+                <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fafafc] dark:bg-neutral-800/60 text-[11px] font-medium text-neutral-500">
                     <History size={11} />
                     Latest on {commitsFor}
                   </div>
@@ -242,7 +242,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
                           href={c.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="block px-3 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/60"
+                          className="block px-3 py-1.5 hover:bg-[#fafafc] dark:hover:bg-neutral-800/60"
                           title={`${c.sha} — ${c.author}`}
                         >
                           <span className="font-mono text-[10px] text-neutral-400">{c.shortSha}</span>{' '}
@@ -263,7 +263,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({
                 placeholder="ghp_… (classic token, repo scope)"
                 autoComplete="off"
                 aria-label="GitHub token"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent font-mono focus:outline-none focus:ring-1 focus:ring-red-500"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-800 bg-transparent font-mono focus:outline-none focus:ring-1 focus:ring-red-500"
               />
               <button
                 type="submit"

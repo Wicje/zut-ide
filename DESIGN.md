@@ -18,8 +18,11 @@
 ## Palette (light + dark, manual toggle)
 
 Theme lives in `App` state (`light | dark`), drilled as a `theme` prop into
-every pane and modal — each renders `isDark` ternaries. No CSS variables file;
-tokens are inline.
+every pane and modal — each renders `isDark` ternaries. The token values
+themselves live once in `src/index.css` as `--zut-*` CSS variables (canvas /
+panel / raised / border / text / text-dim / accent + dark-aware scrollbar
+thumbs); the ternaries resolve to those. Don't invent a near-miss grey —
+reach for the variable. `data-theme` goes on `<html>` as before.
 
 `App` also writes `data-theme` on `<html>`, and `src/index.css` overrides the
 Tailwind `dark:` variant to key off that attribute
@@ -98,10 +101,11 @@ table above. Borders are for surfaces, not for buttons.
 
 ## Typography
 
-- **UI:** `-apple-system, Inter, SF Pro Text, Segoe UI` (Google Fonts Inter).
+- **UI:** `Inter Variable` (`@fontsource-variable/inter`, imported in
+  `src/main.tsx`), fallback stack `-apple-system, Inter, SF Pro Text, Segoe UI`.
   Pane body `text-[13px]`, headers `text-xs`, pills `text-[10.5px]/text-[11px]`.
-- **Code/paths:** `JetBrains Mono` (`.font-code`, liga+calt on), diff rows
-  `text-[12px] leading-[20px]`.
+- **Code/paths:** `JetBrains Mono Variable` (`@fontsource-variable/jetbrains-mono`,
+  `.font-code`, liga+calt on), diff rows `text-[12px] leading-[20px]`.
 - **Editor:** Monaco (`vs` light / `vs-dark` dark), minimap off.
 
 ## Shape & elevation
@@ -115,7 +119,7 @@ table above. Borders are for surfaces, not for buttons.
   (hover `red-500/50`, active `red-600`, double-click resets 210 / 380).
 - Modals: `fixed inset-0 z-50` backdrop `bg-black/50 backdrop-blur-xs`,
   `max-w-md` (simple) / `max-w-lg` / `max-w-2xl max-h-[85vh]` (PR studio).
-- Scrollbars: 6px, `rgba(0,0,0,0.15)` thumb, transparent track.
+- Scrollbars: 6px, thumb `var(--zut-scrollbar)` (dark-aware, transparent track).
 
 ## Brand
 
@@ -146,15 +150,24 @@ table above. Borders are for surfaces, not for buttons.
 - 3 resizable panes; right pane switches Diff / Editor / Preview / Checks via
   top bar, pane tabs, or `Cmd/Ctrl+1..4`. `Cmd/Ctrl+K` palette, `+N` new agent,
   `+D` unified/split, `+J` terminal.
-- Sidebar: traffic lights + search + New Agent; Agents group (sessions) and
-  Project files (click → opens in editor); user footer (avatar, account modal).
+- Sidebar: search + collapse at top, grouped plain-text actions under
+  micro-labels (Start / Connect / Tools), then the task rail (In progress /
+  Ready for review), then Project files. Empty Project shows a hint row, not a
+  void.
 - Composer: model picker, agent steps timeline, summary, follow-up bar with
-  @-mention, commit/review buttons, rules modal entry.
+  @-mention, commit/review buttons, rules modal entry. The follow-up bar is two
+  rows — full-width input on top (send/mic pinned right), toolbar below
+  (@-mention + image attach left, Agent/Plan + model picker right) — so the
+  field never truncates its placeholder.
+- Empty states: one pattern everywhere — the mark at low opacity, one line of
+  what-this-is, the keyboard path (⌘1–4) as quiet hint chips. Never a bare
+  void.
 - Right: Diff = per-file accept/revert under the pane header; the header carries
   the switcher, the diff summary, copy-diff, PR and deploy actions;
   Editor = Monaco tree + tabs + inline prompt; Preview = sandboxed iframe +
-  viewport switch + console drawer + inspect-to-composer; Checks = run history
-  as pass/fail rows with agent auto-fix.
+  device-preset switcher (fluid / laptop / tablet / phones) + rotate + open-in-tab
+  + console/network drawer (level filter, error badge) + inspect-to-composer;
+  Checks = run history as pass/fail rows with agent auto-fix.
 - Every destructive or workspace-replacing action snapshots first (New Agent,
   Import, Restore, revert, rollback) — History is the universal undo.
 - New Agent = fresh instance: starter files, cleared sessions/runs/console,

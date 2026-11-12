@@ -318,13 +318,13 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     >
       <div
         className={`w-full max-w-xl rounded-xl shadow-2xl overflow-hidden border max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
-          isDark ? 'bg-[#1e1e24] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-800'
+          isDark ? 'bg-[#1e1e24] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input Bar */}
         <div className={`flex items-center gap-3 px-3.5 py-3 border-b ${
-          isDark ? 'border-neutral-800 bg-[#25252b]' : 'border-neutral-200 bg-neutral-50/50'
+          isDark ? 'border-neutral-800 bg-[#25252b]' : 'border-neutral-200 bg-[#fafafc]/50'
         }`}>
           <Search size={16} className="text-neutral-400 shrink-0" />
           <input
@@ -332,7 +332,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command, file name, or code search..."
-            className="flex-1 bg-transparent text-sm max-sm:text-base focus:outline-none placeholder-neutral-400"
+            className="flex-1 bg-transparent text-[13px] max-sm:text-base focus:outline-none placeholder-neutral-400"
             autoFocus
           />
           <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/50 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-300">
@@ -358,10 +358,10 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                     isSelected
                       ? isDark
                         ? 'bg-red-600/30 text-white'
-                        : 'bg-neutral-100 text-neutral-900 font-medium'
+                        : 'bg-[#f4f4f6] text-neutral-900 font-medium'
                       : isDark
                       ? 'text-neutral-300 hover:bg-neutral-800'
-                      : 'text-neutral-700 hover:bg-neutral-50'
+                      : 'text-neutral-700 hover:bg-[#fafafc]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">

@@ -88,7 +88,7 @@ export const PlanTasks: React.FC<PlanTasksProps> = ({ content, onChange, theme =
               {task.done && <Check size={9} strokeWidth={3} />}
             </span>
             <span
-              className={`text-[12.5px] leading-[1.4] ${
+              className={`text-[13px] leading-[1.4] ${
                 task.done
                   ? 'text-neutral-400 line-through'
                   : isDark
@@ -121,7 +121,7 @@ export const PlanTasks: React.FC<PlanTasksProps> = ({ content, onChange, theme =
             }
           }}
           placeholder="Add a task, ⌘K to generate..."
-          className={`flex-1 min-w-0 bg-transparent text-[12.5px] outline-none placeholder-neutral-400 ${
+          className={`flex-1 min-w-0 bg-transparent text-[13px] outline-none placeholder-neutral-400 ${
             isDark ? 'text-neutral-100' : 'text-neutral-800'
           }`}
         />

@@ -80,7 +80,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
       <div
         className={`w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden transition-all max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark
-            ? 'bg-[#18181c] border-neutral-700 text-neutral-100'
+            ? 'bg-[#18181b] border-neutral-800 text-neutral-100'
             : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -88,7 +88,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
         {/* Header */}
         <div
           className={`h-12 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-[#fbfbfd]'
           }`}
         >
           <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
           {/* Target Metadata Card */}
           <div
             className={`p-3 rounded-xl border space-y-2 ${
-              isDark ? 'bg-[#222228] border-neutral-700' : 'bg-neutral-50 border-neutral-200'
+              isDark ? 'bg-[#222228] border-neutral-800' : 'bg-[#fafafc] border-neutral-200'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
               </span>
             </div>
 
-            <p className="text-[11.5px] text-neutral-500">
+            <p className="text-[11px] text-neutral-500">
               Publishes this project to a live Vercel URL using your Vercel token (free at vercel.com → Settings → Tokens). Add it once in your Zut account, then publish as often as you like.
             </p>
           </div>
@@ -135,7 +135,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
                 <Zap size={24} />
               </div>
               <div>
-                <h4 className="font-semibold text-sm">Publish this project</h4>
+                <h4 className="font-semibold text-[15px]">Publish this project</h4>
                 <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
                   Uploads the project and gives you a live shareable URL.
                 </p>
@@ -210,7 +210,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
               {/* Preview Card */}
               <div
                 className={`p-3 rounded-xl border space-y-2.5 ${
-                  isDark ? 'bg-[#222228] border-neutral-700' : 'bg-neutral-50 border-neutral-200'
+                  isDark ? 'bg-[#222228] border-neutral-800' : 'bg-[#fafafc] border-neutral-200'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -227,7 +227,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black/40 border border-neutral-200 dark:border-neutral-700 font-mono text-[11.5px]">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black/40 border border-neutral-200 dark:border-neutral-800 font-mono text-[11px]">
                   <span className="text-red-600 dark:text-red-400 truncate">
                     {deploymentUrl}
                   </span>
@@ -256,7 +256,7 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={onClose}
-                    className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-medium"
+                    className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-[#f4f4f6] dark:hover:bg-neutral-800 font-medium"
                   >
                     Done
                   </button>

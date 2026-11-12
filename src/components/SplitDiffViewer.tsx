@@ -42,14 +42,14 @@ export const SplitDiffViewer: React.FC<SplitDiffViewerProps> = ({ file, theme = 
       {/* Left Column: Original */}
       <div className="overflow-x-auto">
         <div className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider sticky top-0 z-10 ${
-          isDark ? 'bg-neutral-800/90 text-neutral-400' : 'bg-neutral-100/90 text-neutral-500'
+          isDark ? 'bg-neutral-800/90 text-neutral-400' : 'bg-[#f4f4f6]/90 text-neutral-500'
         }`}>
           Original (Before)
         </div>
         {rows.map((row, idx) => {
           if (!row.left) {
             return (
-              <div key={`l-empty-${idx}`} className={`h-[20px] ${isDark ? 'bg-neutral-900/50' : 'bg-neutral-100/40'}`}>
+              <div key={`l-empty-${idx}`} className={`h-[20px] ${isDark ? 'bg-neutral-900/50' : 'bg-[#f4f4f6]/40'}`}>
                 &nbsp;
               </div>
             );
@@ -65,14 +65,14 @@ export const SplitDiffViewer: React.FC<SplitDiffViewerProps> = ({ file, theme = 
                     : 'bg-[#ffeef0]'
                   : isDark
                   ? 'hover:bg-white/4'
-                  : 'hover:bg-neutral-50/50'
+                  : 'hover:bg-[#fafafc]/50'
               }`}
             >
               <div className={`w-8 shrink-0 pr-2 text-right select-none ${
                 isDel
                   ? isDark
                     ? 'text-[#f85149] font-medium'
-                    : 'text-[#cf222e] font-medium'
+                    : 'text-[#dc2626] font-medium'
                   : isDark
                   ? 'text-[#6e7681]'
                   : 'text-[#8c959f]'
@@ -90,14 +90,14 @@ export const SplitDiffViewer: React.FC<SplitDiffViewerProps> = ({ file, theme = 
       {/* Right Column: Modified */}
       <div className="overflow-x-auto">
         <div className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider sticky top-0 z-10 ${
-          isDark ? 'bg-neutral-800/90 text-neutral-400' : 'bg-neutral-100/90 text-neutral-500'
+          isDark ? 'bg-neutral-800/90 text-neutral-400' : 'bg-[#f4f4f6]/90 text-neutral-500'
         }`}>
           Modified (After)
         </div>
         {rows.map((row, idx) => {
           if (!row.right) {
             return (
-              <div key={`r-empty-${idx}`} className={`h-[20px] ${isDark ? 'bg-neutral-900/50' : 'bg-neutral-100/40'}`}>
+              <div key={`r-empty-${idx}`} className={`h-[20px] ${isDark ? 'bg-neutral-900/50' : 'bg-[#f4f4f6]/40'}`}>
                 &nbsp;
               </div>
             );
@@ -113,7 +113,7 @@ export const SplitDiffViewer: React.FC<SplitDiffViewerProps> = ({ file, theme = 
                     : 'bg-[#e6ffed]'
                   : isDark
                   ? 'hover:bg-white/4'
-                  : 'hover:bg-neutral-50/50'
+                  : 'hover:bg-[#fafafc]/50'
               }`}
             >
               <div className={`w-8 shrink-0 pr-2 text-right select-none ${

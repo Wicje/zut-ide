@@ -112,7 +112,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
 
       if (['const', 'let', 'var', 'return', 'function', 'export', 'import', 'from', 'type', 'if', 'else'].includes(tok)) {
         return (
-          <span key={i} className={`${dark ? 'text-[#ff7b72]' : 'text-[#cf222e]'} font-medium`}>
+          <span key={i} className={`${dark ? 'text-[#ff7b72]' : 'text-[#dc2626]'} font-medium`}>
             {tok}
           </span>
         );
@@ -159,7 +159,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
     ? 'bg-[#ffeef0]'
     : isAdd
     ? 'bg-[#e6ffed]'
-    : 'hover:bg-neutral-50/50';
+    : 'hover:bg-[#fafafc]/50';
 
   const lineNumberColor = isDark
     ? isDelete
@@ -168,7 +168,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
       ? 'text-[#56d364] font-medium'
       : 'text-[#6e7681]'
     : isDelete
-    ? 'text-[#cf222e] font-medium'
+    ? 'text-[#dc2626] font-medium'
     : isAdd
     ? 'text-[#1a7f37] font-medium'
     : 'text-[#8c959f]';
@@ -182,7 +182,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
             onClick={() => setIsCommentBoxOpen(!isCommentBoxOpen)}
             className={`w-4 h-4 rounded flex items-center justify-center ${
               isDark ? 'bg-red-600 text-white hover:bg-red-500' : 'bg-red-500 text-white hover:bg-red-600'
-            } shadow-xs text-[9px]`}
+            } shadow-xs text-[10px]`}
             title="Add inline review comment"
           >
             +
@@ -204,7 +204,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
           <button
             onClick={() => onAskComposer(line.content.trim())}
             className={`opacity-0 group-hover:opacity-100 transition-opacity mr-2 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
-              isDark ? 'bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700' : 'bg-white text-neutral-600 hover:text-neutral-900 border border-neutral-200'
+              isDark ? 'bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800' : 'bg-white text-neutral-600 hover:text-neutral-900 border border-neutral-200'
             }`}
             title="Ask Composer about this line"
           >
@@ -217,7 +217,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
       {/* Inline Comments Thread */}
       {localComments.length > 0 && (
         <div className={`mx-10 my-1.5 p-3 rounded-lg border text-xs font-sans ${
-          isDark ? 'bg-[#1c1c21] border-neutral-700 text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+          isDark ? 'bg-[#1c1c21] border-neutral-800 text-neutral-200' : 'bg-[#fafafc] border-neutral-200 text-neutral-800'
         }`}>
           <div className="space-y-2">
             {localComments.map((comment) => (
@@ -245,7 +245,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
       {/* Inline Comment Creation Box */}
       {isCommentBoxOpen && (
         <div className={`mx-10 my-1.5 p-3 rounded-lg border text-xs font-sans shadow-md animate-fadeIn ${
-          isDark ? 'bg-[#18181b] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-300 text-neutral-800'
+          isDark ? 'bg-[#18181b] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-300 text-neutral-800'
         }`}>
           <form onSubmit={handleCreateComment} className="space-y-2">
             <div className="flex items-center justify-between">
@@ -266,7 +266,7 @@ export const CodeLine: React.FC<CodeLineProps> = ({
               onChange={(e) => setNewCommentText(e.target.value)}
               placeholder="Leave a comment or suggestion..."
               className={`w-full p-2 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                isDark ? 'bg-[#27272a] border-neutral-700 text-white placeholder-neutral-500' : 'bg-white border-neutral-200 placeholder-neutral-400'
+                isDark ? 'bg-[#222228] border-neutral-800 text-white placeholder-neutral-500' : 'bg-white border-neutral-200 placeholder-neutral-400'
               }`}
               autoFocus
             />

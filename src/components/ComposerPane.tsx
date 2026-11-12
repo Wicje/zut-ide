@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { SessionData, AgentStep, AgentPhase, ToolApprovalRequest, AttachedContext, AttachedImage, ComposerMode } from '../types';
 import { answersPrompt, parseQuestions, stripQuestions } from '../lib/questions';
+import { listRecentModels, pushRecentModel } from '../lib/recent-models';
 import screenRecThumb from '../assets/images/screen_recording_thumb_1791421930526.jpg';
 
 interface ComposerPaneProps {
@@ -163,6 +164,97 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         )?.name ?? opencodeModel.modelID)
       : selectedModel;
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [modelFilter, setModelFilter] = useState('');
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [recentModels, setRecentModels] = useState<string[]>(() => listRecentModels());
+  const modelFilterRef = useRef<HTMLInputElement | null>(null);
+  const activeRowRef = useRef<HTMLButtonElement | null>(null);
+
+  // Search + group + MRU for the (huge) self-host model list.
+  const keyOf = (m: { providerID: string; id: string }) => `${m.providerID}/${m.id}`;
+  const query = modelFilter.trim().toLowerCase();
+  const allOpencodeModels = opencodeModels ?? [];
+  const matches = allOpencodeModels.filter((m) => {
+    if (!query) return true;
+    const id = keyOf(m).toLowerCase();
+    return id.includes(query) || m.name.toLowerCase().includes(query) || m.providerID.toLowerCase().includes(query);
+  });
+  const recentIdSet = new Set(recentModels);
+  const recentMatches =
+    query === ''
+      ? matches
+          .filter((m) => recentIdSet.has(keyOf(m)))
+          .sort((a, b) => recentModels.indexOf(keyOf(a)) - recentModels.indexOf(keyOf(b)))
+      : [];
+  const rest = query === '' && recentMatches.length ? matches.filter((m) => !recentIdSet.has(keyOf(m))) : matches;
+  const groupMap = new Map<string, typeof allOpencodeModels>();
+  for (const m of rest) {
+    const g = groupMap.get(m.providerID);
+    if (g) g.push(m);
+    else groupMap.set(m.providerID, [m]);
+  }
+  const groups = [...groupMap.entries()];
+  const flatMatches = [...recentMatches, ...groups.flatMap(([, items]) => items)];
+  const flatIndex = new Map(flatMatches.map((m, i) => [keyOf(m), i]));
+
+  const pickOpencode = (m: { providerID: string; id: string }) => {
+    onOpencodeModelChange?.({ providerID: m.providerID, modelID: m.id });
+    setRecentModels(pushRecentModel(keyOf(m)));
+    setModelFilter('');
+    setActiveIndex(-1);
+    setIsModelDropdownOpen(false);
+  };
+
+  const onFilterKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (flatMatches.length === 0) return;
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      setActiveIndex((prev) => {
+        if (prev < 0) return dir === 1 ? 0 : flatMatches.length - 1;
+        return (prev + dir + flatMatches.length) % flatMatches.length;
+      });
+    } else if (e.key === 'Enter') {
+      const pick = flatMatches[activeIndex >= 0 ? activeIndex : 0];
+      if (pick) {
+        e.preventDefault();
+        pickOpencode(pick);
+      }
+    } else if (e.key === 'Escape') {
+      setIsModelDropdownOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    activeRowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
+
+  const renderOpencodeRow = (m: { providerID: string; id: string; name: string; free: boolean }) => {
+    const key = keyOf(m);
+    const fi = flatIndex.get(key) ?? -1;
+    const on = opencodeModel?.providerID === m.providerID && opencodeModel?.modelID === m.id;
+    return (
+      <button
+        key={key}
+        ref={fi === activeIndex ? activeRowRef : undefined}
+        type="button"
+        onClick={() => pickOpencode(m)}
+        onMouseEnter={() => setActiveIndex(fi)}
+        className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 cursor-pointer ${
+          isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
+        } ${fi === activeIndex ? (isDark ? 'bg-neutral-800' : 'bg-[#f4f4f6]') : ''} ${
+          on ? 'font-medium text-red-500' : ''
+        }`}
+      >
+        <span className="truncate">{m.name}</span>
+        <span className="text-[10px] text-neutral-400 shrink-0">
+          {m.providerID}
+          {m.free ? ' · free' : ''}
+        </span>
+      </button>
+    );
+  };
+
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const [questionChoice, setQuestionChoice] = useState<number | null>(null);
   const [isQuestionOpen, setIsQuestionOpen] = useState(true);
@@ -340,8 +432,8 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         <div
           className={`border rounded-xl p-3 text-[13px] leading-[1.45] shadow-2xs font-normal ${
             isDark
-              ? 'bg-[#222227] border-neutral-700 text-neutral-100'
-              : 'bg-[#f8f8fa] border-[#e5e5e7] text-neutral-800'
+              ? 'bg-[#222228] border-neutral-800 text-neutral-100'
+              : 'bg-[#f4f4f6] border-[#e5e5e7] text-neutral-800'
           }`}
         >
           {session.prompt || <span className="text-neutral-400">New agent — send a prompt below to begin.</span>}
@@ -353,7 +445,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                   src={img.dataUrl}
                   alt={img.name}
                   title={img.name}
-                  className="w-12 h-12 rounded-lg object-cover border border-neutral-300 dark:border-neutral-700"
+                  className="w-12 h-12 rounded-lg object-cover border border-neutral-300 dark:border-neutral-800"
                 />
               ))}
             </div>
@@ -364,7 +456,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         {isGenerating && (
           <div
             className={`rounded-xl border px-3 py-2 flex items-center gap-2 text-xs ${
-              isDark ? 'bg-[#1c1c22] border-neutral-700/80' : 'bg-neutral-50/80 border-neutral-200'
+              isDark ? 'bg-[#1c1c22] border-neutral-800/80' : 'bg-[#fafafc]/80 border-neutral-200'
             }`}
           >
             <Loader2 size={13} className="text-red-500 animate-spin shrink-0" />
@@ -374,11 +466,30 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
         {/* Action Steps */}
         {session.steps.length === 0 && !isGenerating && !session.response && (
-          <div className="space-y-2 px-1">
-            <p className="text-[12px] text-neutral-400">No activity yet — send a prompt below to start the agent.</p>
+          <div className="px-1 py-6 flex flex-col items-start gap-4">
+            <div>
+              <p className="text-[13px] font-medium text-neutral-500 dark:text-neutral-400">What should Zut build?</p>
+              <p className="text-[11px] text-neutral-400 mt-0.5">Describe it, or tap a starter.</p>
+            </div>
+            <div className="flex flex-col gap-1.5 w-full">
+              {[
+                'Build a landing page for a coffee shop',
+                'Add a dark mode toggle',
+                'Create a todo app with localStorage',
+              ].map((starter) => (
+                <button
+                  key={starter}
+                  type="button"
+                  onClick={() => sendPromptText(starter)}
+                  className="w-full text-left px-3 py-2.5 rounded-lg border border-[var(--zut-border)] bg-[var(--zut-raised)] text-[13px] text-neutral-600 dark:text-neutral-300 hover:border-red-500/40 hover:text-neutral-800 dark:hover:text-neutral-100 transition-colors cursor-pointer"
+                >
+                  {starter}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        <div className="space-y-1.5 text-[12.5px]">
+        <div className="space-y-1.5 text-[13px]">
           {session.steps.map((step) => {
             const isExpanded = expandedStepId === step.id;
 
@@ -410,7 +521,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                 {isExpanded && (
                   <div className="mt-1.5 pl-5 space-y-2 text-xs">
                     {step.details && (
-                      <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400">
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                         {step.details}
                       </p>
                     )}
@@ -424,7 +535,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                           <div
                             key={mi}
                             className={`p-1.5 rounded font-code text-[11px] leading-tight ${
-                              isDark ? 'bg-[#18181c] text-neutral-300' : 'bg-white border border-neutral-200 text-neutral-700'
+                              isDark ? 'bg-[#18181b] text-neutral-300' : 'bg-white border border-neutral-200 text-neutral-700'
                             }`}
                           >
                             <div className="text-[10px] text-red-500 truncate mb-0.5">
@@ -438,7 +549,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
                     {onRollbackCheckpoint && step.checkpointId && (
                       <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[10.5px] text-neutral-400 flex items-center gap-1">
+                        <span className="text-[11px] text-neutral-400 flex items-center gap-1">
                           <span>Snapshot: {step.checkpointId}</span>
                         </span>
                         <button
@@ -449,7 +560,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                           className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                             isDark
                               ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'
-                              : 'bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-700'
+                              : 'bg-white hover:bg-[#f4f4f6] border border-neutral-300 text-neutral-700'
                           }`}
                         >
                           <span>Roll back to step</span>
@@ -482,7 +593,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         {question && (
           <div
             className={`rounded-xl border p-3 space-y-2 ${
-              isDark ? 'border-neutral-700 bg-[#1c1c22]' : 'border-[#e5e5e7] bg-[#f8f8fa]'
+              isDark ? 'border-neutral-800 bg-[#1c1c22]' : 'border-[#e5e5e7] bg-[#f4f4f6]'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -512,7 +623,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                         onChange={() => setQuestionChoice(i)}
                         className="mt-1 accent-red-500"
                       />
-                      <span className="text-[12.5px] leading-[1.4] text-neutral-600 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white">
+                      <span className="text-[13px] leading-[1.4] text-neutral-600 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white">
                         {option}
                       </span>
                     </label>
@@ -550,8 +661,8 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                 onClick={() => onOpenFile?.(file.path)}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
                   isDark
-                    ? 'border-neutral-800 hover:border-neutral-700 hover:bg-white/5'
-                    : 'border-[#e5e5e7] hover:bg-neutral-50'
+                    ? 'border-neutral-800 hover:border-neutral-800 hover:bg-white/5'
+                    : 'border-[#e5e5e7] hover:bg-[#fafafc]'
                 }`}
               >
                 <File size={12} className="text-neutral-400 shrink-0" />
@@ -572,7 +683,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
         )}
 
         {session.processedItem && (
-          <div className="flex items-center gap-1.5 text-[12.5px]">
+          <div className="flex items-center gap-1.5 text-[13px]">
             <span className={`font-semibold ${isDark ? 'text-white' : 'text-neutral-900'}`}>Processed</span>
             <span className="text-neutral-500 font-normal">{session.processedItem}</span>
           </div>
@@ -583,7 +694,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             onClick={onOpenVideoModal}
             className={`relative group rounded-xl overflow-hidden border aspect-[16/10] cursor-pointer shadow-2xs transition-all ${
               isDark
-                ? 'border-neutral-700 bg-neutral-900 hover:border-neutral-500'
+                ? 'border-neutral-800 bg-neutral-900 hover:border-neutral-500'
                 : 'border-[#e5e5e7] bg-[#f2f2f5] hover:border-neutral-400'
             }`}
           >
@@ -606,9 +717,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
       {/* Bottom Controls, Context Chips & Follow-up Input */}
       <div
-        className={`p-3 border-t space-y-2.5 shrink-0 ${
-          isDark ? 'border-neutral-800 bg-[#18181b]' : 'border-[#e5e5e7] bg-white'
-        }`}
+        className="p-3 border-t space-y-2.5 shrink-0 border-[var(--zut-border)] bg-[var(--zut-panel)]"
       >
         {/* Attached Context Chips Bar */}
         {attachedContexts.length > 0 && (
@@ -616,10 +725,10 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             {attachedContexts.map((ctx) => (
               <div
                 key={ctx.id}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-mono border ${
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono border ${
                   isDark
-                    ? 'bg-neutral-800 border-neutral-700 text-neutral-300'
-                    : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                    ? 'bg-neutral-800 border-neutral-800 text-neutral-300'
+                    : 'bg-[#f4f4f6] border-neutral-300 text-neutral-700'
                 }`}
               >
                 <span>@{ctx.name}</span>
@@ -635,86 +744,24 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           </div>
         )}
 
-        {/* Input Bar with Context Mention Button */}
+        {/* Input Bar — full-width field on top, tools in a row below */}
         <form
           onSubmit={handleSendFollowUp}
-          className={`relative flex items-center justify-between pl-2 pr-1.5 py-1.5 rounded-2xl border shadow-2xs transition-all ${
+          className={`relative flex flex-col rounded-2xl border shadow-2xs transition-all ${
             isDark
-              ? 'bg-[#222227] border-neutral-700 focus-within:border-red-500'
-              : 'bg-white border-[#e5e5e7] focus-within:border-red-500'
+              ? 'bg-[#222228] border-neutral-800 focus-within:border-red-500'
+              : 'bg-[var(--zut-panel)] border-[var(--zut-border)] focus-within:border-red-500'
           }`}
         >
-          {/* @ Mention Popover Trigger */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsMentionMenuOpen(!isMentionMenuOpen)}
-              className="w-5 h-5 rounded-md flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
-              title="Attach context (@)"
-            >
-              <AtSign size={13} />
-            </button>
-            <input
-              ref={imgInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: 'none' }}
-              aria-label="Attach images"
-              onChange={(e) => {
-                const list = Array.from(e.target.files ?? []).slice(0, 3);
-                e.target.value = '';
-                if (list.length === 0) return;
-                void Promise.all(list.map((f) => downscaleImage(f)))
-                  .then((imgs) => setPendingImages((prev) => [...prev, ...imgs].slice(0, 3)))
-                  .catch(() => {});
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => imgInputRef.current?.click()}
-              className="w-5 h-5 rounded-md flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
-              title="Attach images (seen by Gemini, OpenRouter, Claude, ChatGPT)"
-            >
-              <ImagePlus size={13} />
-            </button>
-
-            {isMentionMenuOpen && (
-              <div
-                className={`absolute left-0 bottom-full mb-2 w-48 border rounded-xl shadow-xl py-1 z-30 text-[11.5px] ${
-                  isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
-                }`}
-              >
-                <div className="px-2.5 py-1 text-[10px] font-semibold text-neutral-400 uppercase">
-                  Attach Context
-                </div>
-                {(attachableFiles ?? []).length === 0 && (
-                  <div className="px-2.5 py-1 text-neutral-400">No files in this project yet.</div>
-                )}
-                {(attachableFiles ?? []).map((f) => (
-                  <button
-                    key={f.name}
-                    type="button"
-                    onClick={() => addMentionContext(f.name, 'file', f.tokens)}
-                    className="w-full text-left px-2.5 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-between"
-                  >
-                    <span>@{f.name}</span>
-                    <span className="text-neutral-400 text-[10px]">file</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Pending image attachments */}
           {pendingImages.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap px-3 pt-2">
               {pendingImages.map((img) => (
                 <div key={img.id} className="relative">
                   <img
                     src={img.dataUrl}
                     alt={img.name}
-                    className="w-12 h-12 rounded-lg object-cover border border-neutral-300 dark:border-neutral-700"
+                    className="w-12 h-12 rounded-lg object-cover border border-neutral-300 dark:border-neutral-800"
                   />
                   <button
                     type="button"
@@ -729,24 +776,116 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             </div>
           )}
 
-          {/* Follow up text input */}
-          <input
-            type="text"
-            value={followUpText}
-            onChange={(e) => setFollowUpText(e.target.value)}
-            disabled={isGenerating}
-            placeholder={isGenerating ? 'Synthesizing code...' : 'Plan, search, build anything...'}
-            className={`flex-1 min-w-0 px-2 text-[12.5px] max-sm:text-base bg-transparent focus:outline-none placeholder-neutral-400 ${
-              isDark ? 'text-white' : 'text-neutral-800'
-            }`}
-          />
+          {/* Input row: full-width field, send/mic pinned at the end */}
+          <div className="flex items-center gap-2 pl-3 pr-2 pt-2">
+            <input
+              type="text"
+              value={followUpText}
+              onChange={(e) => setFollowUpText(e.target.value)}
+              disabled={isGenerating}
+              placeholder={isGenerating ? 'Synthesizing code…' : 'Describe what you want to build…'}
+              className={`flex-1 min-w-0 py-1.5 text-[13px] max-sm:text-base bg-transparent focus:outline-none placeholder-neutral-400 ${
+                isDark ? 'text-white' : 'text-neutral-800'
+              }`}
+            />
+            {/* Mic / send action button (mic hidden where speech input is unsupported) */}
+            {(followUpText || speechCtor) && (
+              <button
+                type="button"
+                onClick={followUpText ? handleSendFollowUp : toggleVoice}
+                disabled={isGenerating}
+                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer shadow-xs ${
+                  isVoiceRecording
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : isDark
+                    ? 'bg-white text-neutral-900 hover:bg-neutral-200'
+                    : 'bg-neutral-900 text-white hover:bg-black'
+                }`}
+                title={followUpText ? 'Send message' : 'Voice dictation'}
+              >
+                {isGenerating ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : followUpText ? (
+                  <ArrowUp size={12} />
+                ) : (
+                  <Mic size={12} />
+                )}
+              </button>
+            )}
+          </div>
 
-          {/* Mode: agent or plan */}
+          {/* Toolbar row: attach on the left, mode + model on the right */}
+          <div className="flex items-center gap-1 px-2 pb-2 pt-1">
+            {/* @ Mention Popover Trigger */}
+            <div className="relative flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setIsMentionMenuOpen(!isMentionMenuOpen)}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
+                title="Attach context (@)"
+              >
+                <AtSign size={14} />
+              </button>
+              <input
+                ref={imgInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                aria-label="Attach images"
+                onChange={(e) => {
+                  const list = Array.from(e.target.files ?? []).slice(0, 3);
+                  e.target.value = '';
+                  if (list.length === 0) return;
+                  void Promise.all(list.map((f) => downscaleImage(f)))
+                    .then((imgs) => setPendingImages((prev) => [...prev, ...imgs].slice(0, 3)))
+                    .catch(() => {});
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => imgInputRef.current?.click()}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
+                title="Attach images (seen by Gemini, OpenRouter, Claude, ChatGPT)"
+              >
+                <ImagePlus size={14} />
+              </button>
+
+              {isMentionMenuOpen && (
+                <div
+                  className={`absolute left-0 bottom-full mb-2 w-48 border rounded-xl shadow-xl py-1 z-30 text-[11px] ${
+                    isDark ? 'bg-[#222228] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                  }`}
+                >
+                  <div className="px-2.5 py-1 text-[10px] font-semibold text-neutral-400 uppercase">
+                    Attach Context
+                  </div>
+                  {(attachableFiles ?? []).length === 0 && (
+                    <div className="px-2.5 py-1 text-neutral-400">No files in this project yet.</div>
+                  )}
+                  {(attachableFiles ?? []).map((f) => (
+                    <button
+                      key={f.name}
+                      type="button"
+                      onClick={() => addMentionContext(f.name, 'file', f.tokens)}
+                      className="w-full text-left px-2.5 py-1 hover:bg-[#f4f4f6] dark:hover:bg-neutral-800 flex items-center justify-between"
+                    >
+                      <span>@{f.name}</span>
+                      <span className="text-neutral-400 text-[10px]">file</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1" />
+
+            {/* Mode: agent or plan */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setIsModeMenuOpen(!isModeMenuOpen)}
-              className={`flex items-center gap-1 shrink-0 text-[11.5px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+              className={`flex items-center gap-1 shrink-0 text-[11px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
                 isDark ? 'text-neutral-300 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
               }`}
               title={mode === 'plan' ? 'Plan mode: write a plan first' : 'Agent mode: change the code'}
@@ -763,7 +902,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             {isModeMenuOpen && (
               <div
                 className={`absolute right-0 bottom-full mb-2 w-44 border rounded-lg shadow-xl py-1 z-30 text-[12px] ${
-                  isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                  isDark ? 'bg-[#222228] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
                 }`}
               >
                 {(
@@ -780,11 +919,11 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                       setIsModeMenuOpen(false);
                     }}
                     className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
-                      isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                      isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                     } ${mode === m.id ? 'font-medium text-red-500' : ''}`}
                   >
                     <span>{m.label}</span>
-                    <span className="text-[10.5px] text-neutral-400">{m.hint}</span>
+                    <span className="text-[11px] text-neutral-400">{m.hint}</span>
                   </button>
                 ))}
               </div>
@@ -795,8 +934,15 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
           <div className="relative shrink-0">
             <button
               type="button"
-              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-              className={`flex items-center gap-1 text-[11.5px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+              onClick={() => {
+                const next = !isModelDropdownOpen;
+                if (next) {
+                  setModelFilter('');
+                  setActiveIndex(-1);
+                }
+                setIsModelDropdownOpen(next);
+              }}
+              className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
                 isDark ? 'text-neutral-300 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
@@ -806,35 +952,52 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
 
             {isModelDropdownOpen && (
               <div
-                className={`absolute right-0 bottom-full mb-2 w-48 border rounded-lg shadow-xl py-1 z-30 text-[12px] ${
-                  isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                className={`absolute right-0 bottom-full mb-2 w-64 border rounded-lg shadow-xl z-30 text-[12px] overflow-hidden py-1 ${
+                  isDark ? 'bg-[#222228] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
                 }`}
               >
                 {selectedModel === selfHostLabel && (opencodeModels ?? []).length > 0 ? (
                   <>
-                    {(opencodeModels ?? []).map((m) => {
-                      const id = `${m.providerID}/${m.id}`;
-                      const on = opencodeModel?.providerID === m.providerID && opencodeModel?.modelID === m.id;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => {
-                            onOpencodeModelChange?.({ providerID: m.providerID, modelID: m.id });
-                            setIsModelDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 cursor-pointer ${
-                            isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
-                          } ${on ? 'font-medium text-red-500' : ''}`}
-                        >
-                          <span className="truncate">{m.name}</span>
-                          <span className="text-[10px] text-neutral-400 shrink-0">
-                            {m.providerID}
-                            {m.free ? ' · free' : ''}
-                          </span>
-                        </button>
-                      );
-                    })}
+                    <div className="px-1.5 pb-1.5 pt-0.5 border-b border-neutral-200/60 dark:border-neutral-800">
+                      <input
+                        ref={modelFilterRef}
+                        autoFocus
+                        value={modelFilter}
+                        onChange={(e) => {
+                          setModelFilter(e.target.value);
+                          setActiveIndex(-1);
+                        }}
+                        onKeyDown={onFilterKeyDown}
+                        placeholder="Search models…"
+                        spellCheck={false}
+                        aria-label="Filter models"
+                        className="w-full px-2 py-1 rounded-md border font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 bg-transparent border-neutral-200 dark:border-neutral-800 placeholder-neutral-400 dark:placeholder-neutral-600"
+                      />
+                    </div>
+                    <div className="max-h-72 overflow-y-auto py-1">
+                      {flatMatches.length === 0 ? (
+                        <div className="px-3 py-2 text-[11px] text-neutral-400">No models match “{modelFilter}”.</div>
+                      ) : (
+                        <>
+                          {recentMatches.length > 0 && (
+                            <div>
+                              <div className="px-3 pt-1 pb-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase text-neutral-400">
+                                Recent
+                              </div>
+                              {recentMatches.map(renderOpencodeRow)}
+                            </div>
+                          )}
+                          {groups.map(([provider, items]) => (
+                            <div key={provider}>
+                              <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase text-neutral-400">
+                                {provider}
+                              </div>
+                              {items.map(renderOpencodeRow)}
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
                     <div className="px-2 py-1.5 border-t border-neutral-200/60 dark:border-neutral-800">
                       <input
                         value={opencodeCustom}
@@ -848,6 +1011,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                               providerID: v.slice(0, i).trim(),
                               modelID: v.slice(i + 1).trim(),
                             });
+                            setRecentModels(pushRecentModel(`${v.slice(0, i).trim()}/${v.slice(i + 1).trim()}`));
                             setOpencodeCustom('');
                             setIsModelDropdownOpen(false);
                           }
@@ -857,7 +1021,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                         aria-label="Custom model ID"
                         className={`w-full px-2 py-1 rounded-md border font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 ${
                           isDark
-                            ? 'bg-transparent border-neutral-700 text-neutral-300 placeholder-neutral-600'
+                            ? 'bg-transparent border-neutral-800 text-neutral-300 placeholder-neutral-600'
                             : 'bg-transparent border-neutral-300 text-neutral-600 placeholder-neutral-400'
                         }`}
                       />
@@ -871,7 +1035,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                         type="button"
                         onClick={() => pickModel(model)}
                         className={`w-full text-left px-3 py-1.5 flex items-center justify-between cursor-pointer ${
-                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                         } ${selectedModel === model ? 'font-medium text-red-500' : ''}`}
                       >
                         <span>{model}</span>
@@ -884,30 +1048,7 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
             )}
           </div>
 
-          {/* Mic / send action button (mic hidden where speech input is unsupported) */}
-          {(followUpText || speechCtor) && (
-          <button
-            type="button"
-            onClick={followUpText ? handleSendFollowUp : toggleVoice}
-            disabled={isGenerating}
-            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer shadow-xs ${
-              isVoiceRecording
-                ? 'bg-red-500 text-white animate-pulse'
-                : isDark
-                ? 'bg-white text-neutral-900 hover:bg-neutral-200'
-                : 'bg-neutral-900 text-white hover:bg-black'
-            }`}
-            title={followUpText ? 'Send message' : 'Voice dictation'}
-          >
-            {isGenerating ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : followUpText ? (
-              <ArrowUp size={12} />
-            ) : (
-              <Mic size={12} />
-            )}
-          </button>
-          )}
+          </div>
         </form>
         {voiceHint && (
           <p className="px-4 pb-2 text-[11px] text-red-500">{voiceHint}</p>

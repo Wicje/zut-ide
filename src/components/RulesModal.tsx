@@ -39,14 +39,14 @@ export const RulesModal: React.FC<RulesModalProps> = ({
       <div
         className={`w-full max-w-lg rounded-2xl shadow-2xl border overflow-hidden max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark
-            ? 'bg-[#18181c] border-neutral-700 text-neutral-100'
+            ? 'bg-[#18181b] border-neutral-800 text-neutral-100'
             : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className={`h-11 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-[#fbfbfd]'
           }`}
         >
           <div className="flex items-center gap-2 text-xs font-semibold">
@@ -59,7 +59,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
         </div>
 
         <div className="p-4 space-y-3.5 text-xs">
-          <p className="text-[11.5px] text-neutral-500">
+          <p className="text-[11px] text-neutral-500">
             The Agent reads these guidelines on every prompt and diff turn to enforce code style, design systems, and testing conventions.
           </p>
 
@@ -67,10 +67,10 @@ export const RulesModal: React.FC<RulesModalProps> = ({
             rows={8}
             value={rules}
             onChange={(e) => setRules(e.target.value)}
-            className={`w-full p-3 font-code text-[11.5px] rounded-xl border leading-relaxed focus:outline-none focus:ring-1 focus:ring-red-500 ${
+            className={`w-full p-3 font-code text-[11px] rounded-xl border leading-relaxed focus:outline-none focus:ring-1 focus:ring-red-500 ${
               isDark
-                ? 'bg-[#222227] border-neutral-700 text-neutral-200'
-                : 'bg-neutral-50 border-neutral-300 text-neutral-800'
+                ? 'bg-[#222228] border-neutral-800 text-neutral-200'
+                : 'bg-[#fafafc] border-neutral-300 text-neutral-800'
             }`}
           />
 
@@ -83,7 +83,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-500 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-800 text-neutral-500 font-medium hover:bg-[#f4f4f6] dark:hover:bg-neutral-800"
               >
                 Cancel
               </button>

@@ -4,6 +4,8 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { isTerminalClient } from './lib/runtime.ts';
 import { migrateStorage } from './lib/storage-keys.ts';
+import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
 // One namespace for all persisted browser state: migrate any legacy

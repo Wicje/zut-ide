@@ -40,8 +40,8 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
       const msg = this.state.error?.message ?? 'Unknown error';
       return (
         <div className="w-screen h-screen flex items-center justify-center bg-[#141416] text-neutral-200 select-none p-4">
-          <div className="max-w-md w-full rounded-2xl border border-neutral-700 bg-[#18181c] p-6 text-center shadow-2xl">
-            <h1 className="text-sm font-semibold text-white">Something went wrong</h1>
+          <div className="max-w-md w-full rounded-2xl border border-neutral-800 bg-[#18181b] p-6 text-center shadow-2xl">
+            <h1 className="text-[15px] font-semibold text-white">Something went wrong</h1>
             <p className="mt-2 text-xs text-neutral-400 font-mono break-words">{msg}</p>
             <p className="mt-2 text-xs text-neutral-400">
               Your files on this device are intact — reloading restores the last saved state.

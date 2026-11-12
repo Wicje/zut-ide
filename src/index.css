@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+/* Surfaces, borders, text and the accent as CSS variables. The inline
+   `isDark` ternaries still compile to Tailwind classes, but the values now
+   come from one place — this table mirrors the DESIGN.md token table. Any new
+   surface/edge uses var(--zut-*) instead of inventing a near-miss grey. */
+:root {
+  --zut-canvas: #f4f4f6;
+  --zut-panel: #ffffff;
+  --zut-raised: #fafafc;
+  --zut-border: #e5e5e7;
+  --zut-text: #2b2b2f;
+  --zut-text-dim: #6b6b72;
+  --zut-accent: #dc2626;
+  --zut-accent-hover: #ef4444;
+  --zut-scrollbar: rgba(0, 0, 0, 0.15);
+  --zut-scrollbar-hover: rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='dark'] {
+  --zut-canvas: #141416;
+  --zut-panel: #18181b;
+  --zut-raised: #1e1e24;
+  --zut-border: #262626;
+  --zut-text: #e5e5e5;
+  --zut-text-dim: #a3a3a3;
+  --zut-accent: #dc2626;
+  --zut-accent-hover: #ef4444;
+  --zut-scrollbar: rgba(255, 255, 255, 0.18);
+  --zut-scrollbar-hover: rgba(255, 255, 255, 0.28);
+}
+
 /* Theme is app state, not OS preference. The `dark:` variant follows the
    [data-theme] attribute that App writes on <html>, so every `dark:` utility
    agrees with the `isDark` ternaries instead of the OS setting. */
@@ -7,7 +37,7 @@
 
 @layer base {
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    font-family: "Inter Variable", -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
@@ -40,7 +70,7 @@ html[data-terminal] *::after {
 }
 
 .font-code {
-  font-family: "JetBrains Mono", Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", Menlo, Monaco, Consolas, "Courier New", monospace;
   font-feature-settings: "liga" 1, "calt" 1;
 }
 
@@ -55,12 +85,12 @@ html[data-terminal] *::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--zut-scrollbar);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--zut-scrollbar-hover);
 }
 
 /* Debugger breakpoint dot in Monaco's glyph margin. */

@@ -62,11 +62,11 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
       >
         <div className="flex items-center gap-2">
           <span className="font-semibold text-xs">Run Checks</span>
-          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             {passedCount} Passed
           </span>
           {failedCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400">
               {failedCount} Failing
             </span>
           )}
@@ -85,7 +85,7 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
       {/* Tests Tree */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
         {testSuites.length === 0 && !isRunning && (
-          <div className="rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 px-4 py-6 text-center text-neutral-500">
+          <div className="rounded-xl border border-dashed border-neutral-300 dark:border-neutral-800 px-4 py-6 text-center text-neutral-500">
             No checks yet — press Run All to execute the project entry.
           </div>
         )}
@@ -102,8 +102,8 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
                     ? 'border-red-500/30 bg-red-500/5'
                     : 'border-red-200 bg-red-50/40'
                   : isDark
-                  ? 'border-neutral-800 bg-[#202025]'
-                  : 'border-neutral-200 bg-neutral-50/50'
+                  ? 'border-neutral-800 bg-[#1e1e24]'
+                  : 'border-neutral-200 bg-[#fafafc]/50'
               }`}
             >
               {/* Test Row */}
@@ -136,7 +136,7 @@ export const TestExplorerPane: React.FC<TestExplorerPaneProps> = ({
                   {/* Assertion Diff (only for real framework assertions) */}
                   {(test.expected !== undefined || test.actual !== undefined) && (
                     <div
-                      className={`p-2 rounded font-code text-[11.5px] space-y-1 ${
+                      className={`p-2 rounded font-code text-[11px] space-y-1 ${
                         isDark ? 'bg-black/50 text-neutral-300' : 'bg-white border border-neutral-200 text-neutral-700'
                       }`}
                     >

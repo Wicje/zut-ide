@@ -100,7 +100,7 @@ function RealTerminal({ host, isDark }: { host: HostConfig; isDark: boolean }) {
           scrollback: 5000,
           theme: isDark
             ? { background: '#18181b', foreground: '#d4d4d8', cursor: '#f87171', selectionBackground: '#3f3f46' }
-            : { background: '#fbfbfd', foreground: '#27272a', cursor: '#dc2626', selectionBackground: '#e4e4e7' },
+            : { background: '#fbfbfd', foreground: '#2b2b2f', cursor: '#dc2626', selectionBackground: '#e4e4e7' },
         });
         fit = new FitAddonCtor();
         term.loadAddon(fit);
@@ -193,12 +193,12 @@ function RealTerminal({ host, isDark }: { host: HostConfig; isDark: boolean }) {
     if (!termRef.current) return;
     termRef.current.options.theme = isDark
       ? { background: '#18181b', foreground: '#d4d4d8', cursor: '#f87171', selectionBackground: '#3f3f46' }
-      : { background: '#fbfbfd', foreground: '#27272a', cursor: '#dc2626', selectionBackground: '#e4e4e7' };
+      : { background: '#fbfbfd', foreground: '#2b2b2f', cursor: '#dc2626', selectionBackground: '#e4e4e7' };
   }, [isDark]);
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex items-center gap-2 pb-1 mb-1 border-b border-neutral-200/50 dark:border-neutral-800 text-[10.5px]">
+      <div className="flex items-center gap-2 pb-1 mb-1 border-b border-neutral-200/50 dark:border-neutral-800 text-[11px]">
         <span
           className={`inline-block w-1.5 h-1.5 rounded-full ${
             status === 'live'
@@ -228,7 +228,7 @@ function RealTerminal({ host, isDark }: { host: HostConfig; isDark: boolean }) {
           <RotateCw size={12} />
         </button>
       </div>
-      {error && <div className="text-[10.5px] text-red-500 pb-1">{error}</div>}
+      {error && <div className="text-[11px] text-red-500 pb-1">{error}</div>}
       <div ref={mountRef} className="flex-1 min-h-0" />
     </div>
   );
@@ -443,13 +443,13 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
               {/* Metric Cards Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div className={`p-2.5 rounded-lg border ${
-                  isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-200'
+                  isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-200'
                 }`}>
-                  <div className="flex items-center justify-between text-neutral-400 text-[10.5px]">
+                  <div className="flex items-center justify-between text-neutral-400 text-[11px]">
                     <span>Median Run</span>
                     <TrendingDown size={12} className="text-emerald-500" />
                   </div>
-                  <div className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                  <div className="text-[15px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
                     {telemetry?.medianMs != null ? `${telemetry.medianMs}ms` : '—'}
                   </div>
                   <div className="text-[10px] text-neutral-400">
@@ -458,13 +458,13 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                 </div>
 
                 <div className={`p-2.5 rounded-lg border ${
-                  isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-200'
+                  isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-200'
                 }`}>
-                  <div className="flex items-center justify-between text-neutral-400 text-[10.5px]">
+                  <div className="flex items-center justify-between text-neutral-400 text-[11px]">
                     <span>Total Runs</span>
                     <Zap size={12} className="text-amber-500" />
                   </div>
-                  <div className="text-base font-bold text-neutral-800 dark:text-white mt-1">
+                  <div className="text-[15px] font-semibold text-neutral-800 dark:text-white mt-1">
                     {telemetry?.runs ?? 0}
                   </div>
                   <div className="text-[10px] text-neutral-400">
@@ -473,13 +473,13 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                 </div>
 
                 <div className={`p-2.5 rounded-lg border ${
-                  isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-200'
+                  isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-200'
                 }`}>
-                  <div className="flex items-center justify-between text-neutral-400 text-[10.5px]">
+                  <div className="flex items-center justify-between text-neutral-400 text-[11px]">
                     <span>Last Exit</span>
                     <Clock size={12} className="text-red-500" />
                   </div>
-                  <div className="text-base font-bold text-neutral-800 dark:text-white mt-1">
+                  <div className="text-[15px] font-semibold text-neutral-800 dark:text-white mt-1">
                     {telemetry?.lastExit ?? '—'}
                   </div>
                   <div className="text-[10px] text-neutral-400">
@@ -488,13 +488,13 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
                 </div>
 
                 <div className={`p-2.5 rounded-lg border ${
-                  isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-200'
+                  isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-200'
                 }`}>
-                  <div className="flex items-center justify-between text-neutral-400 text-[10.5px]">
+                  <div className="flex items-center justify-between text-neutral-400 text-[11px]">
                     <span>Last Run</span>
                     <Cpu size={12} className="text-red-500" />
                   </div>
-                  <div className="text-base font-bold text-neutral-800 dark:text-white mt-1">
+                  <div className="text-[15px] font-semibold text-neutral-800 dark:text-white mt-1">
                     {telemetry?.lastAt ?? '—'}
                   </div>
                   <div className="text-[10px] text-neutral-400">
@@ -530,9 +530,9 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
           )}
 
           {activeTab === 'terminal' && !host && (
-            <div className="h-full flex flex-col justify-between font-code text-[11.5px]">
+            <div className="h-full flex flex-col justify-between font-code text-[11px]">
               {remoteLine && (
-                <div className="text-[10.5px] text-neutral-400 border-b border-neutral-200/50 dark:border-neutral-800 pb-1 mb-1">
+                <div className="text-[11px] text-neutral-400 border-b border-neutral-200/50 dark:border-neutral-800 pb-1 mb-1">
                   {remoteLine}
                 </div>
               )}

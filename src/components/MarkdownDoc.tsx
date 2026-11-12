@@ -73,7 +73,7 @@ export const MarkdownDoc: React.FC<{ content: string; theme?: 'light' | 'dark' }
         <pre
           key={`b${key++}`}
           className={`my-3 overflow-x-auto rounded-lg p-3 font-mono text-[12px] leading-[1.5] ${
-            isDark ? 'bg-[#111114] text-neutral-200 border border-neutral-800' : 'bg-neutral-100 text-neutral-800 border border-neutral-200'
+            isDark ? 'bg-[#111114] text-neutral-200 border border-neutral-800' : 'bg-[#f4f4f6] text-neutral-800 border border-neutral-200'
           }`}
         >
           {lang ? <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1.5">{lang}</div> : null}
@@ -147,7 +147,7 @@ export const MarkdownDoc: React.FC<{ content: string; theme?: 'light' | 'dark' }
         <blockquote
           key={`b${key++}`}
           className={`my-3 pl-3 border-l-2 text-[13.5px] italic ${
-            isDark ? 'border-neutral-700 text-neutral-400' : 'border-neutral-300 text-neutral-600'
+            isDark ? 'border-neutral-800 text-neutral-400' : 'border-neutral-300 text-neutral-600'
           }`}
         >
           {inline(body.join(' '), `q${key}`)}

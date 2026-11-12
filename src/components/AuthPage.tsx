@@ -187,7 +187,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   if (signedInAs) {
     return (
-      <div className="fixed inset-0 z-[60] bg-[#0b0b0c] text-neutral-100 flex flex-col">
+      <div className="fixed inset-0 z-[60] bg-[#141416] text-neutral-100 flex flex-col">
         <AuthHeader onClose={onClose} />
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="w-full max-w-sm text-center space-y-4">
@@ -195,7 +195,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {(signedInAs.name ?? signedInAs.email ?? '?').slice(0, 1).toUpperCase()}
             </div>
             <div>
-              <div className="text-lg font-semibold">{signedInAs.name || signedInAs.email}</div>
+              <div className="text-[15px] font-semibold">{signedInAs.name || signedInAs.email}</div>
               <div className="text-[13px] text-neutral-500">{signedInAs.email}</div>
             </div>
             <button
@@ -212,7 +212,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#0b0b0c] text-neutral-100 flex flex-col overflow-y-auto">
+    <div className="fixed inset-0 z-[60] bg-[#141416] text-neutral-100 flex flex-col overflow-y-auto">
       <AuthHeader onClose={onClose} />
 
       <div className="flex-1 flex items-start justify-center px-6 pt-[12vh] pb-10">
@@ -227,7 +227,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </p>
 
           {!accounts && !mudReady && (
-            <div className="mt-6 rounded-lg border border-[#26262b] bg-[#121214] px-4 py-3 text-[13px] text-neutral-400 space-y-1">
+            <div className="mt-6 rounded-lg border border-[#262626] bg-[#1e1e24] px-4 py-3 text-[13px] text-neutral-400 space-y-1">
               <p className="font-medium text-neutral-300">Sign-in is not configured on this deployment.</p>
               <p className="text-neutral-500">
                 This copy of Zut has no account backend wired up, so there is nowhere to sign in to yet.
@@ -249,7 +249,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   title={known?.label ?? provider}
                   aria-label={known?.label ?? provider}
                   onClick={() => signInWithSocial(provider as 'github' | 'google')}
-                  className="flex-1 h-11 rounded-lg bg-[#17171a] border border-[#26262b] hover:bg-[#1e1e22] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+                  className="flex-1 h-11 rounded-lg bg-[#222228] border border-[#262626] hover:bg-[#2c2c34] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {known?.icon ?? <span className="text-[12px] capitalize">{provider}</span>}
                 </button>
@@ -268,7 +268,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Your email address"
               autoComplete="email"
-              className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#3a3a40]"
+              className="w-full h-10 px-3 rounded-lg bg-[#1e1e24] border border-[#262626] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-red-500"
             />
             {mode === 'signup' && (
               <label htmlFor="auth-name" className="block text-[12px] text-neutral-400 pt-2">
@@ -282,7 +282,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Display name (optional)"
                 autoComplete="name"
-                className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#3a3a40]"
+                className="w-full h-10 px-3 rounded-lg bg-[#1e1e24] border border-[#262626] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-red-500"
               />
             )}
             {accounts && (
@@ -297,7 +297,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#3a3a40]"
+                  className="w-full h-10 px-3 rounded-lg bg-[#1e1e24] border border-[#262626] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-red-500"
                 />
               </>
             )}
@@ -314,7 +314,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </div>
           )}
           {authHint && !notice && !error && !signInError && (
-            <div className="mt-3 rounded-lg border border-[#26262b] bg-[#121214] px-3 py-2 text-[12px] text-neutral-400">
+            <div className="mt-3 rounded-lg border border-[#262626] bg-[#1e1e24] px-3 py-2 text-[12px] text-neutral-400">
               {authHint}
             </div>
           )}
@@ -344,7 +344,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="your@email.com"
                   autoComplete="email"
-                  className="w-full h-10 px-3 rounded-lg bg-[#0f0f11] border border-[#26262b] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-[#363a3f]"
+                  className="w-full h-10 px-3 rounded-lg bg-[#1e1e24] border border-[#262626] text-[13px] placeholder:text-neutral-600 focus:outline-none focus:border-red-500"
                 />
                 {resetNotice && (
                   <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[12px] text-emerald-300">

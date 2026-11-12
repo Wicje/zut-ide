@@ -42,14 +42,14 @@ export function AccountGate({ checking, onCreateAccount, theme = 'dark' }: Accou
             </p>
           </div>
         </div>
-        <p className={`text-sm mb-4 ${isDark ? 'text-neutral-300' : 'text-neutral-600'}`}>
+        <p className={`text-[13px] mb-4 ${isDark ? 'text-neutral-300' : 'text-neutral-600'}`}>
           Sign in and the IDE opens: pick where the agent runs (your own machine
           or ours), then build.
         </p>
         <button
           type="button"
           onClick={onCreateAccount}
-          className="w-full rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold py-2.5 transition-colors cursor-pointer"
+          className="w-full rounded-xl bg-red-600 hover:bg-red-500 text-white text-[13px] font-semibold py-2.5 transition-colors cursor-pointer"
         >
           Create account
         </button>

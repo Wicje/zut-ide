@@ -106,7 +106,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
       <div
         className={`w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden flex flex-col max-h-[85vh] max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
           isDark
-            ? 'bg-[#18181c] border-neutral-700 text-neutral-100'
+            ? 'bg-[#18181b] border-neutral-800 text-neutral-100'
             : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -114,7 +114,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
         {/* Header Bar */}
         <div
           className={`p-4 border-b space-y-2 ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50/80'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-neutral-200 bg-[#fafafc]/80'
           }`}
         >
           <div className="flex items-start justify-between">
@@ -128,13 +128,13 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
                   {prStatus === 'merged' ? <GitMerge size={12} /> : <GitPullRequest size={12} />}
                   <span className="capitalize">{prStatus}</span>
                 </span>
-                <h3 className="font-bold text-sm">
+                <h3 className="font-semibold text-[15px]">
                   {title ?? 'Review workspace changes'}{' '}
                   {prNumber != null && <span className="text-neutral-400">#{prNumber}</span>}
                 </h3>
               </div>
 
-              <div className="text-[11.5px] text-neutral-500 flex items-center gap-1.5 font-mono">
+              <div className="text-[11px] text-neutral-500 flex items-center gap-1.5 font-mono">
                 <span className="font-sans font-medium text-neutral-800 dark:text-neutral-200">{author ?? 'you'}</span>
                 <span>wants to merge {commits.length} commit{commits.length === 1 ? '' : 's'} into</span>
                 <span className="bg-neutral-200/80 dark:bg-neutral-800 px-1.5 py-0.2 rounded text-[11px]">{baseBranch}</span>
@@ -211,7 +211,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
                 <p className="text-xs text-neutral-500">No review comments yet.</p>
               )}
               {comments.map((c, i) => (
-                <div key={i} className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 space-y-2">
+                <div key={i} className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 space-y-2">
                   <div className="flex items-center justify-between text-neutral-500 text-[11px]">
                     <span className="font-semibold text-neutral-800 dark:text-neutral-200">
                       {c.author}
@@ -230,7 +230,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
                   checks.length === 0
                     ? isDark
                       ? 'bg-[#24242a] border-neutral-800 text-neutral-300'
-                      : 'bg-neutral-100 border-neutral-200 text-neutral-700'
+                      : 'bg-[#f4f4f6] border-neutral-200 text-neutral-700'
                     : checksAllPassed
                     ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300'
                     : 'bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300'
@@ -280,14 +280,14 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               {commits.map((c) => (
                 <div
                   key={c.hash}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700"
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <GitCommit size={14} className="text-red-500 shrink-0" />
                     <span className="font-medium truncate">{c.message}</span>
                   </div>
                   <div className="flex items-center gap-2 text-neutral-400 font-mono text-[11px] shrink-0 ml-2">
-                    <span className="bg-neutral-100 dark:bg-neutral-800 px-1 rounded">{c.hash}</span>
+                    <span className="bg-[#f4f4f6] dark:bg-neutral-800 px-1 rounded">{c.hash}</span>
                     <span>{c.time}</span>
                   </div>
                 </div>
@@ -303,7 +303,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               {checks.map((chk, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700"
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800"
                 >
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={14} className="text-emerald-500" />
@@ -320,7 +320,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
               {files.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 font-code text-[11.5px]"
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 font-code text-[11px]"
                 >
                   <span className="truncate">{file.path}</span>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -336,14 +336,14 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
         {/* Footer Actions */}
         <div
           className={`p-3 border-t flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-neutral-200 bg-[#fafafc]'
           }`}
         >
           {/* Review Decision Button */}
           <div className="relative">
             <button
               onClick={() => setIsReviewMenuOpen(!isReviewMenuOpen)}
-              className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-xs font-medium flex items-center gap-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-800 text-xs font-medium flex items-center gap-1.5 hover:bg-[#f4f4f6] dark:hover:bg-neutral-800 cursor-pointer"
             >
               {reviewDecision === 'approved' ? (
                 <span className="text-emerald-600 font-semibold flex items-center gap-1">
@@ -359,7 +359,7 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
             {isReviewMenuOpen && (
               <div
                 className={`absolute left-0 bottom-full mb-1 w-44 rounded-xl border shadow-xl p-1 z-30 text-xs ${
-                  isDark ? 'bg-[#222228] border-neutral-700 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
+                  isDark ? 'bg-[#222228] border-neutral-800 text-neutral-200' : 'bg-white border-neutral-200 text-neutral-700'
                 }`}
               >
                 <button
@@ -367,14 +367,14 @@ export const PRReviewStudioModal: React.FC<PRReviewStudioModalProps> = ({
                     setReviewDecision('approved');
                     setIsReviewMenuOpen(false);
                   }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#f4f4f6] dark:hover:bg-neutral-800 flex items-center gap-2 cursor-pointer"
                 >
                   <Check size={12} className="text-emerald-500" />
                   <span>Approve</span>
                 </button>
                 <button
                   onClick={() => setIsReviewMenuOpen(false)}
-                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#f4f4f6] dark:hover:bg-neutral-800 flex items-center gap-2 cursor-pointer"
                 >
                   <MessageSquare size={12} className="text-red-500" />
                   <span>Comment</span>

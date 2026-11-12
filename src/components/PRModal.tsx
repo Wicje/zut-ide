@@ -43,7 +43,7 @@ export const PRModal: React.FC<PRModalProps> = ({
         className="w-full max-w-lg bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden text-neutral-800 max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="h-11 px-4 bg-neutral-50 border-b border-neutral-200 flex items-center justify-between text-[13px] font-medium">
+        <div className="h-11 px-4 bg-[#fafafc] border-b border-neutral-200 flex items-center justify-between text-[13px] font-medium">
           <div className="flex items-center gap-2 text-neutral-800">
             <GitPullRequest size={16} className="text-emerald-600" />
             <span>Create Pull Request</span>
@@ -57,7 +57,7 @@ export const PRModal: React.FC<PRModalProps> = ({
         </div>
 
         <div className="p-4 space-y-3.5 text-xs">
-          <div className="flex items-center gap-2 p-2 bg-neutral-100 rounded-lg text-neutral-600 font-mono text-[11px]">
+          <div className="flex items-center gap-2 p-2 bg-[#f4f4f6] rounded-lg text-neutral-600 font-mono text-[11px]">
             <span className="font-semibold text-neutral-800">base:</span> {baseBranch}
             <span className="text-neutral-400">←</span>
             <span className="font-semibold text-neutral-800">compare:</span> {headBranch ?? 'workspace'}
@@ -95,7 +95,7 @@ export const PRModal: React.FC<PRModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 font-medium"
+                className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-[#fafafc] font-medium"
               >
                 Cancel
               </button>

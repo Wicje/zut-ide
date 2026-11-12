@@ -306,6 +306,40 @@ export function injectConsoleHarness(): string {
       orig.apply(null, args);
     };
   });
+  // Network capture: wrap fetch + XHR so requests stream to the drawer.
+  // Best-effort — a broken wrap must never take the page down.
+  try {
+    var origFetch = window.fetch ? window.fetch.bind(window) : null;
+    if (origFetch) {
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || String(input);
+        var method = (init && init.method) || (typeof input !== 'string' && input && input.method) || 'GET';
+        var t0 = performance.now();
+        return origFetch(input, init).then(function (res) {
+          post('network', { method: String(method).toUpperCase(), url: String(url), status: res.status, ms: Math.round(performance.now() - t0) });
+          return res;
+        }, function (err) {
+          post('network', { method: String(method).toUpperCase(), url: String(url), status: 0, ms: Math.round(performance.now() - t0) });
+          throw err;
+        });
+      };
+    }
+    var XOpen = XMLHttpRequest.prototype.open;
+    var XSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this.__zutMethod = method;
+      this.__zutUrl = url;
+      return XOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function () {
+      var xhr = this;
+      var t0 = performance.now();
+      xhr.addEventListener('loadend', function () {
+        post('network', { method: String(xhr.__zutMethod || 'GET').toUpperCase(), url: String(xhr.__zutUrl || ''), status: xhr.status, ms: Math.round(performance.now() - t0) });
+      });
+      return XSend.apply(this, arguments);
+    };
+  } catch (e) {}
   window.addEventListener('error', function (ev) {
     var msg = ev.message || 'Unknown script error';
     if (ev.error && ev.error.stack) msg += '\\n' + ev.error.stack;

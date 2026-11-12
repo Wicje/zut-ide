@@ -8,7 +8,7 @@ import { DiffReviewPane } from './components/DiffReviewPane';
 const CodeEditorPane = lazy(() =>
   import('./components/CodeEditorPane').then((m) => ({ default: m.CodeEditorPane })),
 );
-import { LiveAppPreviewPane } from './components/LiveAppPreviewPane';
+import { LiveAppPreviewPane, type PreviewNetworkEntry } from './components/LiveAppPreviewPane';
 import { TestExplorerPane } from './components/TestExplorerPane';
 import { VideoPreviewModal } from './components/VideoPreviewModal';
 import { PRModal } from './components/PRModal';
@@ -140,11 +140,13 @@ import {
   Check,
   MoreHorizontal,
   Terminal,
+  Pencil,
 } from 'lucide-react';
 
 // Which workspace was open last, so a reload can reconnect it without
 // silently moving files between disk/host/device.
 import { K, readKey, writeKey, removeKey } from './lib/storage-keys';
+import { listRecents, pushRecent, removeRecent } from './lib/recent-projects';
 
 function rememberSource(kind: WorkspaceSourceKind): void {
   try {
@@ -289,6 +291,8 @@ export default function App() {
   // ---- Real project (local draft first, broker cloud when signed in) ----
   const [files, setFiles] = useState<FileMap>(() => loadDraft()?.files ?? STARTER);
   const [projectName, setProjectName] = useState(() => loadDraft()?.name ?? 'Untitled project');
+  const [isRenamingProject, setIsRenamingProject] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
   const [projectId, setProjectId] = useState<string | null>(null);
   const filesRef = useRef(files);
   filesRef.current = files;
@@ -427,7 +431,9 @@ export default function App() {
   // ---- Runs, preview, events, video, PR (all real) ----
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [srcDoc, setSrcDoc] = useState('');
+  const [recents, setRecents] = useState(() => listRecents());
   const [consoleLines, setConsoleLines] = useState<string[]>([]);
+  const [networkEvents, setNetworkEvents] = useState<PreviewNetworkEntry[]>([]);
   const [buildMs, setBuildMs] = useState<number | null>(null);
   const [remotePreviewUrl, setRemotePreviewUrl] = useState<string | null>(null);
 
@@ -767,9 +773,20 @@ export default function App() {
   // Preview console harness -> console drawer lines.
   useEffect(() => {
     function onMessage(e: MessageEvent) {
-      const data = e.data as { source?: string; type?: string; payload?: { level?: string; message?: string } };
+      const data = e.data as { source?: string; type?: string; payload?: { level?: string; message?: string; method?: string; url?: string; status?: number; ms?: number } };
       if (data && data.source === CONSOLE_SOURCE && data.type === 'console') {
         setConsoleLines((prev) => [...prev.slice(-199), redactSecrets(`[${data.payload?.level ?? 'log'}] ${data.payload?.message ?? ''}`)]);
+      } else if (data && data.source === CONSOLE_SOURCE && data.type === 'network') {
+        const n = data.payload ?? {};
+        setNetworkEvents((prev) => [
+          ...prev.slice(-99),
+          {
+            method: String(n.method ?? 'GET'),
+            url: redactSecrets(String(n.url ?? '')),
+            status: Number(n.status ?? 0),
+            ms: Number(n.ms ?? 0),
+          },
+        ]);
       }
     }
     window.addEventListener('message', onMessage);
@@ -841,6 +858,7 @@ export default function App() {
         bundle = await bundleProject(target);
       }
       setSrcDoc(buildSrcdoc(target['index.html'], bundle));
+      setNetworkEvents([]);
       setBuildMs(Math.round(performance.now() - t0));
     } catch (e) {
       const errs = formatBuildErrors(e).map((r) => r.message).join(' | ');
@@ -1582,11 +1600,9 @@ export default function App() {
     showToast('Snapshot restored (previous state checkpointed).');
   }
 
-  // Start a blank project immediately — no modal. Old sessions stay in the
-  // sidebar, outgoing files were snapshotted, model carries over.
-  function startNewProject() {
-    takeSnapshot(filesRef.current);
-    // Detach any open folder: a new project must never write into the old repo.
+  // Activate a fresh workspace: blank session, device draft source, outgoing
+  // files already snapshot. Shared by "new project" and "reopen a recent".
+  function activateWorkspace(name: string, fresh: FileMap) {
     localRepoRef.current = null;
     localBaselineRef.current = {};
     localStampRef.current = '';
@@ -1595,17 +1611,16 @@ export default function App() {
     void forgetRepo();
     setWorkspaceSource('device');
     rememberSource('device');
-    const fresh = { ...STARTER };
     const newId = `session-${Date.now()}`;
     const newSession = blankSession(
       newId,
-      'New project',
+      name === 'Untitled project' ? 'New project' : name,
       activeSession?.model ?? (opencodeReady ? OPENCODE_LABEL : 'Gemini 2.5 Flash'),
     );
     generatingRef.current = false;
     setIsGenerating(false);
     setFiles(fresh);
-    setProjectName('Untitled project');
+    setProjectName(name);
     setProjectId(null);
     setShareLink(null);
     setSavedTo('device');
@@ -1615,14 +1630,34 @@ export default function App() {
     if (isMobile) setMobileTab('agent');
     setRuns([]);
     setConsoleLines([]);
+    setNetworkEvents([]);
     setSrcDoc('');
     setBuildMs(null);
     setPrData(null);
     setVideoUrl(null);
-    setEvents([`[${stamp()}] New project started.`]);
+    setEvents([`[${stamp()} ${name === 'Untitled project' ? 'New project' : name} started.`]);
     takeSnapshot(fresh);
     setRightPaneMode('editor');
-    showToast('New project started — old work kept in the sidebar + History.');
+  }
+
+  // Start a blank project immediately — no modal. The outgoing work is
+  // stashed in Recents + snapshotted first, so it is always one click away.
+  function startNewProject() {
+    takeSnapshot(filesRef.current);
+    setRecents(pushRecent(projectName, filesRef.current));
+    activateWorkspace('Untitled project', { ...STARTER });
+    showToast('New project started — old work kept in Recents + History.');
+  }
+
+  // Reopen a stashed project from the sidebar. The outgoing work is stashed
+  // the same way, so switching never loses anything.
+  function openRecentProject(id: string) {
+    const rec = recents.find((r) => r.id === id);
+    if (!rec) return;
+    takeSnapshot(filesRef.current);
+    setRecents(pushRecent(projectName, filesRef.current));
+    activateWorkspace(rec.name, { ...rec.files });
+    showToast(`Reopened “${rec.name}”.`);
   }
 
   async function handleImport(url: string): Promise<{ name: string; files: number }> {
@@ -1720,7 +1755,7 @@ export default function App() {
       <div
         className={`${
           isMobile ? 'relative shrink-0 min-h-11' : 'absolute top-0 left-0 right-0 h-11'
-        } z-30 flex items-center justify-between gap-3 px-3 border-b border-black/10 dark:border-white/10 bg-[#f4f4f6]/85 dark:bg-[#18181b]/85 backdrop-blur-md text-xs`}
+        } z-30 flex items-center justify-between gap-3 px-3 border-b border-black/10 dark:border-white/10 bg-[#f4f4f6]/85 dark:bg-[#18181b]/85 backdrop-blur-md text-xs text-neutral-500 dark:text-neutral-300`}
         style={isMobile ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}
       >
         <div className="flex items-center gap-2 shrink-0">
@@ -1728,13 +1763,36 @@ export default function App() {
           <span className={`font-medium ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>Zut</span>
         </div>
 
-        <div
-          className={`absolute left-1/2 -translate-x-1/2 max-w-[45%] truncate pointer-events-none hidden sm:block ${
-            isDark ? 'text-neutral-400' : 'text-neutral-500'
-          }`}
-        >
-          {projectName}
-        </div>
+        {isRenamingProject ? (
+          <input
+            autoFocus
+            value={renameDraft}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            onBlur={() => {
+              const v = renameDraft.trim();
+              if (v) setProjectName(v);
+              setIsRenamingProject(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Escape') setIsRenamingProject(false);
+            }}
+            aria-label="Project name"
+            className="hidden sm:block absolute left-1/2 -translate-x-1/2 w-56 px-2 py-0.5 text-center text-xs rounded-md border border-red-500 focus:outline-none bg-white dark:bg-[#1e1e24] text-neutral-800 dark:text-neutral-100"
+          />
+        ) : (
+          <button
+            onClick={() => {
+              setRenameDraft(projectName);
+              setIsRenamingProject(true);
+            }}
+            title="Rename project"
+            className="hidden sm:flex absolute left-1/2 -translate-x-1/2 max-w-[45%] items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+          >
+            <span className="truncate text-neutral-500 dark:text-neutral-400">{projectName}</span>
+            <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+          </button>
+        )}
 
         <div className="flex items-center gap-1 shrink-0">
         <button
@@ -1742,61 +1800,51 @@ export default function App() {
           className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Command Palette (⌘K)"
         >
-          <Command size={11} />
+          <Command size={14} />
           <span className="text-[11px] font-medium hidden sm:inline">⌘K</span>
         </button>
-
-        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setIsVercelDeployOpen(true)}
           className="flex items-center gap-1.5 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Deploy to the web"
         >
-          <svg viewBox="0 0 76 65" fill="currentColor" className="w-2.5 h-2.5">
+          <svg viewBox="0 0 76 65" fill="currentColor" className="w-3 h-3">
             <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
           </svg>
           <span className="text-[11px] font-medium hidden md:inline">Deploy</span>
         </button>
-
-        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={toggleTheme}
           className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
         >
-          {isDark ? <Sun size={12} className="text-amber-400" /> : <Moon size={12} className="text-red-300" />}
+          {isDark ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-red-300" />}
         </button>
-
-        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setWallpaperMenuOpen((v) => !v)}
           className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Wallpaper"
         >
-          <Image size={12} className={wallpaperMenuOpen ? 'text-white' : wallpaperOn ? 'text-neutral-600 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-600'} />
+          <Image size={14} className={wallpaperMenuOpen ? 'text-white' : wallpaperOn ? 'text-neutral-600 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-600'} />
         </button>
-
-        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={() => setIsMaximized(!isMaximized)}
           className="flex items-center gap-1 max-sm:hidden max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title={isMaximized ? 'Restore Window' : 'Full Screen'}
         >
-          {isMaximized ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+          {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
-
-        <span className="hidden sm:inline text-neutral-300 dark:text-neutral-600 text-xs">|</span>
 
         <button
           onClick={handleReset}
           className="flex items-center gap-1 max-sm:h-9 max-sm:w-9 max-sm:justify-center max-sm:p-0 px-1.5 py-0.5 hover:text-neutral-900 dark:hover:text-white rounded transition-colors cursor-pointer"
           title="Refresh workspace from saved state"
         >
-          <RefreshCw size={11} />
+          <RefreshCw size={14} />
         </button>
         </div>
         {wallpaperMenuOpen && (
@@ -1891,6 +1939,9 @@ export default function App() {
             onNewAgent={startNewProject}
             onOpenFolder={isLocalRepoSupported() ? () => void openLocalRepo() : undefined}
             onCloneRepo={() => setShowImport(true)}
+            recents={recents}
+            onOpenRecent={openRecentProject}
+            onRemoveRecent={(id) => setRecents(removeRecent(id))}
             workspaceLabel={
               workspaceSource === 'local'
                 ? projectName
@@ -2124,7 +2175,7 @@ export default function App() {
                     <div
                       className={`absolute right-0 top-full mt-1 w-52 rounded-lg border py-1 shadow-xl z-40 text-[12px] ${
                         isDark
-                          ? 'bg-[#222228] border-neutral-700 text-neutral-200'
+                          ? 'bg-[#222228] border-neutral-800 text-neutral-200'
                           : 'bg-white border-neutral-200 text-neutral-700'
                       }`}
                     >
@@ -2135,7 +2186,7 @@ export default function App() {
                           setIsPaneMenuOpen(false);
                         }}
                         className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                         }`}
                       >
                         Switch to {diffViewMode === 'split' ? 'Unified' : 'Split'} view
@@ -2147,7 +2198,7 @@ export default function App() {
                           setIsPaneMenuOpen(false);
                         }}
                         className={`w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer ${
-                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                         }`}
                       >
                         <Terminal size={13} className="text-neutral-400" />
@@ -2159,7 +2210,7 @@ export default function App() {
                           setIsPaneMenuOpen(false);
                         }}
                         className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                         }`}
                       >
                         {copiedDiff ? 'Diff copied!' : 'Copy the whole diff'}
@@ -2170,7 +2221,7 @@ export default function App() {
                           setIsPaneMenuOpen(false);
                         }}
                         className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                         }`}
                       >
                         Create PR
@@ -2181,7 +2232,7 @@ export default function App() {
                           setIsPaneMenuOpen(false);
                         }}
                         className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer ${
-                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-neutral-100'
+                          isDark ? 'hover:bg-neutral-800' : 'hover:bg-[#f4f4f6]'
                         }`}
                       >
                         Save & deploy
@@ -2204,7 +2255,7 @@ export default function App() {
             >
               <div className="flex items-center gap-0.5 mr-1 ml-auto shrink-0">
                 {activeFilePath.endsWith('.md') && (
-                  <div className="flex items-center gap-0.5 rounded-md border border-neutral-200 dark:border-neutral-700 p-0.5">
+                  <div className="flex items-center gap-0.5 rounded-md border border-neutral-200 dark:border-neutral-800 p-0.5">
                     {(['document', 'source'] as const).map((v) => (
                       <button
                         key={v}
@@ -2461,6 +2512,8 @@ export default function App() {
               }}
               onOpenLiveUrl={(url) => window.open(url, '_blank', 'noopener')}
               consoleLines={consoleLines}
+              networkEvents={networkEvents}
+              onClearNetwork={() => setNetworkEvents([])}
               onInspectElement={({ component, file, line }) => {
                 setRightPaneMode('diff');
                 showToast(`Inspecting ${component} (${file}:${line}) in Composer.`);
@@ -2867,12 +2920,12 @@ export default function App() {
 
       {showSelfHostCard && (
         <div className="fixed inset-x-4 bottom-20 z-40 mx-auto max-w-xl">
-          <div className="rounded-xl border border-neutral-700/70 bg-neutral-900/95 backdrop-blur-md shadow-xl">
+          <div className="rounded-xl border border-neutral-800/70 bg-neutral-900/95 backdrop-blur-md shadow-xl">
             <div className="px-4 py-3">
               <p className="text-xs text-neutral-400 leading-relaxed">
                 {selfHostHelp.caption}
               </p>
-              <pre className="mt-2 mb-2 text-xs text-neutral-200 leading-relaxed font-mono bg-neutral-950/70 rounded-lg p-3 border border-neutral-700/50 overflow-x-auto">
+              <pre className="mt-2 mb-2 text-xs text-neutral-200 leading-relaxed font-mono bg-neutral-950/70 rounded-lg p-3 border border-neutral-800/50 overflow-x-auto">
                 {selfHostHelp.commands.map((c, i) => (
                   <div key={i}>{c}</div>
                 ))}
@@ -2949,7 +3002,10 @@ export default function App() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-neutral-900/95 text-white backdrop-blur-md rounded-full shadow-2xl text-xs font-medium border border-white/10 animate-fadeIn">
+        <div
+          className="fixed bottom-44 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 max-w-[calc(100vw-2rem)] px-4 py-2 bg-neutral-900/95 text-white backdrop-blur-md rounded-full shadow-2xl text-xs font-medium border border-white/10 animate-fadeIn"
+          style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
           <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>

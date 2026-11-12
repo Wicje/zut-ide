@@ -131,7 +131,7 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
                 onClose();
                 onConnectHost();
               }}
-              className="mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-white/5"
+              className="mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-800 hover:bg-[#fafafc] dark:hover:bg-white/5"
             >
               <Server size={12} /> Connect host
             </button>
@@ -159,7 +159,7 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
         <button
           onClick={() => void refresh()}
           disabled={busy !== null}
-          className="flex items-center gap-1 px-2 py-1 rounded-md border border-neutral-300 dark:border-neutral-700 text-[10.5px] hover:bg-neutral-50 dark:hover:bg-white/5 disabled:opacity-40"
+          className="flex items-center gap-1 px-2 py-1 rounded-md border border-neutral-300 dark:border-neutral-800 text-[11px] hover:bg-[#fafafc] dark:hover:bg-white/5 disabled:opacity-40"
         >
           {busy === 'refresh' ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
           Refresh
@@ -220,7 +220,7 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
                         ? isDark
                           ? 'bg-red-500/15 text-red-300'
                           : 'bg-red-500/10 text-red-700'
-                        : 'hover:bg-neutral-500/5'
+                        : 'hover:bg-[#fafafc]0/5'
                     }`}
                   >
                     <span className="w-4 shrink-0 font-mono text-[10px] text-amber-600 dark:text-amber-400">
@@ -242,7 +242,7 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
                 placeholder="fix: describe what changed"
                 rows={2}
                 className={`w-full rounded-md border px-2 py-1.5 text-[11px] font-mono resize-none focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                  isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-300'
+                  isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-300'
                 }`}
               />
               <button
@@ -268,8 +268,8 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
                 <select
                   value={targetBranch}
                   onChange={(e) => setTargetBranch(e.target.value)}
-                  className={`h-7 min-w-0 flex-1 rounded-md border px-1.5 text-[10.5px] font-mono ${
-                    isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-300'
+                  className={`h-7 min-w-0 flex-1 rounded-md border px-1.5 text-[11px] font-mono ${
+                    isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-300'
                   }`}
                 >
                   {branches.map((b) => (
@@ -288,7 +288,7 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
                     })
                   }
                   disabled={busy !== null || !targetBranch || targetBranch === status?.branch}
-                  className="h-7 px-2 rounded-md border border-neutral-300 dark:border-neutral-700 text-[10.5px] disabled:opacity-40"
+                  className="h-7 px-2 rounded-md border border-neutral-300 dark:border-neutral-800 text-[11px] disabled:opacity-40"
                 >
                   Switch
                 </button>
@@ -298,8 +298,8 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
                   value={branchName}
                   onChange={(e) => setBranchName(e.target.value)}
                   placeholder="feature/my-branch"
-                  className={`h-7 min-w-0 flex-1 rounded-md border px-1.5 text-[10.5px] font-mono focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                    isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-300'
+                  className={`h-7 min-w-0 flex-1 rounded-md border px-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-red-500 ${
+                    isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-300'
                   }`}
                 />
                 <button
@@ -312,7 +312,7 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
                     })
                   }
                   disabled={busy !== null || !branchName.trim()}
-                  className="h-7 px-2 rounded-md border border-neutral-300 dark:border-neutral-700 text-[10.5px] flex items-center gap-1 disabled:opacity-40"
+                  className="h-7 px-2 rounded-md border border-neutral-300 dark:border-neutral-800 text-[11px] flex items-center gap-1 disabled:opacity-40"
                 >
                   <Plus size={11} /> New
                 </button>
@@ -322,9 +322,9 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
             <div>
               <div className="text-[10px] uppercase tracking-wide text-neutral-400 pb-1">Recent commits</div>
               <div className="max-h-24 overflow-y-auto space-y-0.5">
-                {commits.length === 0 && <div className="text-[10.5px] text-neutral-400">No commits yet.</div>}
+                {commits.length === 0 && <div className="text-[11px] text-neutral-400">No commits yet.</div>}
                 {commits.map((c) => (
-                  <div key={c.sha} className="flex items-baseline gap-1.5 text-[10.5px]">
+                  <div key={c.sha} className="flex items-baseline gap-1.5 text-[11px]">
                     <span className="font-mono text-neutral-400 shrink-0">{c.shortSha}</span>
                     <span className="truncate" title={c.message}>
                       {c.message}
@@ -336,11 +336,11 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
           </div>
 
           <div className="min-h-0 flex flex-col rounded-md border border-neutral-200 dark:border-neutral-800 overflow-hidden">
-            <div className="h-7 px-2 flex items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-[#202025] text-[10.5px] text-neutral-500">
+            <div className="h-7 px-2 flex items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] text-[11px] text-neutral-500">
               <FileDiff size={11} />
               <span className="truncate font-mono">{selectedFile ?? 'Select a changed file'}</span>
             </div>
-            <pre className="flex-1 min-h-[8rem] max-h-56 overflow-auto p-2 text-[10.5px] leading-4 font-mono whitespace-pre-wrap">
+            <pre className="flex-1 min-h-[8rem] max-h-56 overflow-auto p-2 text-[11px] leading-4 font-mono whitespace-pre-wrap">
               {selectedFile ? (
                 busy === 'diff' ? (
                   <span className="text-neutral-400">Loading diff…</span>
@@ -395,13 +395,13 @@ function Shell({
     >
       <div
         className={`w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden max-sm:max-h-[calc(100dvh-2rem)] max-sm:overflow-y-auto ${
-          isDark ? 'bg-[#18181c] border-neutral-700 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
+          isDark ? 'bg-[#18181b] border-neutral-800 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className={`h-11 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-[#fbfbfd]'
           }`}
         >
           <div className="flex items-center gap-2 text-xs font-semibold">

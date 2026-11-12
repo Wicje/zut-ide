@@ -25,6 +25,8 @@ export const K = {
   agentMode: 'zut:agent-mode',
   host: 'zut:host:v1',
   opencodeModel: 'zut:opencode-model',
+  recentProjects: 'zut:recent-projects',
+  recentModels: 'zut:recent-models',
   stepRatings: 'zut:step-ratings',
   aiComplete: 'zut:ai-complete',
   // Wallpaper

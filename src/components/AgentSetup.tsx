@@ -37,7 +37,7 @@ export const AgentSetup: React.FC<AgentSetupProps> = ({ onDone, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#0b0b0c] text-neutral-100 flex flex-col overflow-y-auto">
+    <div className="fixed inset-0 z-[60] bg-[#141416] text-neutral-100 flex flex-col overflow-y-auto">
       <div className="flex items-center justify-between px-6 py-5">
         <div className="flex items-center gap-2">
           <img src={mark} alt="Zut" className="h-4 w-4" />
@@ -69,7 +69,7 @@ export const AgentSetup: React.FC<AgentSetupProps> = ({ onDone, onClose }) => {
             <button
               type="button"
               onClick={() => choose('self')}
-              className="w-full text-left rounded-xl border border-[#26262b] bg-[#121214] hover:border-[#3a3a40] hover:bg-[#16161a] p-4 transition-colors cursor-pointer"
+              className="w-full text-left rounded-xl border border-[#262626] bg-[#1e1e24] hover:border-[#3a3a40] hover:bg-[#16161a] p-4 transition-colors cursor-pointer"
             >
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 w-8 h-8 rounded-lg bg-[#1c1c20] border border-[#2a2a30] flex items-center justify-center shrink-0">
@@ -82,7 +82,7 @@ export const AgentSetup: React.FC<AgentSetupProps> = ({ onDone, onClose }) => {
                       Available now
                     </span>
                   </div>
-                  <p className="text-[12.5px] text-neutral-500 mt-1 leading-relaxed">
+                  <p className="text-[13px] text-neutral-500 mt-1 leading-relaxed">
                     Run opencode — or a zut host — on your own computer. Your models, your keys,
                     your quota. Your files never leave the machine, and the terminal is a real PTY.
                   </p>
@@ -92,7 +92,7 @@ export const AgentSetup: React.FC<AgentSetupProps> = ({ onDone, onClose }) => {
 
             {/* Our hosted agent — launch-gated copy (flips to "Online" when the VPS is up
                 and VITE_OPENCODE_URL is set). Keep in sync with the landing FAQ + pricing. */}
-            <div className="w-full rounded-xl border border-[#232327] bg-[#0f0f11] p-4 opacity-70">
+            <div className="w-full rounded-xl border border-[#232327] bg-[#1e1e24] p-4 opacity-70">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 w-8 h-8 rounded-lg bg-[#1c1c20] border border-[#2a2a30] flex items-center justify-center shrink-0">
                   <Server size={15} className="text-neutral-500" />
@@ -106,7 +106,7 @@ export const AgentSetup: React.FC<AgentSetupProps> = ({ onDone, onClose }) => {
                       {hostedUp ? 'Online' : 'Coming soon'}
                     </span>
                   </div>
-                  <p className="text-[12.5px] text-neutral-500 mt-1 leading-relaxed">
+                  <p className="text-[13px] text-neutral-500 mt-1 leading-relaxed">
                     {hostedUp
                       ? 'Our hosted agent, running opencode for you. Nothing to install, billed for what it uses.'
                       : 'Our hosted agent, running opencode for you — no setup, billed for what it uses. We are bringing the server online; self-host works today.'}

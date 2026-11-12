@@ -214,13 +214,13 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
 
   if (!host) {
     return (
-      <div className="h-full grid place-content-center text-center gap-2 text-[11.5px] text-neutral-500">
+      <div className="h-full grid place-content-center text-center gap-2 text-[11px] text-neutral-500">
         <Bug size={18} className="mx-auto text-neutral-400" />
         <div>Connect a host to debug Node scripts (.js / .ts).</div>
         {onConnectHost && (
           <button
             onClick={onConnectHost}
-            className="mx-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-white/5"
+            className="mx-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-neutral-300 dark:border-neutral-800 hover:bg-[#fafafc] dark:hover:bg-white/5"
           >
             <Server size={12} /> Connect host
           </button>
@@ -241,9 +241,9 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
             value={entry}
             onChange={(e) => setEntry(e.target.value)}
             disabled={live || status === 'starting'}
-            className={`h-7 min-w-0 flex-1 rounded border px-1.5 text-[10.5px] font-mono ${
+            className={`h-7 min-w-0 flex-1 rounded border px-1.5 text-[11px] font-mono ${
               isDark
-                ? 'bg-[#202025] border-neutral-700 text-neutral-200'
+                ? 'bg-[#1e1e24] border-neutral-800 text-neutral-200'
                 : 'bg-white border-neutral-300 text-neutral-800'
             }`}
             title="Entry script"
@@ -276,7 +276,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
           <button
             onClick={() => void start()}
             disabled={live || !entry}
-            className="h-7 w-7 grid place-content-center rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40"
+            className="h-7 w-7 grid place-content-center rounded border border-neutral-300 dark:border-neutral-800 disabled:opacity-40"
             title="Restart"
           >
             <RotateCw size={11} />
@@ -287,14 +287,14 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
           <button
             onClick={() => void control('continue')}
             disabled={!paused}
-            className="flex-1 h-6 rounded border border-neutral-300 dark:border-neutral-700 text-[10px] disabled:opacity-35 hover:bg-neutral-50 dark:hover:bg-white/5"
+            className="flex-1 h-6 rounded border border-neutral-300 dark:border-neutral-800 text-[10px] disabled:opacity-35 hover:bg-[#fafafc] dark:hover:bg-white/5"
           >
             Continue
           </button>
           <button
             onClick={() => void control('stepOver')}
             disabled={!paused}
-            className="h-6 w-6 grid place-content-center rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-35"
+            className="h-6 w-6 grid place-content-center rounded border border-neutral-300 dark:border-neutral-800 disabled:opacity-35"
             title="Step over"
           >
             <StepForward size={11} />
@@ -302,7 +302,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
           <button
             onClick={() => void control('stepInto')}
             disabled={!paused}
-            className="h-6 w-6 grid place-content-center rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-35"
+            className="h-6 w-6 grid place-content-center rounded border border-neutral-300 dark:border-neutral-800 disabled:opacity-35"
             title="Step into"
           >
             <ArrowDownToLine size={11} />
@@ -310,7 +310,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
           <button
             onClick={() => void control('stepOut')}
             disabled={!paused}
-            className="h-6 w-6 grid place-content-center rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-35"
+            className="h-6 w-6 grid place-content-center rounded border border-neutral-300 dark:border-neutral-800 disabled:opacity-35"
             title="Step out"
           >
             <ArrowUpFromLine size={11} />
@@ -341,7 +341,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
                   ? isDark
                     ? 'bg-red-500/15 text-red-300'
                     : 'bg-red-500/10 text-red-700'
-                  : 'hover:bg-neutral-500/10'
+                  : 'hover:bg-[#fafafc]0/10'
               }`}
             >
               <div className="truncate font-medium">{frame.functionName}</div>
@@ -353,18 +353,18 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
         </div>
 
         {verified.some((b) => !b.verified) && (
-          <div className="text-[9.5px] text-amber-500 pt-1">
+          <div className="text-[10px] text-amber-500 pt-1">
             {verified.filter((b) => !b.verified).length} breakpoint(s) not bound — save the file first.
           </div>
         )}
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col gap-1.5 min-h-0">
-        {error && <div className="text-red-500 text-[10.5px]">{error}</div>}
+        {error && <div className="text-red-500 text-[11px]">{error}</div>}
         {paused && selected && (
           <button
             onClick={() => onOpenFile?.(workspacePath(selected.path, files))}
-            className="text-left text-[10.5px] text-neutral-500 hover:text-red-500 truncate"
+            className="text-left text-[11px] text-neutral-500 hover:text-red-500 truncate"
             title={selected.path}
           >
             Paused at {selected.path}:{selected.line}
@@ -398,8 +398,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
                 onChange={(e) => setExpression(e.target.value)}
                 placeholder={paused ? 'Evaluate expression…' : 'Pause to evaluate'}
                 disabled={!paused}
-                className={`h-6 min-w-0 flex-1 rounded border px-1.5 font-mono text-[10.5px] focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50 ${
-                  isDark ? 'bg-[#202025] border-neutral-700' : 'bg-white border-neutral-300'
+                className={`h-6 min-w-0 flex-1 rounded border px-1.5 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50 ${
+                  isDark ? 'bg-[#1e1e24] border-neutral-800' : 'bg-white border-neutral-300'
                 }`}
               />
               <button
@@ -411,7 +411,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               </button>
             </form>
             {evalResult && (
-              <div className="text-[10.5px] font-mono break-all text-emerald-600 dark:text-emerald-400 pb-1">
+              <div className="text-[11px] font-mono break-all text-emerald-600 dark:text-emerald-400 pb-1">
                 {evalResult}
               </div>
             )}
@@ -424,7 +424,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               Console · stdout/stderr
             </button>
             {showConsole && (
-              <div ref={outputRef} className="flex-1 min-h-0 overflow-y-auto font-mono text-[10.5px] leading-4 text-neutral-600 dark:text-neutral-300">
+              <div ref={outputRef} className="flex-1 min-h-0 overflow-y-auto font-mono text-[11px] leading-4 text-neutral-600 dark:text-neutral-300">
                 {output.length === 0 ? (
                   <div className="text-neutral-400">Program output appears here.</div>
                 ) : (

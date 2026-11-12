@@ -110,7 +110,7 @@ export type RightPaneMode = 'diff' | 'editor' | 'preview' | 'tests';
 export type ComposerMode = 'agent' | 'plan';
 export type DiffViewMode = 'unified' | 'split';
 export type ThemeMode = 'light' | 'dark';
-export type DeviceViewport = 'desktop' | 'tablet' | 'mobile';
+export type DeviceViewport = 'desktop' | 'laptop' | 'tablet' | 'mobile' | 'pixel' | 'iphone-se';
 
 export interface AgentPhase {
   id: string;

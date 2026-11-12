@@ -72,13 +72,13 @@ export const HostModal: React.FC<HostModalProps> = ({ isOpen, onClose, onSaved, 
     >
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${
-          isDark ? 'bg-[#18181c] border-neutral-700 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
+          isDark ? 'bg-[#18181b] border-neutral-800 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className={`h-11 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-[#fbfbfd]'
           }`}
         >
           <div className="flex items-center gap-2 text-xs font-semibold">
@@ -115,7 +115,7 @@ export const HostModal: React.FC<HostModalProps> = ({ isOpen, onClose, onSaved, 
                 <CheckCircle size={13} /> Host reachable
               </div>
               {health.workspace && (
-                <div className="font-mono text-[10.5px] break-all">{health.workspace}</div>
+                <div className="font-mono text-[11px] break-all">{health.workspace}</div>
               )}
               <div>
                 {health.mode} · terminal {health.terminal ? 'on' : 'off'} · git {health.git ? 'on' : 'off'}
@@ -132,7 +132,7 @@ export const HostModal: React.FC<HostModalProps> = ({ isOpen, onClose, onSaved, 
               onChange={(e) => setUrl(e.target.value)}
               placeholder="http://localhost:8790"
               spellCheck={false}
-              className="w-full h-8 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
+              className="w-full h-8 rounded-md border border-neutral-300 dark:border-neutral-800 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
             />
           </label>
 
@@ -147,7 +147,7 @@ export const HostModal: React.FC<HostModalProps> = ({ isOpen, onClose, onSaved, 
               placeholder="shared host token"
               type="password"
               autoComplete="off"
-              className="w-full h-8 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
+              className="w-full h-8 rounded-md border border-neutral-300 dark:border-neutral-800 bg-transparent px-2 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
             />
           </label>
 
@@ -155,7 +155,7 @@ export const HostModal: React.FC<HostModalProps> = ({ isOpen, onClose, onSaved, 
             <button
               onClick={() => void test()}
               disabled={busy || !url.trim()}
-              className="h-8 px-3 rounded-md border border-neutral-300 dark:border-neutral-700 text-[11px] font-medium hover:bg-neutral-50 dark:hover:bg-white/5 disabled:opacity-40 flex items-center gap-1.5"
+              className="h-8 px-3 rounded-md border border-neutral-300 dark:border-neutral-800 text-[11px] font-medium hover:bg-[#fafafc] dark:hover:bg-white/5 disabled:opacity-40 flex items-center gap-1.5"
             >
               {busy && <Loader2 size={12} className="animate-spin" />}
               Test

@@ -40,13 +40,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     >
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden max-sm:w-full max-sm:max-w-full max-sm:max-h-[calc(100dvh-2rem)] ${
-          isDark ? 'bg-[#18181c] border-neutral-700 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
+          isDark ? 'bg-[#18181b] border-neutral-800 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-800'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className={`h-11 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-neutral-800 bg-[#1f1f25]' : 'border-neutral-200 bg-neutral-50'
+            isDark ? 'border-neutral-800 bg-[#161619]' : 'border-[#e5e5e7] bg-[#fbfbfd]'
           }`}
         >
           <div className="flex items-center gap-2 text-xs font-semibold">
@@ -69,11 +69,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   readOnly
                   value={link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="h-9 flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2.5 font-mono text-[11px] focus:outline-none"
+                  className="h-9 flex-1 rounded-lg border border-neutral-300 dark:border-neutral-800 bg-transparent px-2.5 font-mono text-[11px] focus:outline-none"
                 />
                 <button
                   onClick={copy}
-                  className="h-9 px-3 rounded-lg border border-neutral-300 dark:border-neutral-700 font-medium flex items-center gap-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  className="h-9 px-3 rounded-lg border border-neutral-300 dark:border-neutral-800 font-medium flex items-center gap-1.5 hover:bg-[#fafafc] dark:hover:bg-neutral-800"
                 >
                   {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
                   <span>{copied ? 'Copied' : 'Copy'}</span>

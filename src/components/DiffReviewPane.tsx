@@ -11,6 +11,7 @@ import { DiffFile, DiffViewMode } from '../types';
 import { CodeLine } from './CodeLine';
 import { SplitDiffViewer } from './SplitDiffViewer';
 import { TerminalDrawer } from './TerminalDrawer';
+import mark from '../assets/zut-mark.png';
 
 interface DiffReviewPaneProps {
   files: DiffFile[];
@@ -75,23 +76,42 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
   return (
     <div
       className={`@container flex-1 flex flex-col overflow-hidden select-none text-[13px] transition-colors ${
-        isDark ? 'bg-[#1e1e24] text-neutral-200' : 'bg-white text-[#1e1e24]'
+        'bg-[var(--zut-raised)] text-[var(--zut-text)]'
       }`}
     >
       {/* Code Diffs Scroll Area */}
+      {files.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center select-none">
+          <img
+            src={mark}
+            alt=""
+            className={`h-8 w-8 opacity-50 ${isDark ? 'brightness-0 invert' : ''}`}
+          />
+          <p className="text-[13px] font-medium text-neutral-500 dark:text-neutral-400">Nothing to review yet</p>
+          <p className="text-[11px] leading-[1.5] text-neutral-400 max-w-[300px]">
+            Describe what you want in the composer — the agent's edits land here, one file at a time.
+          </p>
+          <div className="flex items-center gap-2 mt-1 text-[10px] text-neutral-400">
+            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘1</kbd>Review</span>
+            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘2</kbd>Code</span>
+            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘3</kbd>Preview</span>
+            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘4</kbd>Checks</span>
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto divide-y divide-[#e5e5e7] dark:divide-neutral-800">
         {files.map((file) => {
           const isCollapsed = collapsedFiles[file.id];
           const isContextExpanded = expandedContext[file.id];
 
           return (
-            <div key={file.id} className={isDark ? 'bg-[#18181b]' : 'bg-white'}>
+            <div key={file.id} className="bg-[var(--zut-panel)]">
               {/* File Diff Header Accordion */}
               <div
                 className={`h-8 px-3.5 border-b flex items-center justify-between cursor-pointer select-none transition-colors ${
                   isDark
                     ? 'border-neutral-800 hover:bg-neutral-800/40'
-                    : 'border-[#e5e5e7]/80 hover:bg-neutral-50/70'
+                    : 'border-[#e5e5e7]/80 hover:bg-[#fafafc]/70'
                 }`}
                 onClick={() => toggleCollapse(file.id)}
               >
@@ -139,7 +159,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
                 >
                   <button
                     onClick={() => onRevertFile(file.id)}
-                    className="hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                    className="hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded hover:bg-[#f4f4f6] dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                     title="Revert file changes"
                   >
                     <RotateCcw size={13} />
@@ -149,7 +169,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
                     className={`p-1 rounded transition-colors cursor-pointer ${
                       file.accepted
                         ? 'text-green-600 bg-green-50 dark:bg-green-950/40'
-                        : 'hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                        : 'hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-[#f4f4f6] dark:hover:bg-neutral-800'
                     }`}
                     title={file.accepted ? 'Changes accepted' : 'Accept file changes'}
                   >
@@ -168,7 +188,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
                       className={`w-full py-1 px-4 text-left text-[11px] font-code transition-colors flex items-center gap-1.5 ${
                         isDark
                           ? 'bg-neutral-900/40 hover:bg-neutral-800 text-neutral-400'
-                          : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-500'
+                          : 'bg-[#fafafc] hover:bg-[#f4f4f6] text-neutral-500'
                       }`}
                     >
                       <span>↕ {isContextExpanded ? 'Collapse context lines' : 'Expand 10 hidden context lines'}</span>
@@ -208,6 +228,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
           );
         })}
       </div>
+      )}
 
       {/* Embedded Terminal & Benchmark Drawer */}
       <TerminalDrawer
