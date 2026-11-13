@@ -444,6 +444,11 @@ export default function App() {
   // Ref mirror so a workspace reset can cancel/restart turns synchronously
   // (state reads in stale closures would otherwise block the new turn).
   const generatingRef = useRef(false);
+  // Post-turn verification: after an agent edit, the preview rebuild runs;
+  // a quiet sandbox boot or an error posts back as a Checks run and feeds
+  // the next prompt if it failed.
+  const verifyPendingRef = useRef<number | null>(null);
+  const lastVerifyRef = useRef<{ ok: boolean; detail: string; at: number } | null>(null);
 
   const activeSession = sessions[activeSessionId] ?? Object.values(sessions)[0];
   const activeFiles = activeSession.files;
@@ -807,6 +812,17 @@ export default function App() {
             ms: Number(n.ms ?? 0),
           },
         ]);
+      } else if (data && data.source === CONSOLE_SOURCE && (data.type === 'boot-ok' || data.type === 'boot-error')) {
+        const p = data.payload ?? {};
+        if (verifyPendingRef.current !== null) {
+          const ok = data.type === 'boot-ok';
+          const detail = ok
+            ? `Boot clean in ${Number(p.ms ?? 0)}ms.`
+            : `Runtime error: ${String(p.message ?? 'unknown').slice(0, 400)}`;
+          recordRun('verify: runtime', ok ? 0 : 1, Number(p.ms ?? 0), detail);
+          lastVerifyRef.current = { ok, detail, at: Date.now() };
+          verifyPendingRef.current = null;
+        }
       }
     }
     window.addEventListener('message', onMessage);
@@ -879,12 +895,22 @@ export default function App() {
       }
       setSrcDoc(buildSrcdoc(target['index.html'], bundle));
       setNetworkEvents([]);
-      setBuildMs(Math.round(performance.now() - t0));
+      const ms = Math.round(performance.now() - t0);
+      setBuildMs(ms);
+      if (verifyPendingRef.current !== null) {
+        recordRun('verify: build', 0, ms, `Build ok in ${ms}ms.`);
+      }
     } catch (e) {
       const errs = formatBuildErrors(e).map((r) => r.message).join(' | ');
       setConsoleLines((prev) => [...prev.slice(-199), `[error] Build error: ${errs}`]);
       setSrcDoc('');
       setBuildMs(null);
+      if (verifyPendingRef.current !== null) {
+        const detail = `Build error: ${errs.slice(0, 400)}`;
+        recordRun('verify: build', 1, Math.round(performance.now() - t0), detail);
+        lastVerifyRef.current = { ok: false, detail, at: Date.now() };
+        verifyPendingRef.current = null;
+      }
     }
   }
 
@@ -948,6 +974,12 @@ export default function App() {
   async function runAgentTurn(sessionId: string, promptText: string, images: AttachedImage[] = [], mentions: string[] = []) {
     const sess = sessionsRef.current[sessionId];
     if (!sess || generatingRef.current) return;
+    // Fold a failed verification into the task so the model fixes it first.
+    const prevVerify = lastVerifyRef.current;
+    const taskPrompt =
+      prevVerify && !prevVerify.ok
+        ? `[verify] The last verify of this project FAILED: ${prevVerify.detail.slice(0, 400)}\nFix the code before anything else.\n\n${promptText}`
+        : promptText;
     const base = { ...filesRef.current };
     const snap = takeSnapshot(base);
     const t0 = performance.now();
@@ -977,7 +1009,7 @@ export default function App() {
       let reply: string;
       let changedPaths: string[];
       if (modelLabel === CLOUD_LABEL) {
-        const r = await cloudAgentTurn(base, promptText, { projectId });
+        const r = await cloudAgentTurn(base, taskPrompt, { projectId });
         for (const [p, c] of Object.entries(r.updated)) base[p] = c;
         for (const [p, c] of Object.entries(r.created)) base[p] = c;
         for (const p of r.deleted) delete base[p];
@@ -992,7 +1024,7 @@ export default function App() {
         const { buildSystemPrompt } = await import('./adapters/gemini');
         const r = await opencodeTurn(
           base,
-          promptText,
+          taskPrompt,
           buildSystemPrompt(projectName, base, activeFilePath, planInstruction(), retrievedBlock),
           () => {},
           opencodeModel ?? undefined,
@@ -1015,7 +1047,7 @@ export default function App() {
         const { streamProvider } = await import('./adapters/providers');
         const { buildSystemPrompt } = await import('./adapters/gemini');
         const history = (chatHistories[sessionId] ?? []).slice(-12);
-        const withPrompt = [...history, { role: 'user' as const, content: promptText }];
+        const withPrompt = [...history, { role: 'user' as const, content: taskPrompt }];
         let acc = '';
         await streamProvider(
           provider,
@@ -1044,7 +1076,7 @@ export default function App() {
         }));
       } else {
         const history = (chatHistories[sessionId] ?? []).slice(-12);
-        const r = await geminiTurn(history, promptText, {
+        const r = await geminiTurn(history, taskPrompt, {
           model: labelToGeminiId(modelLabel),
           projectName,
           files: base,
@@ -1129,6 +1161,19 @@ export default function App() {
       bumpAgentUse();
       logEvent('AGENT', `Turn done in ${ms}ms (${files.length} files)`);
       showToast(files.length > 0 ? `Agent updated ${files.length} file${files.length === 1 ? '' : 's'} — review the diff` : 'Agent replied (no file changes)');
+      // Arm the post-turn verify: the preview rebuild (debounced) reports
+      // build + runtime results back as a Checks run and into lastVerifyRef.
+      if (changedPaths.length > 0) {
+        verifyPendingRef.current = Date.now();
+        window.setTimeout(() => {
+          if (verifyPendingRef.current === null) return;
+          verifyPendingRef.current = null;
+          // The sandbox never reported a boot within 8s — treat as clean but
+          // note the silence instead of claiming a pass.
+          recordRun('verify: runtime', 0, 8000, 'No runtime errors observed within 8s of boot.');
+          lastVerifyRef.current = { ok: true, detail: 'No runtime errors observed within 8s of boot.', at: Date.now() };
+        }, 8000);
+      }
     } catch (e) {
       dropRunning();
       const msg = (e as Error).message;

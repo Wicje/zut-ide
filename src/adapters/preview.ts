@@ -298,11 +298,18 @@ export function injectConsoleHarness(): string {
       return '{' + parts.join(', ') + '}';
     } catch (e) { return String(v); }
   }
+  var sawError = false;
+  function markBootError(msg) {
+    if (sawError) return;
+    sawError = true;
+    post('boot-error', { ms: Math.round(performance.now()), message: msg });
+  }
   ['log', 'info', 'warn', 'error', 'debug'].forEach(function (level) {
     var orig = console[level] ? console[level].bind(console) : function () {};
     console[level] = function () {
       var args = Array.prototype.slice.call(arguments);
       try { post('console', { level: level, message: args.map(function (a) { return fmt(a, 0); }).join(' ') }); } catch (e) {}
+      if (level === 'error') markBootError(args.map(function (a) { return fmt(a, 0); }).join(' '));
       orig.apply(null, args);
     };
   });
@@ -342,14 +349,21 @@ export function injectConsoleHarness(): string {
   } catch (e) {}
   window.addEventListener('error', function (ev) {
     var msg = ev.message || 'Unknown script error';
-    if (ev.error && ev.error.stack) msg += '\\n' + ev.error.stack;
+    if (ev.error && ev.error.stack) msg += '\n' + ev.error.stack;
     post('console', { level: 'error', message: msg });
+    markBootError(msg);
     return false;
   });
   window.addEventListener('unhandledrejection', function (ev) {
     var msg = (ev.reason && (ev.reason.message || ev.reason.stack)) ? (ev.reason.message + ' ' + ev.reason.stack) : String(ev.reason);
     post('console', { level: 'error', message: 'Unhandled promise rejection: ' + msg });
+    markBootError('Unhandled promise rejection: ' + msg);
   });
+  // A quiet boot is still data: if no error surfaced in the first seconds of
+  // life, report the run as clean so the caller can record a pass.
+  setTimeout(function () {
+    if (!sawError) post('boot-ok', { ms: Math.round(performance.now()) });
+  }, 2500);
   post('ready', {});
 })();
 `;
