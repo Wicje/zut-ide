@@ -22,6 +22,7 @@ import { HostModal } from './components/HostModal';
 import { HostGitModal } from './components/HostGitModal';
 import { LoginAndAccountModal } from './components/LoginAndAccountModal';
 import { AuthPage } from './components/AuthPage';
+import { SetPasswordCard } from './components/SetPasswordCard';
 import { PlanTasks } from './components/PlanTasks';
 import { MarkdownDoc } from './components/MarkdownDoc';
 import { RulesModal } from './components/RulesModal';
@@ -196,6 +197,9 @@ export default function App() {
   const [isVercelDeployOpen, setIsVercelDeployOpen] = useState(false);
   const [isLoginAccountOpen, setIsLoginAccountOpen] = useState(false);
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
+  // Recovery links land here with a one-time session; show the set-password card.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   // A signed-in user picks where the agent runs (their machine, or ours).
   const [needsAgentSetup, setNeedsAgentSetup] = useState(false);
@@ -259,6 +263,15 @@ export default function App() {
     // The door needs to know: are we signed in yet?
     void currentAccount().then(() => setAuthChecked(true));
 
+    // Detect a recovery link before any auth event matters — the URL hash is
+    // the source of truth and survives slow SDK initialization.
+    try {
+      if (typeof window !== 'undefined' && /type=recovery/.test(window.location.hash)) {
+        setIsPasswordRecovery(true);
+      }
+    } catch {
+      /* ignore */
+    }
     const sb = getSupabase();
     if (!sb) return;
     sb.auth.getSession().then(({ data }) => {
@@ -270,7 +283,10 @@ export default function App() {
         });
       }
     });
-    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+      }
       const u = session?.user;
       if (u?.email) {
         setUser({
@@ -1261,13 +1277,32 @@ export default function App() {
     if (!sb) throw new Error('Sign-in is not configured (VITE_SUPABASE_URL).');
     setSignInError(null);
     const { error } = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/app`,
     });
     if (error) {
       setSignInError(error.message);
       throw new Error(error.message);
     }
     return 'If that email is in your account, we sent a reset link. Check your inbox (and spam) and follow the link to set a new password.';
+  }
+
+  async function handleSetNewPassword(password: string): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Sign-in is not configured.');
+    setRecoveryError(null);
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) {
+      setRecoveryError(error.message);
+      throw new Error(error.message);
+    }
+    try {
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch {
+      /* ignore */
+    }
+    setIsPasswordRecovery(false);
+    setRecoveryError(null);
+    showToast('Password updated — you are signed in.');
   }
 
   /** Social sign-in, shared by the account modal and the full sign-in page. */
@@ -1700,7 +1735,11 @@ export default function App() {
     takeSnapshot(filesRef.current);
     setRecents(pushRecent(projectName, filesRef.current));
     activateWorkspace('Untitled project', { ...STARTER });
-    showToast('New project started — old work kept in Recents + History.');
+    // Open the naming field right away — a new project is the moment people
+    // look for it.
+    setRenameDraft('');
+    setIsRenamingProject(true);
+    showToast('New project — name it up top, or keep building.');
   }
 
   // Reopen a stashed project from the sidebar. The outgoing work is stashed
@@ -1832,7 +1871,8 @@ export default function App() {
               if (e.key === 'Escape') setIsRenamingProject(false);
             }}
             aria-label="Project name"
-            className="hidden sm:block absolute left-1/2 -translate-x-1/2 w-56 px-2 py-0.5 text-center text-xs rounded-md border border-red-500 focus:outline-none bg-white dark:bg-[#1e1e24] text-neutral-800 dark:text-neutral-100"
+            placeholder="Project name"
+            className="absolute left-1/2 -translate-x-1/2 w-44 sm:w-56 px-2 py-0.5 text-center text-xs rounded-md border border-red-500 focus:outline-none bg-white dark:bg-[#1e1e24] text-neutral-800 dark:text-neutral-100"
           />
         ) : (
           <button
@@ -1841,7 +1881,7 @@ export default function App() {
               setIsRenamingProject(true);
             }}
             title="Rename project"
-            className="hidden sm:flex absolute left-1/2 -translate-x-1/2 max-w-[45%] items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+            className="flex absolute left-1/2 -translate-x-1/2 max-w-[38%] sm:max-w-[45%] items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group"
           >
             <span className="truncate text-neutral-500 dark:text-neutral-400">{projectName}</span>
             <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -2741,6 +2781,24 @@ export default function App() {
         onPushGithub={() => setShowGithub(true)}
         theme={theme}
       />
+
+      {isPasswordRecovery && (
+        <SetPasswordCard
+          theme={theme}
+          error={recoveryError}
+          onError={setRecoveryError}
+          onSubmit={handleSetNewPassword}
+          onCancel={() => {
+            setIsPasswordRecovery(false);
+            setRecoveryError(null);
+            try {
+              window.history.replaceState(null, '', window.location.pathname);
+            } catch {
+              /* ignore */
+            }
+          }}
+        />
+      )}
 
       {isAuthPageOpen && (
         <AuthPage
