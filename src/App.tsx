@@ -50,7 +50,11 @@ import {
   fileMapToProjectFiles,
   buildDiffFiles,
 } from './adapters/filemap';
-import { parseEdits, stripEditBlocks } from './adapters/aiEdits';
+import {
+  parseEdits,
+  stripEditBlocks,
+} from './adapters/aiEdits';
+import { retrieveContext, formatRetrieved } from './lib/contextEngine';
 import {
   isLocalRepoSupported,
   pickLocalRepo,
@@ -941,7 +945,7 @@ export default function App() {
       .filter((t): t is string => Boolean(t));
   }
 
-  async function runAgentTurn(sessionId: string, promptText: string, images: AttachedImage[] = []) {
+  async function runAgentTurn(sessionId: string, promptText: string, images: AttachedImage[] = [], mentions: string[] = []) {
     const sess = sessionsRef.current[sessionId];
     if (!sess || generatingRef.current) return;
     const base = { ...filesRef.current };
@@ -967,6 +971,7 @@ export default function App() {
       });
     };
 
+    const retrievedBlock = formatRetrieved(retrieveContext(base, promptText, mentions));
     try {
       const modelLabel = sessionsRef.current[sessionId]?.model ?? 'Gemini 2.5 Flash';
       let reply: string;
@@ -988,7 +993,7 @@ export default function App() {
         const r = await opencodeTurn(
           base,
           promptText,
-          buildSystemPrompt(projectName, base, activeFilePath, planInstruction()),
+          buildSystemPrompt(projectName, base, activeFilePath, planInstruction(), retrievedBlock),
           () => {},
           opencodeModel ?? undefined,
         );
@@ -1015,7 +1020,7 @@ export default function App() {
         await streamProvider(
           provider,
           withPrompt,
-          buildSystemPrompt(projectName, base, activeFilePath),
+          buildSystemPrompt(projectName, base, activeFilePath, undefined, retrievedBlock),
           (d) => {
             acc += d;
           },
@@ -1143,13 +1148,15 @@ export default function App() {
     }
   }
 
-  // Sidebar sections from live data (agents + project files).
+  // Sidebar sections from live data (agents + project files). Dirty files
+  // (vs the review baseline) are flagged so the tree can sort them first.
+  const isDirtyPath = (p: string) => (reviewBase[p] ?? '') !== (files[p] ?? '');
   const sections: SidebarSection[] = [
     {
       title: 'Project',
       items: Object.keys(files)
         .sort()
-        .map((p) => ({ id: `file:${p}`, title: p })),
+        .map((p) => ({ id: `file:${p}`, title: p, dirty: isDirtyPath(p) })),
     },
   ];
 
@@ -2113,7 +2120,7 @@ export default function App() {
               if (isMobile) setMobileTab('code');
               showToast('Focusing SCM diff review pane');
             }}
-            onGenerateEdits={(prompt, images) => {
+            onGenerateEdits={(prompt, images, mentions) => {
               if (images && images.length > 0) {
                 setSessions((prev) => {
                   const s = prev[activeSessionId];
@@ -2121,7 +2128,7 @@ export default function App() {
                   return { ...prev, [activeSessionId]: { ...s, attachments: [...(s.attachments ?? []), ...images] } };
                 });
               }
-              void runAgentTurn(activeSessionId, prompt, images ?? []);
+              void runAgentTurn(activeSessionId, prompt, images ?? [], mentions ?? []);
             }}
             onRollbackCheckpoint={handleRollbackCheckpoint}
             onOpenRules={() => setIsRulesModalOpen(true)}
@@ -3079,6 +3086,7 @@ export default function App() {
         onClose={() => setIsHostGitModalOpen(false)}
         host={hostConfig}
         onConnectHost={() => setIsHostModalOpen(true)}
+        onImportRepo={() => setShowImport(true)}
         theme={theme}
       />
 

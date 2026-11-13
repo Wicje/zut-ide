@@ -35,6 +35,8 @@ export interface SidebarItem {
   title: string;
   isMore?: boolean;
   category?: string;
+  /** Changed vs the review baseline (file items only). */
+  dirty?: boolean;
 }
 
 export interface SidebarTask {

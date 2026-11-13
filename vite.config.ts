@@ -28,6 +28,12 @@ function localStackPlugin(): Plugin {
 }
 
 export default defineConfig({
+  optimizeDeps: {
+    // Monaco is imported only through the lazy CodeEditorPane chunk — force
+    // it into deps so dev doesn't stall on-demand-compiling thousands of
+    // ESM modules on first editor open.
+    include: ['monaco-editor', '@monaco-editor/react'],
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -42,10 +48,22 @@ export default defineConfig({
         // esbuild-wasm exceeds workbox's 2MB default — never exclude it.
         maximumFileSizeToCacheInBytes: 15_000_000,
         globPatterns: ['**/*.{js,css,html,wasm,woff,woff2,ttf,png,svg,ico}'],
+        // Monaco's editor chunks are ~3.4MB; runtime-cached on first editor
+        // open instead of forcing a heavy first-visit precache.
+        globIgnores: ['**/CodeEditorPane-*.js', '**/*.worker-*.js', '**/*Mode-*.js'],
         // App shell lives at /app/index.html — / is the landing page.
         // Without this the SW would serve the landing for offline app navigations.
         navigateFallback: 'app/index.html',
         runtimeCaching: [
+          {
+            // Same-origin build chunks (incl. Monaco) — cache on first open.
+            urlPattern: /\/assets\/.*\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'zut-assets',
+              expiration: { maxEntries: 150, maxAgeSeconds: 30 * 24 * 3600 },
+            },
+          },
           {
             // React/Vue starters pull packages from esm.sh at runtime.
             urlPattern: /^https:\/\/esm\.sh\/.*/i,

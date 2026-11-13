@@ -6,6 +6,7 @@ import type { FileMap } from './filemap';
 import type { SessionData } from '../types';
 import { resolveBrokerUrl, type BrokerEnv } from '../lib/brokerUrl';
 import { K, readKey, writeKey, removeKey } from '../lib/storage-keys';
+import { readBlob, writeBlob } from '../lib/blobStore';
 
 export interface StoredProject {
   id: string;
@@ -198,12 +199,12 @@ export async function cloudAgentTurn(
 // ---- local draft (offline editing; syncs to broker on save) ----
 
 export function loadDraft(): { name: string; files: FileMap } | null {
-  const raw = readKey(K.draft);
+  const raw = readBlob(K.draft);
   return raw ? (JSON.parse(raw) as { name: string; files: FileMap }) : null;
 }
 
 export function saveDraft(name: string, files: FileMap): void {
-  writeKey(K.draft, JSON.stringify({ name, files }));
+  writeBlob(K.draft, JSON.stringify({ name, files }));
 }// ---- snapshots for rollback (local; broker persists runs server-side) ----
 
 export interface Snapshot {
@@ -213,14 +214,14 @@ export interface Snapshot {
 }
 
 export function listSnapshots(): Snapshot[] {
-  const raw = readKey(K.snapshots);
+  const raw = readBlob(K.snapshots);
   const arr = raw ? (JSON.parse(raw) as Snapshot[]) : [];
   return Array.isArray(arr) ? arr.sort((a, b) => b.createdAt - a.createdAt).slice(0, 20) : [];
 }
 
 export function takeSnapshot(files: FileMap): Snapshot {
   const snap: Snapshot = { id: `cp-${Date.now().toString(36)}`, createdAt: Date.now(), files: { ...files } };
-  writeKey(K.snapshots, JSON.stringify([snap, ...listSnapshots()].slice(0, 20)));
+  writeBlob(K.snapshots, JSON.stringify([snap, ...listSnapshots()].slice(0, 20)));
   return snap;
 }
 
@@ -245,12 +246,12 @@ export function saveSessionBackup(
     const ids = Object.keys(sessions).sort().slice(-MAX_BACKUP_SESSIONS);
     const slimSessions = Object.fromEntries(ids.map((id) => [id, sessions[id]]));
     const slimChats = Object.fromEntries(ids.map((id) => [id, chats[id] ?? []]));
-    writeKey(K.sessions, JSON.stringify({ sessions: slimSessions, chats: slimChats, activeId }));
+    writeBlob(K.sessions, JSON.stringify({ sessions: slimSessions, chats: slimChats, activeId }));
   } catch {
     try {
       const ids = Object.keys(sessions).sort().slice(-5);
       const slimSessions = Object.fromEntries(ids.map((id) => [id, sessions[id]]));
-      writeKey(K.sessions, JSON.stringify({ sessions: slimSessions, chats: {}, activeId }));
+      writeBlob(K.sessions, JSON.stringify({ sessions: slimSessions, chats: {}, activeId }));
     } catch {
       /* leave the previous backup intact */
     }
@@ -258,7 +259,7 @@ export function saveSessionBackup(
 }
 
 export function loadSessionBackup(): SessionBackup | null {
-  const raw = readKey(K.sessions);
+  const raw = readBlob(K.sessions);
   if (!raw) return null;
   const j = JSON.parse(raw) as Partial<SessionBackup>;
   if (!j || typeof j.sessions !== 'object' || !j.sessions) return null;

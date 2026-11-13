@@ -10,7 +10,9 @@ import {
   Check,
   Loader2,
   FileDiff,
+  Github,
 } from 'lucide-react';
+import { setConnectorKey, getConnectorKey, clearConnectorKey } from '../lib/connectors';
 import {
   hostGitBranches,
   hostGitCheckout,
@@ -30,6 +32,8 @@ interface HostGitModalProps {
   onClose: () => void;
   host: HostConfig | null;
   onConnectHost?: () => void;
+  /** Jump to the GitHub import flow (ImportModal). */
+  onImportRepo?: () => void;
   theme?: 'light' | 'dark';
 }
 
@@ -43,6 +47,7 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
   onClose,
   host,
   onConnectHost,
+  onImportRepo,
   theme = 'light',
 }) => {
   const isDark = theme === 'dark';
@@ -119,23 +124,104 @@ export const HostGitModal: React.FC<HostGitModalProps> = ({
     }
   }
 
+  const [ghToken, setGhToken] = useState('');
+  const [ghSaved, setGhSaved] = useState(() => getConnectorKey('github') !== null);
+
   if (!host) {
     return (
-      <Shell onClose={onClose} isDark={isDark} title="Host git">
-        <div className="h-40 grid place-content-center text-center gap-2 text-xs text-neutral-500">
-          <GitBranch size={18} className="mx-auto text-neutral-400" />
-          <div>Connect a host to read and write its real git repository.</div>
-          {onConnectHost && (
-            <button
-              onClick={() => {
-                onClose();
-                onConnectHost();
-              }}
-              className="mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-800 hover:bg-[#fafafc] dark:hover:bg-white/5"
-            >
-              <Server size={12} /> Connect host
-            </button>
-          )}
+      <Shell onClose={onClose} isDark={isDark} title="Git">
+        <div className="grid gap-3 text-xs text-neutral-500 p-1">
+          <div className="pt-2 grid place-content-center text-center gap-2">
+            <GitBranch size={18} className="mx-auto text-neutral-400" />
+            <div>Git needs something to run against. Two ways in:</div>
+          </div>
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3 space-y-2">
+            <div className="flex items-center gap-1.5 font-medium text-neutral-700 dark:text-neutral-200">
+              <Server size={12} className="text-red-500" /> On a host
+            </div>
+            <p className="text-[11px] text-neutral-500">
+              Branches, diffs and commits against the workspace your zut host owns.
+            </p>
+            {onConnectHost && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onConnectHost();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-800 hover:bg-[#fafafc] dark:hover:bg-white/5"
+              >
+                Connect host
+              </button>
+            )}
+          </div>
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3 space-y-2">
+            <div className="flex items-center gap-1.5 font-medium text-neutral-700 dark:text-neutral-200">
+              <Github size={12} className="text-neutral-500" /> On GitHub
+            </div>
+            {ghSaved ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+                  <Check size={12} /> GitHub token saved in this browser
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  Push from the Deploy dialog, and the GitHub connector can clone private repos.
+                </p>
+                <button
+                  onClick={() => {
+                    clearConnectorKey('github');
+                    setGhSaved(false);
+                    setGhToken('');
+                  }}
+                  className="text-[11px] text-neutral-400 underline underline-offset-2 hover:text-neutral-600 dark:hover:text-neutral-200"
+                >
+                  Remove token
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-[11px] text-neutral-500">
+                  A classic token with <span className="font-code">repo</span> scope (github.com →
+                  Settings → Developer settings → Tokens). Push and PRs run from this browser; the
+                  token never leaves it.
+                </p>
+                <input
+                  value={ghToken}
+                  onChange={(e) => setGhToken(e.target.value)}
+                  placeholder="ghp_…"
+                  type="password"
+                  autoComplete="off"
+                  aria-label="GitHub token"
+                  className="w-full px-2 py-1.5 text-xs font-mono rounded-md border border-neutral-300 dark:border-neutral-800 bg-[#fafafc] dark:bg-[#1e1e24] focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const t = ghToken.trim();
+                      if (!t) return;
+                      setConnectorKey('github', t);
+                      setGhSaved(true);
+                      setGhToken('');
+                    }}
+                    disabled={!ghToken.trim()}
+                    className="px-3 py-1.5 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-[11px] font-semibold disabled:opacity-40"
+                  >
+                    Save token
+                  </button>
+                  {onImportRepo && (
+                    <button
+                      onClick={() => {
+                        onClose();
+                        onImportRepo();
+                      }}
+                      className="px-3 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-800 text-[11px] hover:bg-[#fafafc] dark:hover:bg-white/5"
+                    >
+                      Import a repo instead
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </Shell>
     );

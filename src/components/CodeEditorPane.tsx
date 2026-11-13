@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import '../lib/monacoSetup';
 import { K, readKey, writeKey } from '../lib/storage-keys';
 import Editor, { type OnMount, type Monaco } from '@monaco-editor/react';
 import { completeInline, completionProvider } from '../adapters/inlineComplete';

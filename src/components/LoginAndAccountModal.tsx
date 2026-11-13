@@ -541,22 +541,26 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
                   <div className="text-[10px] text-neutral-400">Keys stay in this browser; the agent sees what's connected</div>
                 </div>
               </div>
-              <ProviderKeyRow
-                label="GitHub"
-                placeholder="ghp_… (classic token, repo scope)"
-                saved={ghSaved}
-                input={keyInput}
-                onInput={setKeyInput}
-                onSave={(k) => {
-                  setConnectorKey('github', k);
-                  setKeyInput('');
-                  setGhSaved(true);
-                }}
-                onClear={() => {
-                  clearConnectorKey('github');
-                  setGhSaved(false);
-                }}
-              />
+                <ProviderKeyRow
+                  label="GitHub"
+                  placeholder="ghp_… (classic token, repo scope)"
+                  saved={ghSaved}
+                  input={keyInput}
+                  onInput={setKeyInput}
+                  onSave={(k) => {
+                    setConnectorKey('github', k);
+                    setKeyInput('');
+                    setGhSaved(true);
+                  }}
+                  onClear={() => {
+                    clearConnectorKey('github');
+                    setGhSaved(false);
+                  }}
+                />
+                <p className="text-[10px] text-neutral-400 -mt-1">
+                  Connect GitHub for push &amp; private repos — github.com → Settings → Developer
+                  settings → Tokens (classic, repo scope). Stored only in this browser.
+                </p>
               <ProviderKeyRow
                 label="Pexels"
                 placeholder="Pexels API key (pexels.com/api)"

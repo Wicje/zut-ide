@@ -6,6 +6,7 @@ import { loadRules } from './zut';
 import { parseEdits, stripEditBlocks, type ProposedEdit } from './aiEdits';
 import type { FileMap } from './filemap';
 import { connectorsPromptBlock } from '../lib/connectors';
+import { repoMap, retrieveContext, formatRetrieved } from '../lib/contextEngine';
 
 export const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] as const;
 
@@ -41,12 +42,12 @@ export function buildSystemPrompt(
   files: FileMap,
   activePath: string,
   extra?: string,
+  retrievedContext?: string,
 ): string {
-  const names = Object.keys(files).sort();
   const parts = [
     'You are a coding assistant inside a browser IDE. Help improve the code with short explanations.',
     '',
-    `Project: ${projectName} (${names.length} files): ${names.join(', ')}`,
+    repoMap(files),
   ];
   const active = files[activePath];
   if (active !== undefined) {
@@ -59,6 +60,7 @@ export function buildSystemPrompt(
     '[questions] on its own line, then the question, then one numbered option per line,',
     'then [/questions]. Otherwise do not ask anything.',
   );
+  if (retrievedContext) parts.push('', retrievedContext);
   const rules = loadRules().trim();
   if (rules) parts.push('', `Project rules (always follow):\n${rules}`);
   const tools = connectorsPromptBlock();
@@ -92,9 +94,10 @@ export async function geminiTurn(
     })),
     { role: 'user' as const, parts: [{ text: prompt }, ...imgParts] },
   ];
+  const retrieved = formatRetrieved(retrieveContext(opts.files, prompt));
   const response = await ai.models.generateContent({
     model: opts.model,
-    config: { systemInstruction: buildSystemPrompt(opts.projectName, opts.files, opts.activePath) },
+    config: { systemInstruction: buildSystemPrompt(opts.projectName, opts.files, opts.activePath, undefined, retrieved) },
     contents,
   });
   const reply = (response.text ?? '').trim();

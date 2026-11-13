@@ -27,7 +27,7 @@ interface ComposerPaneProps {
   onOpenVideoModal: () => void;
   onCommitPush: () => void;
   onReviewClick: () => void;
-  onGenerateEdits: (promptText: string, images?: AttachedImage[]) => void;
+  onGenerateEdits: (promptText: string, images?: AttachedImage[], mentions?: string[]) => void;
   onRollbackCheckpoint?: (checkpointId: string, stepTitle: string) => void;
   /** Open a changed file in the diff pane. */
   onOpenFile?: (path: string) => void;
@@ -309,16 +309,20 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
     if (!followUpText.trim() || isGenerating) return;
 
     const userText = followUpText.trim();
+    const mentions = attachedContexts.map((c) => c.name);
     setFollowUpText('');
     const images = pendingImages;
     setPendingImages([]);
-    onGenerateEdits(userText, images);
+    setAttachedContexts([]);
+    onGenerateEdits(userText, images, mentions);
   };
 
   const sendPromptText = (text: string) => {
     const images = pendingImages;
+    const mentions = attachedContexts.map((c) => c.name);
     setPendingImages([]);
-    onGenerateEdits(text, images);
+    setAttachedContexts([]);
+    onGenerateEdits(text, images, mentions);
   };
 
   const speechCtor: (new () => VoiceRecognizer) | null =

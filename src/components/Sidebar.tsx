@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Search,
   PanelLeftClose,
+  ChevronRight,
   ChevronUp,
   ChevronDown,
   User,
   Loader2,
   CheckCircle2,
   FolderOpen,
+  Folder,
   X,
 } from 'lucide-react';
 import { SidebarSection, SidebarItem, SidebarTask } from '../types';
 import { timeAgo } from '../lib/appModel';
+import { buildPathTree, filterTree, flattenTree, countFiles } from '../lib/pathTree';
 import type { RecentProject } from '../lib/recent-projects';
 
 interface SidebarProps {
@@ -39,6 +42,104 @@ interface SidebarProps {
   onOpenRecent?: (id: string) => void;
   onRemoveRecent?: (id: string) => void;
 }
+
+interface ProjectTreeProps {
+  items: SidebarItem[];
+  activeItem: string;
+  onSelectItem: (id: string) => void;
+  searchFilter: string;
+  isDark: boolean;
+}
+
+/** Collapsible folder tree for the Project list: folders collapse on click,
+ *  dirty files sort first, rows are capped (filter narrows the rest). */
+const ProjectTree: React.FC<ProjectTreeProps> = ({
+  items,
+  activeItem,
+  onSelectItem,
+  searchFilter,
+  isDark,
+}) => {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const tree = useMemo(() => {
+    const dirtyOf = (path: string) => items.find((i) => i.title === path)?.dirty ?? false;
+    const built = buildPathTree(items.map((i) => i.title), dirtyOf);
+    return filterTree(built, searchFilter);
+  }, [items, searchFilter]);
+  const total = countFiles(tree);
+  const { rows, hidden } = flattenTree(tree, collapsed, 300);
+  const toggle = (path: string) =>
+    setCollapsed((prev) => ({ ...prev, [path]: !prev[path] }));
+
+  if (searchFilter && total === 0) {
+    return (
+      <div className="px-2.5 py-1.5 text-[11px] text-neutral-400">
+        No files match “{searchFilter}”.
+      </div>
+    );
+  }
+  if (total === 0) {
+    return (
+      <div className="px-2.5 py-1.5 text-[11px] leading-[1.45] text-neutral-400">
+        No files yet — start a new project or open a folder.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-0.5">
+      <div className="px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase flex items-center gap-2">
+        <span>Project</span>
+        <span className="font-mono normal-case tracking-normal">{total}</span>
+      </div>
+      {rows.map(({ node, depth }) =>
+        node.kind === 'folder' ? (
+          <button
+            key={node.path}
+            onClick={() => toggle(node.path)}
+            aria-expanded={!collapsed[node.path]}
+            className={`w-full flex items-center gap-1.5 py-1 rounded-md text-[12px] transition-colors cursor-pointer ${
+              isDark ? 'text-neutral-400 hover:bg-white/5' : 'text-neutral-500 hover:bg-black/5'
+            }`}
+            style={{ paddingLeft: 10 + depth * 12 }}
+          >
+            {collapsed[node.path] ? (
+              <ChevronRight size={11} className="shrink-0" />
+            ) : (
+              <ChevronDown size={11} className="shrink-0" />
+            )}
+            <Folder size={11} className="shrink-0" />
+            <span className="truncate">{node.name}</span>
+            <span className="text-[10px] text-neutral-500 ml-auto pr-1">{countFiles(node.children)}</span>
+          </button>
+        ) : (
+          <button
+            key={node.path}
+            onClick={() => onSelectItem(`file:${node.path}`)}
+            title={node.path}
+            className={`w-full flex items-center gap-1.5 py-1 rounded-md text-[12px] transition-colors cursor-pointer ${
+              activeItem === `file:${node.path}`
+                ? isDark
+                  ? 'bg-white/8 text-white'
+                  : 'bg-[#e7e7eb] text-neutral-900'
+                : isDark
+                  ? 'text-neutral-300 hover:bg-white/5'
+                  : 'text-neutral-600 hover:bg-black/5'
+            }`}
+            style={{ paddingLeft: 10 + depth * 12 + 16 }}
+          >
+            {node.dirty && <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-amber-500" aria-label="Modified" />}
+            <span className="truncate">{node.name}</span>
+          </button>
+        ),
+      )}
+      {hidden > 0 && (
+        <div className="px-2.5 py-1.5 text-[11px] text-neutral-400">
+          +{hidden} more — type to filter
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({
   sections,
@@ -319,6 +420,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {sections.map((section) => {
+            if (section.title === 'Project') {
+              return (
+                <ProjectTree
+                  key="project-tree"
+                  items={section.items}
+                  activeItem={activeItem}
+                  onSelectItem={onSelectItem}
+                  searchFilter={searchFilter}
+                  isDark={isDark}
+                />
+              );
+            }
             const filteredItems = section.items.filter((item) =>
               item.title.toLowerCase().includes(searchFilter.toLowerCase())
             );
