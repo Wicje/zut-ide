@@ -19,6 +19,8 @@ interface DiffReviewPaneProps {
   onRevertFile: (fileId: string) => void;
   onToggleStageFile: (fileId: string) => void;
   onAskComposer?: (codeSnippet: string) => void;
+  onAcceptAll: () => void;
+  onRevertAll: () => void;
   diffViewMode: DiffViewMode;
   isTerminalOpen: boolean;
   onToggleTerminal: () => void;
@@ -49,6 +51,8 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
   onRevertFile,
   onToggleStageFile,
   onAskComposer,
+  onAcceptAll,
+  onRevertAll,
   diffViewMode,
   isTerminalOpen,
   onToggleTerminal,
@@ -58,6 +62,9 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
   const isDark = theme === 'dark';
   const [collapsedFiles, setCollapsedFiles] = useState<Record<string, boolean>>({});
   const [expandedContext, setExpandedContext] = useState<Record<string, boolean>>({});
+  const totalAdditions = files.reduce((acc, f) => acc + f.additions, 0);
+  const totalDeletions = files.reduce((acc, f) => acc + f.deletions, 0);
+  const allAccepted = files.length > 0 && files.every((f) => f.accepted);
 
   const toggleCollapse = (fileId: string) => {
     setCollapsedFiles((prev) => ({
@@ -91,14 +98,55 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
           <p className="text-[11px] leading-[1.5] text-neutral-400 max-w-[300px]">
             Describe what you want in the composer — the agent's edits land here, one file at a time.
           </p>
-          <div className="flex items-center gap-2 mt-1 text-[10px] text-neutral-400">
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-1 text-[10px] text-neutral-400">
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘1</kbd>Review</span>
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘2</kbd>Code</span>
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘3</kbd>Preview</span>
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘4</kbd>Checks</span>
+            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘K</kbd>Search</span>
+            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-800 font-mono text-[10px]">⌘J</kbd>Terminal</span>
           </div>
         </div>
       ) : (
+      <>
+      {/* Review summary bar: what the agent changed, one decision */}
+      <div
+        className={`h-9 px-3.5 border-b flex items-center justify-between gap-2 shrink-0 ${
+          isDark ? 'border-neutral-800 bg-neutral-900/40' : 'border-[#e5e5e7] bg-[#fafafc]'
+        }`}
+      >
+        <div className="text-[11px] truncate">
+          <span className="font-medium text-neutral-700 dark:text-neutral-200">
+            {files.length} {files.length === 1 ? 'file' : 'files'} changed
+          </span>{' '}
+          <span className="text-[#16a34a] font-medium">+{totalAdditions}</span>{' '}
+          <span className="text-[#dc2626] font-medium">−{totalDeletions}</span>
+          {allAccepted && (
+            <span className="ml-2 text-emerald-600 dark:text-emerald-500 font-medium">Accepted</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onRevertAll}
+            className="h-6 px-2 rounded-md text-[11px] font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-100 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+          >
+            Revert all
+          </button>
+          <button
+            type="button"
+            onClick={onAcceptAll}
+            disabled={allAccepted}
+            className={`h-6 px-2 rounded-md text-[11px] font-semibold transition-colors ${
+              allAccepted
+                ? 'text-neutral-400 cursor-default'
+                : 'bg-red-600 hover:bg-red-500 text-white cursor-pointer'
+            }`}
+          >
+            {allAccepted ? 'Accepted' : 'Accept all'}
+          </button>
+        </div>
+      </div>
       <div className="flex-1 overflow-y-auto divide-y divide-[#e5e5e7] dark:divide-neutral-800">
         {files.map((file) => {
           const isCollapsed = collapsedFiles[file.id];
@@ -228,6 +276,7 @@ export const DiffReviewPane: React.FC<DiffReviewPaneProps> = ({
           );
         })}
       </div>
+      </>
       )}
 
       {/* Embedded Terminal & Benchmark Drawer */}

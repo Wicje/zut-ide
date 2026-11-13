@@ -225,3 +225,35 @@ The mobile shell and voice input are real. Swipe-to-approve review and the "tran
 ### 7. Keep the self-host story simple
 
 BYOK + self-hosted opencode + host workspace + broker + cloud is a lot of ways to run the same IDE. The product is better for having all of them. The onramp has to stay dead simple, because the options will confuse a first-time user fast. One Primary path per surface, and the first-run card is where that discipline gets tested.
+
+---
+
+## 10. How Zut Competes — the three tracks
+
+Production quality comes from the engineering loop and validation, not the
+model choice alone. What competing with Cursor and VS Code means for Zut:
+
+- **IDE capability.** Dependable language support, project search and
+  context, terminal, Git, debugging, and a smooth workflow for existing
+  repositories. Foundations already in place: Monaco, file editing, a real
+  local agent connection, diff review, previews, and terminal and Git paths.
+  What remains is making each of those dependable on real repositories, not
+  just demoable — search that finds symbols, not just strings; a terminal
+  and Git experience that survives a dirty tree; language intelligence that
+  does not eat memory on a 4GB laptop.
+- **Agent reliability.** Inspect and plan, make scoped changes, run
+  formatter/typecheck/tests/build, recover from failures, and present the
+  full diff for review. The review loop is the product: an agent turn that
+  ends in a readable diff, checks the developer can run, and one-click
+  accept/revert beats a faster model that leaves the workspace in an unknown
+  state. Every agent turn must leave the developer with a reviewable result.
+- **Model access.** Keep OpenCode/local models, API keys, and the official
+  ChatGPT plan connection as separate user choices. That gives Zut a real
+  no-API-fee option while funded hosted compute is still pending. These are
+  three distinct doors, not one marketplace: bring your own key, run your
+  own machine (opencode), or use your existing plan — and the UI should say
+  plainly which is live today and which is coming.
+
+The next bar is the whole loop dependable: understand a repository, edit
+across files, run its checks, diagnose failures, fix them, and leave the
+developer with a reviewable result.

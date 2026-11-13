@@ -430,6 +430,40 @@ export const LoginAndAccountModal: React.FC<LoginAndAccountModalProps> = ({
               </span>
             </div>
 
+            {/* Model access — the three doors */}
+            <div className="p-2.5 rounded-lg border border-[#e5e5e7] dark:border-neutral-800 space-y-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-neutral-400" />
+                <div>
+                  <div className="font-medium">Model access</div>
+                  <div className="text-[10px] text-neutral-400">Three doors — pick per session, mix freely</div>
+                </div>
+              </div>
+              <div className="space-y-1.5 text-[11px] leading-[1.45]">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-medium text-neutral-700 dark:text-neutral-200">Your key</span>
+                    <span className="text-neutral-400"> — Gemini, OpenRouter, Anthropic or OpenAI, saved in this browser</span>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-0.5 font-medium">Live</span>
+                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-medium text-neutral-700 dark:text-neutral-200">Your machine</span>
+                    <span className="text-neutral-400"> — self-hosted opencode; free, your quota (<span className="font-code">npm run dev:opencode</span>)</span>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-0.5 font-medium">Live</span>
+                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-medium text-neutral-700 dark:text-neutral-200">Your plan</span>
+                    <span className="text-neutral-400"> — sign in with your ChatGPT plan, no API key needed</span>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-neutral-500/10 text-neutral-400 text-[10px] px-2 py-0.5 font-medium">Coming soon</span>
+                </div>
+              </div>
+            </div>
+
             {/* API Keys Configuration Toggle */}
             <div className="p-2.5 rounded-lg border border-[#e5e5e7] dark:border-neutral-800 space-y-2">
               <div className="flex items-center justify-between">

@@ -1044,6 +1044,13 @@ export const ComposerPane: React.FC<ComposerPaneProps> = ({
                     )
                   )
                 )}
+                <div
+                  className="px-3 py-1.5 flex items-center justify-between text-neutral-400 border-t border-neutral-200 dark:border-neutral-800 cursor-default"
+                  title="Official ChatGPT plan connection — coming soon"
+                >
+                  <span>Your plan (ChatGPT)</span>
+                  <span className="text-[9px] uppercase tracking-wide rounded-full bg-neutral-500/10 text-neutral-400 px-2 py-0.5">Soon</span>
+                </div>
               </div>
             )}
           </div>

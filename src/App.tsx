@@ -1406,8 +1406,62 @@ export default function App() {
 
   const handleAcceptFile = (fileId: string) => {
     // Edits land in the workspace immediately; accept marks review state.
-    showToast('File hunk accepted');
-    void fileId;
+    setSessions((prev) => {
+      const s = prev[activeSessionId];
+      if (!s) return prev;
+      return {
+        ...prev,
+        [activeSessionId]: {
+          ...s,
+          files: s.files.map((f) => (f.id === fileId ? { ...f, accepted: true } : f)),
+        },
+      };
+    });
+    showToast('File changes accepted');
+  };
+
+  const handleAcceptAll = () => {
+    const count = activeSession.files.length;
+    setSessions((prev) => {
+      const s = prev[activeSessionId];
+      if (!s) return prev;
+      return {
+        ...prev,
+        [activeSessionId]: {
+          ...s,
+          files: s.files.map((f) => ({ ...f, accepted: true })),
+        },
+      };
+    });
+    showToast(`Accepted ${count} file${count === 1 ? '' : 's'}`);
+  };
+
+  const handleRevertAll = () => {
+    const base = sessionBases[activeSessionId] ?? {};
+    const targets = activeSession.files;
+    if (targets.length === 0) return;
+    takeSnapshot(filesRef.current);
+    setFiles((prev) => {
+      const next = { ...prev };
+      for (const t of targets) {
+        if (t.path in base) next[t.path] = base[t.path];
+        else delete next[t.path];
+      }
+      return next;
+    });
+    setSessions((prev) => {
+      const s = prev[activeSessionId];
+      if (!s) return prev;
+      return {
+        ...prev,
+        [activeSessionId]: {
+          ...s,
+          files: [],
+          diffStats: { ...s.diffStats, additions: 0, deletions: 0, filesCount: 0 },
+        },
+      };
+    });
+    showToast(`Reverted ${targets.length} file${targets.length === 1 ? '' : 's'} to before the agent turn`);
   };
 
   const handleRevertFile = (fileId: string) => {
@@ -2316,6 +2370,8 @@ export default function App() {
               onRevertFile={handleRevertFile}
               onToggleStageFile={handleToggleStageFile}
               onAskComposer={handleAskComposerAboutLine}
+              onAcceptAll={handleAcceptAll}
+              onRevertAll={handleRevertAll}
               diffViewMode={diffViewMode}
               isTerminalOpen={isTerminalOpen}
               onToggleTerminal={() => setIsTerminalOpen(!isTerminalOpen)}

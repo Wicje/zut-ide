@@ -150,3 +150,17 @@ landing. This file is the honest backlog behind it.
     silently lose user data. The storage layer is now one module
     (`src/lib/storage-keys.ts`) with migration + helpers, which is easier to
     cover than the per-module `store()` fallbacks it replaced.
+
+## Competing with Cursor — three tracks
+
+The roadmap for this now lives in VISION.md §10 (IDE capability, agent
+reliability, model access). This file stays the honest backlog; the
+near-term, investor-visible slices are:
+
+- Agent reliability: the review loop made unmissable — after every agent
+  turn the Review pane states what changed and how to accept or revert it.
+- Model access: the picker/account UI names the three doors explicitly
+  (your key, your machine, your plan) with honest "live today" vs
+  "coming soon" labels.
+- IDE capability: ⌘K project search, ⌘J terminal, and host Git are real —
+  they need to be discoverable in the empty states, not tribal knowledge.
