@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import '../lib/monacoSetup';
 import { K, readKey, writeKey } from '../lib/storage-keys';
 import Editor, { type OnMount, type Monaco } from '@monaco-editor/react';
@@ -27,6 +27,7 @@ import {
   CornerDownLeft,
 } from 'lucide-react';
 import { ProjectFile } from '../types';
+import { buildPathTree, flattenTree, countFiles } from '../lib/pathTree';
 import { isConnectorSet, uploadToCloudinary } from '../lib/connectors';
 import { isTerminalClient } from '../lib/runtime';
 
@@ -84,6 +85,12 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
 }) => {
   const uploadRef = useRef<HTMLInputElement | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [collapsedDirs, setCollapsedDirs] = useState<Record<string, boolean>>({});
+  const fileByPath = useMemo(() => new Map(files.map((f) => [f.path, f] as const)), [files]);
+  const explorerTree = useMemo(() => {
+    const tree = buildPathTree(files.map((f) => f.path), (path) => Boolean(fileByPath.get(path)?.isModified));
+    return flattenTree(tree, collapsedDirs, 400);
+  }, [files, collapsedDirs, fileByPath]);
   const cloudUploadRef = useRef<HTMLInputElement | null>(null);
   const [imgBusy, setImgBusy] = useState(false);
   const [imgDone, setImgDone] = useState(false);
@@ -540,12 +547,31 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
               </div>
 
               <div className="space-y-0.5 pl-1.5">
-                {files.map((file) => {
+                {explorerTree.rows.map(({ node, depth }) => {
+                  if (node.kind === 'folder') {
+                    const dirCollapsed = Boolean(collapsedDirs[node.path]);
+                    return (
+                      <button
+                        key={node.path}
+                        onClick={() => setCollapsedDirs((prev) => ({ ...prev, [node.path]: !prev[node.path] }))}
+                        aria-expanded={!dirCollapsed}
+                        className="w-full flex items-center gap-1.5 py-1 rounded text-[11px] text-neutral-500 dark:text-neutral-400 hover:bg-black/5 dark:hover:bg-neutral-800/40 cursor-pointer"
+                        style={{ paddingLeft: 4 + depth * 12 }}
+                      >
+                        {dirCollapsed ? <ChevronRight size={11} className="shrink-0" /> : <ChevronDown size={11} className="shrink-0" />}
+                        <Folder size={11} className="shrink-0" />
+                        <span className="truncate">{node.name}</span>
+                        <span className="ml-auto pr-1 text-[10px] text-neutral-500">{countFiles(node.children)}</span>
+                      </button>
+                    );
+                  }
+                  const file = fileByPath.get(node.path);
+                  if (!file) return null;
                   const isSelected = activeFileId === file.id;
                   const menuOpen = menuFor === file.id;
                   const renaming = renamingId === file.id;
                   return (
-                    <div key={file.id} className="relative">
+                    <div key={file.id} className="relative" style={{ paddingLeft: depth > 0 ? 16 + (depth - 0) * 12 : 0 }}>
                       <div
                         className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-colors text-left ${
                           isSelected
@@ -656,6 +682,9 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
                     </div>
                   );
                 })}
+              {explorerTree.hidden > 0 && (
+                <div className="px-2 py-1.5 text-[10px] text-neutral-400">+{explorerTree.hidden} more</div>
+              )}
               </div>
             </div>
 
