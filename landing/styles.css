@@ -547,3 +547,16 @@ code {
   font-size: 0.85em; padding: 0.1em 0.35em;
   background: var(--card); border: 1px solid var(--border-soft); border-radius: 0.35em;
 }
+
+
+/* Open the IDE (signed-in visitors) */
+.nav-open-ide { display: none; }
+.hero-note { margin-top: 0.7rem; font-size: 0.9rem; color: var(--muted); }
+.hero-note a { color: var(--accent-ink); text-decoration: none; font-weight: 600; }
+.hero-note a:hover { color: var(--accent-hover); }
+.hero-note a span { display: inline-block; transition: transform 0.15s; }
+.hero-note a:hover span { transform: translateX(3px); }
+
+@media (min-width: 768px) {
+  .nav-open-ide { display: inline-flex; }
+}
