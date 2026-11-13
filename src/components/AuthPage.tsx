@@ -6,7 +6,7 @@ import {
   mudOAuthProviders,
   mudOAuthStart,
 } from '../adapters/mudauth';
-import { accountsConfigured, createAccount, signInWithPassword } from '../lib/account';
+import { accountsConfigured, createAccount, setGuestAccess, signInWithPassword } from '../lib/account';
 
 // A full-screen sign in / sign up page.
 //
@@ -423,10 +423,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </p>
 
           <p className="mt-6 text-center text-[12px] text-neutral-600">
-            Just using it locally?{' '}
+            Just looking around?{' '}
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                setGuestAccess();
+                onClose();
+              }}
               className="text-neutral-400 hover:text-neutral-200 underline underline-offset-2 transition-colors cursor-pointer"
             >
               Continue without an account

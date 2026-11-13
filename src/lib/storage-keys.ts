@@ -25,6 +25,7 @@ export const K = {
   agentMode: 'zut:agent-mode',
   host: 'zut:host:v1',
   opencodeModel: 'zut:opencode-model',
+  guestAccess: 'zut:guest-access',
   recentProjects: 'zut:recent-projects',
   recentModels: 'zut:recent-models',
   stepRatings: 'zut:step-ratings',

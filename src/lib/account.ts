@@ -170,8 +170,9 @@ export async function currentAccount(): Promise<AccountUser | null> {
 }
 
 /**
- * Local development (and the `?nowait` escape hatch) skips the account
- * gate. Nothing else does: an account is how the product works now.
+ * Local development, the `?nowait` escape hatch, and guests skip the account
+ * gate. The rest of the product (sign-up, cloud save, hosted agent) still
+ * needs an account — guests get the IDE only, with localStorage persistence.
  */
 export function accessBypassed(): boolean {
   try {
@@ -179,8 +180,13 @@ export function accessBypassed(): boolean {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return true;
     const q = new URLSearchParams(window.location.search);
-    return q.has('nowait') || q.has('skip_waitlist') || q.has('local');
+    if (q.has('nowait') || q.has('skip_waitlist') || q.has('local')) return true;
+    return readKey(K.guestAccess) === '1';
   } catch {
     return false;
   }
+}
+
+export function setGuestAccess(): void {
+  writeKey(K.guestAccess, '1');
 }
