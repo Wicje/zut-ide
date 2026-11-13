@@ -1034,7 +1034,14 @@ export default function App() {
         for (const p of r.deleted) delete base[p];
         if (r.deleted.length) deleteFromDisk(r.deleted);
         reply = r.reply;
-        changedPaths = [...Object.keys(r.updated), ...Object.keys(r.created), ...r.deleted];
+        // The self-host agent may answer with edit blocks in its text
+        // instead of calling its file tools — parse them too so the diff
+        // review still shows real changes.
+        const textEdits = parseEdits(r.reply, base);
+        for (const e of textEdits) {
+          base[e.path] = e.content;
+        }
+        changedPaths = [...new Set([...Object.keys(r.updated), ...Object.keys(r.created), ...r.deleted, ...textEdits.map((e) => e.path)])];
         if (composerMode === 'plan') {
           const tasks = planTasksFrom(r.reply);
           if (tasks.length > 0) {
