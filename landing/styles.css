@@ -560,3 +560,52 @@ code {
 @media (min-width: 768px) {
   .nav-open-ide { display: inline-flex; }
 }
+
+/* professional nav: single conversion CTA */
+.nav-cta-btn { margin-left: 0.35rem; }
+@media (max-width: 520px) {
+  .nav-cta-btn { padding: 0.4rem 0.85rem; font-size: 0.8rem; }
+}
+
+/* logo strip: quiet marquee */
+.strip-marquee { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.strip-track { display: inline-flex; gap: 2.75rem; align-items: center; width: max-content; animation: strip-marquee 26s linear infinite; padding: 0.35rem 0 0.85rem; }
+.strip-track:hover { animation-play-state: paused; }
+.strip-item { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--faint); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap; }
+.strip-item svg { width: 16px; height: 16px; fill: currentColor; opacity: 0.72; transition: opacity 0.2s; }
+.strip-item:hover { color: var(--ink); }
+.strip-item:hover svg { opacity: 1; }
+@keyframes strip-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .strip-track { animation: none; }
+}
+
+/* Zut Compute: split figure + points */
+.compute-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 1.5rem; align-items: stretch; margin-top: 2rem; }
+.compute-figure { overflow: hidden; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); display: flex; flex-direction: column; }
+.compute-figure img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.compute-figure:hover img { transform: scale(1.02); }
+.compute-caption { font-size: 0.75rem; color: var(--faint); padding: 0.6rem 0.9rem; border-top: 1px solid var(--border); }
+.compute-points { display: grid; gap: 0.9rem; align-content: center; }
+.card-hover { transition: transform 0.25s ease, border-color 0.25s ease; }
+.card-hover:hover { transform: translateY(-2px); border-color: var(--border-bright); }
+
+/* Steps: image cards */
+.steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.9rem; margin-top: 2rem; }
+.step-card { overflow: hidden; border-radius: 14px; border: 1px solid var(--border); background: var(--card); display: flex; flex-direction: column; transition: transform 0.25s ease, border-color 0.25s ease; }
+.step-card:hover { transform: translateY(-3px); border-color: var(--border-bright); }
+.step-card img { width: 100%; aspect-ratio: 16 / 10.5; object-fit: cover; object-position: center 20%; display: block; border-bottom: 1px solid var(--border); }
+.step-body { padding: 0.65rem 0.75rem 0.8rem; display: grid; gap: 0.25rem; }
+.step-body h3 { display: flex; align-items: center; gap: 0.55rem; font-size: 0.95rem; }
+.step-body p { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
+.step-n { display: inline-flex; width: 1.35rem; height: 1.35rem; border-radius: 999px; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-size: 0.72rem; font-weight: 700; }
+@media (max-width: 1020px) { .steps-grid { grid-template-columns: repeat(2, 1fr); } .compute-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .steps-grid { grid-template-columns: 1fr; } }
+
+/* quote cards: subtle human watermark — neutral silhouette, never a face */
+.quote { position: relative; overflow: hidden; }
+.quote::after {
+  content: ""; position: absolute; right: -1.35rem; bottom: -1.7rem; width: 8rem; height: 8rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M12 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm-8 18c0-4.4 3.6-8 8-8s8 3.6 8 8Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-size: contain; opacity: 0.12; pointer-events: none;
+}
