@@ -115,25 +115,38 @@ export async function hydrateBlobStore(): Promise<void> {
   }
   for (const [k, v] of await dbAll(db)) mem.set(k, String(v));
   // One-time move: anything still in localStorage that belongs to IndexedDB.
-  for (const k of BIG_STORAGE_KEYS) {
-    let raw: string | null = null;
-    try {
-      raw = localStorage.getItem(k);
-    } catch {
-      raw = null;
-    }
-    if (raw && !mem.has(k)) {
-      mem.set(k, raw);
-      dbPut(db, k, raw);
-    }
-    if (raw) {
-      try {
-        localStorage.removeItem(k);
-      } catch {
-        /* ignore */
-      }
-    }
-  }
+  const database = db;
+  const pending = BIG_STORAGE_KEYS.map(
+    (k) =>
+      new Promise<void>((resolve) => {
+        let raw: string | null = null;
+        try {
+          raw = localStorage.getItem(k);
+        } catch {
+          raw = null;
+        }
+        if (!raw || mem.has(k)) {
+          if (raw && mem.has(k)) {
+            try { localStorage.removeItem(k); } catch { /* ignore */ }
+          }
+          return resolve();
+        }
+        mem.set(k, raw);
+        try {
+          const tx = database.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).put(raw, k);
+          // Only drop the localStorage copy once IDB has committed the value.
+          tx.oncomplete = () => {
+            try { localStorage.removeItem(k); } catch { /* ignore */ }
+            resolve();
+          };
+          tx.onerror = () => resolve(); // keep localStorage as backup
+        } catch {
+          resolve(); // db write failed — keep localStorage as backup
+        }
+      }),
+  );
+  await Promise.all(pending);
 }
 
 /** Read a big value (synchronous; serve from memory). */
