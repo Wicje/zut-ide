@@ -4,6 +4,24 @@
 
 ---
 
+## 0. The Positioning (canonical, verbatim)
+
+> **Zut is the web-IDE for the professional workflow: you bring Claude, OpenAI or
+> Gemini and your CLI plans — and you decide where compute lives. Bring your own
+> compute, or we give you ours. Either way, the workload is offloaded from your
+> local setup.**
+>
+> **Installing toolchains broke software development.** npm, pip, clang, Go, all
+> of them. Zut is the professional web IDE where you bring your models and your
+> credentials, skip installs forever, describe what you want, review the diff,
+> and ship. Your laptop stays quiet; nothing to set up; every project runs on
+> the same path.
+
+- **Who it is for:** professionals who build anything and everything — scripts to tools to apps, in any language, who do not want to install npm / pip / clang / go / rust on their machines, and who refuse to rent a black box.
+- **What makes it not-another-builder:** browser-native Monaco IDE, terminal + git, diff review before anything ships, self-host opencode (free) or your own frontier plans, and compute that can live on your machine (free), ours (hosted Compute), or your own private infra.
+- **What we are not:** a Copilot replacement for people who stay on VS Code, a frontend generator (Lovable), or a hosted toy with no IDE (Replit). We are the workflow where you keep the model keys and pay only when your agent runs on Zut's machines.
+- **The honest trade:** Zut is opinionated about the editing loop (reviewable diffs, your keys, your compute); it is neutral about everything else.
+
 ## 1. The Core Thesis
 
 **Professional software development should not be gated by local hardware, installation hurdles, or device form factors.**

@@ -2,7 +2,7 @@
 // Vite builds the IDE to dist/index.html. This moves it to dist/app/index.html
 // and copies the static landing page to dist/ root.
 // Run via: npm run build:vercel
-import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, renameSync, rmSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,7 +29,10 @@ if (existsSync(appHtml)) rmSync(appHtml);
 renameSync(ideHtml, appHtml);
 
 // 2. Copy landing static files to dist root (relative hrefs keep working).
-cpSync(path.join(landing, 'index.html'), path.join(dist, 'index.html'));
+//    Every top-level landing .html lands on its own clean route (/docs, …).
+for (const f of readdirSync(landing)) {
+  if (f.endsWith('.html')) cpSync(path.join(landing, f), path.join(dist, f));
+}
 for (const f of ['styles.css', 'script.js']) {
   const src = path.join(landing, f);
   if (existsSync(src)) cpSync(src, path.join(dist, f));

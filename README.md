@@ -1,7 +1,12 @@
-# Zut — desktop-class coding in the browser. Nothing to install.
+# Zut — the professional web IDE. Anything, any language, no install.
 
-> Read `VISION.md` for the full product story: who this is for, the wall
-> Cursor/Lovable/Bolt run into, and how the classroom plan validates it.
+> **The web-IDE for the professional workflow: you bring Claude, OpenAI or
+> Gemini and your CLI plans — and you decide where compute lives. Bring your own
+> compute, or we give you ours. Either way, the workload is offloaded from your
+> local setup.**
+>
+> Read `VISION.md` for the full product story and `landing/docs.html` (/docs)
+> for the public docs page.
 
 A browser IDE (resizable 3-pane shell: sidebar, agent composer,
 diff / editor / preview / checks). The agent writes the files, the IDE shows
