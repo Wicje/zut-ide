@@ -609,3 +609,10 @@ code {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M12 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm-8 18c0-4.4 3.6-8 8-8s8 3.6 8 8Z'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-size: contain; opacity: 0.12; pointer-events: none;
 }
+
+/* nav polish: brand presence, tighter links */
+.brand-mark { width: 1.55rem; height: 1.55rem; flex-shrink: 0; }
+.brand-word { font-size: 1.02rem; letter-spacing: -0.015em; font-weight: 750; }
+.nav-links { gap: 1.1rem; }
+.nav-links a { font-size: 0.86rem; }
+.nav-cta { gap: 0.55rem; }
